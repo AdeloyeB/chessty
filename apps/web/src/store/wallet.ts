@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { USE_MOCK_DATA } from '@/lib/mock/mockData'
 
 export type BalanceChangeType =
   | 'game_win'
@@ -122,15 +123,15 @@ const DEV_BALANCE_HISTORY: BalanceChange[] = [
 ]
 
 export const useWalletStore = create<WalletState>((set, get) => ({
-  // Initial state
-  isConnected: false,
-  address: null,
-  chainId: null,
-  usdcBalance: '0',
+  // Initial state - auto-enable dev mode when USE_MOCK_DATA is true
+  isConnected: USE_MOCK_DATA,
+  address: USE_MOCK_DATA ? '0x742d35Cc6634C0532925a3b844Bc9e7595f2bD2e' : null,
+  chainId: USE_MOCK_DATA ? 8453 : null, // Base chain
+  usdcBalance: USE_MOCK_DATA ? '1250.00' : '0',
   isLoadingBalance: false,
   isWalletModalOpen: false,
-  balanceHistory: [],
-  isDevMode: false,
+  balanceHistory: USE_MOCK_DATA ? DEV_BALANCE_HISTORY : [],
+  isDevMode: USE_MOCK_DATA,
 
   // Actions
   setConnected: (address, chainId) =>

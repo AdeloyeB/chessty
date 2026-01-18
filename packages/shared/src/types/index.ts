@@ -154,6 +154,16 @@ export const WSMessageTypeSchema = z.enum([
   'spectate:join',
   'spectate:leave',
   'bet:place',
+  // Challenge messages (Client -> Server)
+  'challenge:create',
+  'challenge:cancel',
+  'challenge:accept',
+  'challenge:confirm',
+  'challenge:decline',
+  // Spectator chat/predictions (Client -> Server)
+  'spectator:chat_send',
+  'spectator:prediction_create',
+  'spectator:prediction_accept',
   // Server -> Client
   'game:started',
   'game:move_made',
@@ -170,6 +180,20 @@ export const WSMessageTypeSchema = z.enum([
   'odds:updated',
   'bet:placed',
   'bet:settled',
+  // Challenge messages (Server -> Client)
+  'challenge:created',
+  'challenge:list_update',
+  'challenge:accepted',
+  'challenge:confirmed',
+  'challenge:expired',
+  'challenge:cancelled',
+  'challenge:declined',
+  // Spectator chat/predictions (Server -> Client)
+  'spectator:chat_message',
+  'spectator:prediction_created',
+  'spectator:prediction_matched',
+  'spectator:prediction_settled',
+  'spectator:predictions_list',
   'error',
   'ping',
   'pong',
@@ -253,17 +277,120 @@ export interface ErrorPayload {
   message: string;
 }
 
+// Challenge payload types
+export interface ChallengeCreatePayload {
+  gameMode: GameMode;
+  timeControlKey: string;
+  stakeAmount: number;
+  minElo?: number;
+  maxElo?: number;
+}
+
+export interface ChallengeCancelPayload {
+  challengeId: string;
+}
+
+export interface ChallengeAcceptPayload {
+  challengeId: string;
+}
+
+export interface ChallengeConfirmPayload {
+  challengeId: string;
+}
+
+export interface ChallengeDeclinePayload {
+  challengeId: string;
+}
+
+export interface ChallengeCreatedPayload {
+  challenge: ChallengeWithCreator;
+}
+
+export interface ChallengeListUpdatePayload {
+  challenges: ChallengeWithCreator[];
+}
+
+export interface ChallengeAcceptedPayload {
+  challenge: ChallengeWithCreator;
+  acceptedBy: PublicUser;
+}
+
+export interface ChallengeConfirmedPayload {
+  challenge: ChallengeWithCreator;
+  game: Game;
+  whitePlayer: PublicUser;
+  blackPlayer: PublicUser;
+}
+
+export interface ChallengeExpiredPayload {
+  challengeId: string;
+}
+
+export interface ChallengeCancelledPayload {
+  challengeId: string;
+}
+
+export interface ChallengeDeclinedPayload {
+  challengeId: string;
+}
+
+// Spectator chat payload types
+export interface SpectatorChatSendPayload {
+  gameId: string;
+  message: string;
+}
+
+export interface SpectatorChatMessagePayload {
+  message: SpectatorChatMessage;
+}
+
+// Spectator prediction payload types
+export interface SpectatorPredictionCreatePayload {
+  gameId: string;
+  predictedWinnerId: string;
+  amount: number;
+}
+
+export interface SpectatorPredictionAcceptPayload {
+  predictionId: string;
+}
+
+export interface SpectatorPredictionCreatedPayload {
+  prediction: SpectatorPredictionWithUsers;
+}
+
+export interface SpectatorPredictionMatchedPayload {
+  prediction: SpectatorPredictionWithUsers;
+}
+
+export interface SpectatorPredictionSettledPayload {
+  prediction: SpectatorPredictionWithUsers;
+  winnerId: string | null;
+}
+
+export interface SpectatorPredictionsListPayload {
+  predictions: SpectatorPredictionWithUsers[];
+}
+
 // Auth types
+export const PasswordSchema = z
+  .string()
+  .min(12, 'Password must be at least 12 characters')
+  .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
+  .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
+  .regex(/[0-9]/, 'Password must contain at least one number')
+  .regex(/[^A-Za-z0-9]/, 'Password must contain at least one special character');
+
 export const LoginSchema = z.object({
   email: z.string().email(),
-  password: z.string().min(8),
+  password: z.string().min(1), // Don't enforce complexity on login, just ensure non-empty
 });
 export type LoginInput = z.infer<typeof LoginSchema>;
 
 export const RegisterSchema = z.object({
   email: z.string().email(),
-  username: z.string().min(3).max(20),
-  password: z.string().min(8),
+  username: z.string().min(3).max(20).regex(/^[a-zA-Z0-9_-]+$/, 'Username can only contain letters, numbers, underscores, and hyphens'),
+  password: PasswordSchema,
 });
 export type RegisterInput = z.infer<typeof RegisterSchema>;
 
@@ -290,3 +417,88 @@ export interface LeaderboardEntry {
 }
 
 export type LeaderboardType = 'elo' | 'winnings';
+
+// Game Mode
+export const GameModeSchema = z.enum(['standard', 'chess960']);
+export type GameMode = z.infer<typeof GameModeSchema>;
+
+// Challenge types
+export const ChallengeStatusSchema = z.enum(['open', 'accepted', 'confirmed', 'cancelled', 'expired']);
+export type ChallengeStatus = z.infer<typeof ChallengeStatusSchema>;
+
+export const ChallengeSchema = z.object({
+  id: z.string(),
+  creatorId: z.string(),
+  gameMode: GameModeSchema,
+  timeControlKey: z.string(),
+  timeControl: TimeControlSchema,
+  stakeAmount: z.number(),
+  minElo: z.number().nullable(),
+  maxElo: z.number().nullable(),
+  status: ChallengeStatusSchema,
+  acceptedById: z.string().nullable(),
+  createdAt: z.date(),
+  expiresAt: z.date(),
+});
+export type Challenge = z.infer<typeof ChallengeSchema>;
+
+// Challenge with creator info for display
+export interface ChallengeWithCreator extends Challenge {
+  creator: PublicUser;
+  acceptedBy?: PublicUser;
+}
+
+// Spectator Prediction (P2P)
+export const SpectatorPredictionStatusSchema = z.enum(['open', 'matched', 'settled', 'cancelled']);
+export type SpectatorPredictionStatus = z.infer<typeof SpectatorPredictionStatusSchema>;
+
+export const SpectatorPredictionSchema = z.object({
+  id: z.string(),
+  gameId: z.string(),
+  creatorId: z.string(),
+  acceptorId: z.string().nullable(),
+  predictedWinnerId: z.string(),
+  amount: z.number().positive(),
+  status: SpectatorPredictionStatusSchema,
+  createdAt: z.date(),
+  settledAt: z.date().nullable(),
+});
+export type SpectatorPrediction = z.infer<typeof SpectatorPredictionSchema>;
+
+// Spectator Prediction with user info for display
+export interface SpectatorPredictionWithUsers extends SpectatorPrediction {
+  creator: PublicUser;
+  acceptor?: PublicUser;
+  predictedWinner: PublicUser;
+}
+
+// Spectator Chat
+export const SpectatorChatMessageSchema = z.object({
+  id: z.string(),
+  gameId: z.string(),
+  userId: z.string(),
+  username: z.string(),
+  message: z.string().max(500),
+  createdAt: z.date(),
+});
+export type SpectatorChatMessage = z.infer<typeof SpectatorChatMessageSchema>;
+
+// Profile types
+export interface UserProfileData {
+  isPublic: boolean;
+  currentStreak: number;
+  longestStreak: number;
+  totalCheckmates: number;
+  quickestWin: number | null;
+  biggestStakeWin: number;
+}
+
+export interface AchievementProgress {
+  id: string;
+  unlocked: boolean;
+  unlockedAt?: Date;
+  progress: number;
+}
+
+// Re-export history types
+export * from './history';

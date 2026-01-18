@@ -9,6 +9,10 @@ import {
   handleGetGame,
   handleGetUserGameHistory,
   handleGetUserActiveGame,
+  handleGetUserGameHistoryFiltered,
+  handleGetUserHistoryStats,
+  handleGetUserTransactionsFiltered,
+  handleGetUserFinancialSummary,
 } from './routes/games';
 import {
   handleJoinQueue,
@@ -34,6 +38,12 @@ import {
   handleGetUserStats,
 } from './routes/users';
 import {
+  handleGetProfile,
+  handleUpdateProfile,
+  handleGetAchievements,
+  handleGetPublicProfile,
+} from './routes/profile';
+import {
   handleWebSocketUpgrade,
   handleWebSocketOpen,
   handleWebSocketClose,
@@ -43,6 +53,20 @@ import type { WebSocketData } from './websocket/GameManager';
 
 const PORT = parseInt(process.env.PORT || '3001');
 const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:3000';
+
+// Validate nanoid format (21 chars, URL-safe alphabet)
+const NANOID_REGEX = /^[a-zA-Z0-9_-]{21}$/;
+
+function isValidId(id: string | undefined): id is string {
+  return typeof id === 'string' && NANOID_REGEX.test(id);
+}
+
+function invalidIdResponse(): Response {
+  return Response.json(
+    { success: false, error: { code: 'INVALID_ID', message: 'Invalid ID format' } },
+    { status: 400 }
+  );
+}
 
 function corsHeaders(): HeadersInit {
   return {
@@ -106,11 +130,23 @@ const server = Bun.serve<WebSocketData>({
         response = await handleGetActiveGames(req);
       } else if (path === '/api/games/history' && method === 'GET') {
         response = await handleGetUserGameHistory(req);
+      } else if (path === '/api/games/history/filtered' && method === 'GET') {
+        response = await handleGetUserGameHistoryFiltered(req);
+      } else if (path === '/api/games/history/stats' && method === 'GET') {
+        response = await handleGetUserHistoryStats(req);
+      } else if (path === '/api/games/history/transactions' && method === 'GET') {
+        response = await handleGetUserTransactionsFiltered(req);
+      } else if (path === '/api/games/history/financial' && method === 'GET') {
+        response = await handleGetUserFinancialSummary(req);
       } else if (path === '/api/games/current' && method === 'GET') {
         response = await handleGetUserActiveGame(req);
       } else if (path.startsWith('/api/games/') && method === 'GET') {
         const gameId = path.split('/')[3];
-        response = await handleGetGame(req, gameId);
+        if (!isValidId(gameId)) {
+          response = invalidIdResponse();
+        } else {
+          response = await handleGetGame(req, gameId);
+        }
       }
       // Matchmaking routes
       else if (path === '/api/matchmaking/join' && method === 'POST') {
@@ -129,7 +165,11 @@ const server = Bun.serve<WebSocketData>({
         response = await handleGetBetStats(req);
       } else if (path.startsWith('/api/betting/odds/') && method === 'GET') {
         const gameId = path.split('/')[4];
-        response = await handleGetGameOdds(req, gameId);
+        if (!isValidId(gameId)) {
+          response = invalidIdResponse();
+        } else {
+          response = await handleGetGameOdds(req, gameId);
+        }
       }
       // Wallet routes
       else if (path === '/api/wallet/balance' && method === 'GET') {
@@ -143,13 +183,36 @@ const server = Bun.serve<WebSocketData>({
       } else if (path === '/api/leaderboard/winnings' && method === 'GET') {
         response = await handleGetWinningsLeaderboard(req);
       }
+      // Profile routes
+      else if (path === '/api/profile' && method === 'GET') {
+        response = await handleGetProfile(req);
+      } else if (path === '/api/profile' && method === 'PUT') {
+        response = await handleUpdateProfile(req);
+      } else if (path === '/api/profile/achievements' && method === 'GET') {
+        response = await handleGetAchievements(req);
+      } else if (path.match(/^\/api\/profile\/[^/]+$/) && method === 'GET') {
+        const userId = path.split('/')[3];
+        if (!isValidId(userId)) {
+          response = invalidIdResponse();
+        } else {
+          response = await handleGetPublicProfile(req, userId);
+        }
+      }
       // User routes
       else if (path.match(/^\/api\/users\/[^/]+\/stats$/) && method === 'GET') {
         const userId = path.split('/')[3];
-        response = await handleGetUserStats(req, userId);
+        if (!isValidId(userId)) {
+          response = invalidIdResponse();
+        } else {
+          response = await handleGetUserStats(req, userId);
+        }
       } else if (path.startsWith('/api/users/') && method === 'GET') {
         const userId = path.split('/')[3];
-        response = await handleGetUser(req, userId);
+        if (!isValidId(userId)) {
+          response = invalidIdResponse();
+        } else {
+          response = await handleGetUser(req, userId);
+        }
       }
       // Health check
       else if (path === '/health' && method === 'GET') {

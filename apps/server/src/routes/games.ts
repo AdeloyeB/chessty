@@ -1,7 +1,14 @@
-import type { ApiResponse } from '@chess-game/shared';
+import type { ApiResponse, HistoryFilters, DateRange } from '@chess-game/shared';
 import * as gameService from '../services/game';
 import * as authService from '../services/auth';
 import { authenticateRequest } from './auth';
+
+// Helper to parse date from query string
+function parseDate(value: string | null): Date | null {
+  if (!value) return null;
+  const date = new Date(value);
+  return isNaN(date.getTime()) ? null : date;
+}
 
 export async function handleGetActiveGames(req: Request): Promise<Response> {
   try {
@@ -192,6 +199,189 @@ export async function handleGetUserActiveGame(req: Request): Promise<Response> {
       {
         success: false,
         error: { code: 'SERVER_ERROR', message: 'Failed to get active game' },
+      } satisfies ApiResponse<never>,
+      { status: 500 }
+    );
+  }
+}
+
+// Enhanced history with filters
+export async function handleGetUserGameHistoryFiltered(req: Request): Promise<Response> {
+  try {
+    const auth = await authenticateRequest(req);
+    if (!auth) {
+      return Response.json(
+        {
+          success: false,
+          error: { code: 'UNAUTHORIZED', message: 'Authentication required' },
+        } satisfies ApiResponse<never>,
+        { status: 401 }
+      );
+    }
+
+    const url = new URL(req.url);
+    const limit = parseInt(url.searchParams.get('limit') || '20');
+    const offset = parseInt(url.searchParams.get('offset') || '0');
+
+    // Parse filters from query params
+    const filters: HistoryFilters = {
+      dateRange: {
+        start: parseDate(url.searchParams.get('startDate')),
+        end: parseDate(url.searchParams.get('endDate')),
+      },
+      result: (url.searchParams.get('result') as 'all' | 'win' | 'loss' | 'draw') || 'all',
+      timeControl: (url.searchParams.get('timeControl') as 'all' | 'bullet' | 'blitz' | 'rapid' | 'classical') || 'all',
+      gameMode: (url.searchParams.get('gameMode') as 'all' | 'standard' | 'chess960') || 'all',
+      minStake: url.searchParams.get('minStake') ? parseFloat(url.searchParams.get('minStake')!) : undefined,
+      maxStake: url.searchParams.get('maxStake') ? parseFloat(url.searchParams.get('maxStake')!) : undefined,
+    };
+
+    const { games, total } = await gameService.getUserGameHistoryFiltered(
+      auth.userId,
+      filters,
+      limit,
+      offset
+    );
+
+    return Response.json({
+      success: true,
+      data: {
+        data: games,
+        total,
+        hasMore: offset + games.length < total,
+      },
+    } satisfies ApiResponse<unknown>);
+  } catch (error) {
+    console.error('Failed to get filtered game history:', error);
+    return Response.json(
+      {
+        success: false,
+        error: { code: 'SERVER_ERROR', message: 'Failed to get game history' },
+      } satisfies ApiResponse<never>,
+      { status: 500 }
+    );
+  }
+}
+
+// History stats
+export async function handleGetUserHistoryStats(req: Request): Promise<Response> {
+  try {
+    const auth = await authenticateRequest(req);
+    if (!auth) {
+      return Response.json(
+        {
+          success: false,
+          error: { code: 'UNAUTHORIZED', message: 'Authentication required' },
+        } satisfies ApiResponse<never>,
+        { status: 401 }
+      );
+    }
+
+    const url = new URL(req.url);
+    const dateRange: DateRange = {
+      start: parseDate(url.searchParams.get('startDate')),
+      end: parseDate(url.searchParams.get('endDate')),
+    };
+
+    const stats = await gameService.getUserHistoryStats(auth.userId, dateRange);
+
+    return Response.json({
+      success: true,
+      data: stats,
+    } satisfies ApiResponse<unknown>);
+  } catch (error) {
+    console.error('Failed to get history stats:', error);
+    return Response.json(
+      {
+        success: false,
+        error: { code: 'SERVER_ERROR', message: 'Failed to get history stats' },
+      } satisfies ApiResponse<never>,
+      { status: 500 }
+    );
+  }
+}
+
+// Transactions with filters
+export async function handleGetUserTransactionsFiltered(req: Request): Promise<Response> {
+  try {
+    const auth = await authenticateRequest(req);
+    if (!auth) {
+      return Response.json(
+        {
+          success: false,
+          error: { code: 'UNAUTHORIZED', message: 'Authentication required' },
+        } satisfies ApiResponse<never>,
+        { status: 401 }
+      );
+    }
+
+    const url = new URL(req.url);
+    const limit = parseInt(url.searchParams.get('limit') || '50');
+    const offset = parseInt(url.searchParams.get('offset') || '0');
+    const dateRange: DateRange = {
+      start: parseDate(url.searchParams.get('startDate')),
+      end: parseDate(url.searchParams.get('endDate')),
+    };
+
+    const { transactions, total } = await gameService.getUserTransactionsFiltered(
+      auth.userId,
+      dateRange,
+      limit,
+      offset
+    );
+
+    return Response.json({
+      success: true,
+      data: {
+        data: transactions,
+        total,
+        hasMore: offset + transactions.length < total,
+      },
+    } satisfies ApiResponse<unknown>);
+  } catch (error) {
+    console.error('Failed to get filtered transactions:', error);
+    return Response.json(
+      {
+        success: false,
+        error: { code: 'SERVER_ERROR', message: 'Failed to get transactions' },
+      } satisfies ApiResponse<never>,
+      { status: 500 }
+    );
+  }
+}
+
+// Financial summary
+export async function handleGetUserFinancialSummary(req: Request): Promise<Response> {
+  try {
+    const auth = await authenticateRequest(req);
+    if (!auth) {
+      return Response.json(
+        {
+          success: false,
+          error: { code: 'UNAUTHORIZED', message: 'Authentication required' },
+        } satisfies ApiResponse<never>,
+        { status: 401 }
+      );
+    }
+
+    const url = new URL(req.url);
+    const dateRange: DateRange = {
+      start: parseDate(url.searchParams.get('startDate')),
+      end: parseDate(url.searchParams.get('endDate')),
+    };
+
+    const summary = await gameService.getUserFinancialSummary(auth.userId, dateRange);
+
+    return Response.json({
+      success: true,
+      data: summary,
+    } satisfies ApiResponse<unknown>);
+  } catch (error) {
+    console.error('Failed to get financial summary:', error);
+    return Response.json(
+      {
+        success: false,
+        error: { code: 'SERVER_ERROR', message: 'Failed to get financial summary' },
       } satisfies ApiResponse<never>,
       { status: 500 }
     );

@@ -1,12 +1,13 @@
 import { z } from 'zod';
 import type { ApiResponse } from '@chess-game/shared';
+import { MIN_BET, MAX_BET } from '@chess-game/shared';
 import * as bettingService from '../services/betting';
 import { authenticateRequest } from './auth';
 
 const PlaceBetSchema = z.object({
-  gameId: z.string(),
-  betOnPlayerId: z.string(),
-  amount: z.number().positive(),
+  gameId: z.string().min(1),
+  betOnPlayerId: z.string().min(1),
+  amount: z.number().positive().min(MIN_BET).max(MAX_BET),
 });
 
 export async function handlePlaceBet(req: Request): Promise<Response> {

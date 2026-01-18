@@ -1,6 +1,14 @@
 'use client';
 
 import { useAuthStore } from '@/store/auth';
+import type { HistoryFilters, HistoryGame, HistoryStats, HistoryTransaction, FinancialSummary, DateRange, PaginatedResponse } from '@chess-game/shared';
+import {
+  USE_MOCK_DATA,
+  mockDelay,
+  generateMockEloLeaderboard,
+  generateMockWinningsLeaderboard,
+  generateMockActiveGames,
+} from '@/lib/mock/mockData';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -79,6 +87,10 @@ export function useApi() {
 
   // Game methods
   async function getActiveGames() {
+    if (USE_MOCK_DATA) {
+      await mockDelay();
+      return generateMockActiveGames(8);
+    }
     return fetchApi<any[]>('/api/games/active');
   }
 
@@ -141,10 +153,18 @@ export function useApi() {
 
   // Leaderboard methods
   async function getEloLeaderboard(limit = 50) {
+    if (USE_MOCK_DATA) {
+      await mockDelay();
+      return generateMockEloLeaderboard(limit);
+    }
     return fetchApi<any[]>(`/api/leaderboard/elo?limit=${limit}`);
   }
 
   async function getWinningsLeaderboard(limit = 50) {
+    if (USE_MOCK_DATA) {
+      await mockDelay();
+      return generateMockWinningsLeaderboard(limit);
+    }
     return fetchApi<any[]>(`/api/leaderboard/winnings?limit=${limit}`);
   }
 
@@ -155,6 +175,78 @@ export function useApi() {
 
   async function getUserStats(userId: string) {
     return fetchApi<any>(`/api/users/${userId}/stats`);
+  }
+
+  // History methods
+  async function getGameHistoryFiltered(filters: HistoryFilters, limit = 20, offset = 0) {
+    const params = new URLSearchParams();
+    params.set('limit', String(limit));
+    params.set('offset', String(offset));
+
+    if (filters.dateRange.start) {
+      params.set('startDate', filters.dateRange.start.toISOString());
+    }
+    if (filters.dateRange.end) {
+      params.set('endDate', filters.dateRange.end.toISOString());
+    }
+    if (filters.result !== 'all') {
+      params.set('result', filters.result);
+    }
+    if (filters.timeControl !== 'all') {
+      params.set('timeControl', filters.timeControl);
+    }
+    if (filters.gameMode !== 'all') {
+      params.set('gameMode', filters.gameMode);
+    }
+    if (filters.minStake !== undefined) {
+      params.set('minStake', String(filters.minStake));
+    }
+    if (filters.maxStake !== undefined) {
+      params.set('maxStake', String(filters.maxStake));
+    }
+
+    return fetchApi<PaginatedResponse<HistoryGame>>(`/api/games/history/filtered?${params.toString()}`);
+  }
+
+  async function getHistoryStats(dateRange?: DateRange) {
+    const params = new URLSearchParams();
+    if (dateRange?.start) {
+      params.set('startDate', dateRange.start.toISOString());
+    }
+    if (dateRange?.end) {
+      params.set('endDate', dateRange.end.toISOString());
+    }
+
+    const query = params.toString();
+    return fetchApi<HistoryStats>(`/api/games/history/stats${query ? '?' + query : ''}`);
+  }
+
+  async function getTransactionsFiltered(dateRange?: DateRange, limit = 50, offset = 0) {
+    const params = new URLSearchParams();
+    params.set('limit', String(limit));
+    params.set('offset', String(offset));
+
+    if (dateRange?.start) {
+      params.set('startDate', dateRange.start.toISOString());
+    }
+    if (dateRange?.end) {
+      params.set('endDate', dateRange.end.toISOString());
+    }
+
+    return fetchApi<PaginatedResponse<HistoryTransaction>>(`/api/games/history/transactions?${params.toString()}`);
+  }
+
+  async function getFinancialSummary(dateRange?: DateRange) {
+    const params = new URLSearchParams();
+    if (dateRange?.start) {
+      params.set('startDate', dateRange.start.toISOString());
+    }
+    if (dateRange?.end) {
+      params.set('endDate', dateRange.end.toISOString());
+    }
+
+    const query = params.toString();
+    return fetchApi<FinancialSummary>(`/api/games/history/financial${query ? '?' + query : ''}`);
   }
 
   return {
@@ -186,5 +278,10 @@ export function useApi() {
     // Users
     getUser,
     getUserStats,
+    // History
+    getGameHistoryFiltered,
+    getHistoryStats,
+    getTransactionsFiltered,
+    getFinancialSummary,
   };
 }

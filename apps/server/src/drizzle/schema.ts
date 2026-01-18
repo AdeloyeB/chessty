@@ -24,6 +24,10 @@ export const transactionTypeEnum = pgEnum('transaction_type', [
   'game_win',
   'bonus',
 ]);
+export const gameModeEnum = pgEnum('game_mode', ['standard', 'chess960']);
+export const challengeStatusEnum = pgEnum('challenge_status', ['open', 'accepted', 'confirmed', 'cancelled', 'expired']);
+export const spectatorPredictionStatusEnum = pgEnum('spectator_prediction_status', ['open', 'matched', 'settled', 'cancelled']);
+export const achievementCategoryEnum = pgEnum('achievement_category', ['games', 'elo', 'streaks', 'special_moves', 'milestones']);
 
 // Users table
 export const users = pgTable(
@@ -68,6 +72,8 @@ export const games = pgTable(
     winnerId: text('winner_id').references(() => users.id),
     status: gameStatusEnum('status').notNull().default('pending'),
     result: gameResultEnum('result'),
+    gameMode: gameModeEnum('game_mode').notNull().default('standard'),
+    startingFen: text('starting_fen').notNull().default('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'),
     currentFen: text('current_fen').notNull().default('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'),
     pgn: text('pgn').notNull().default(''),
     moves: jsonb('moves').notNull().default([]),
@@ -183,8 +189,120 @@ export const sessions = pgTable(
   })
 );
 
+// Challenges table for marketplace
+export const challenges = pgTable(
+  'challenges',
+  {
+    id: text('id').primaryKey(),
+    creatorId: text('creator_id')
+      .notNull()
+      .references(() => users.id),
+    gameMode: gameModeEnum('game_mode').notNull().default('standard'),
+    timeControlKey: text('time_control_key').notNull(),
+    timeControlInitial: integer('time_control_initial').notNull(),
+    timeControlIncrement: integer('time_control_increment').notNull().default(0),
+    stakeAmount: decimal('stake_amount', { precision: 12, scale: 2 }).notNull(),
+    minElo: integer('min_elo'),
+    maxElo: integer('max_elo'),
+    status: challengeStatusEnum('status').notNull().default('open'),
+    acceptedById: text('accepted_by_id').references(() => users.id),
+    creatorConfirmed: integer('creator_confirmed').notNull().default(0),
+    acceptorConfirmed: integer('acceptor_confirmed').notNull().default(0),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    expiresAt: timestamp('expires_at').notNull(),
+  },
+  (table) => ({
+    creatorIdx: index('challenges_creator_idx').on(table.creatorId),
+    statusIdx: index('challenges_status_idx').on(table.status),
+    expiresAtIdx: index('challenges_expires_at_idx').on(table.expiresAt),
+  })
+);
+
+// Spectator predictions table (P2P betting between spectators)
+export const spectatorPredictions = pgTable(
+  'spectator_predictions',
+  {
+    id: text('id').primaryKey(),
+    gameId: text('game_id')
+      .notNull()
+      .references(() => games.id),
+    creatorId: text('creator_id')
+      .notNull()
+      .references(() => users.id),
+    acceptorId: text('acceptor_id').references(() => users.id),
+    predictedWinnerId: text('predicted_winner_id')
+      .notNull()
+      .references(() => users.id),
+    amount: decimal('amount', { precision: 12, scale: 2 }).notNull(),
+    status: spectatorPredictionStatusEnum('status').notNull().default('open'),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    settledAt: timestamp('settled_at'),
+  },
+  (table) => ({
+    gameIdx: index('spectator_predictions_game_idx').on(table.gameId),
+    creatorIdx: index('spectator_predictions_creator_idx').on(table.creatorId),
+    statusIdx: index('spectator_predictions_status_idx').on(table.status),
+  })
+);
+
+// User achievements table
+export const userAchievements = pgTable(
+  'user_achievements',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id),
+    achievementId: text('achievement_id').notNull(),
+    category: achievementCategoryEnum('category').notNull(),
+    unlockedAt: timestamp('unlocked_at').notNull().defaultNow(),
+  },
+  (table) => ({
+    userIdx: index('user_achievements_user_idx').on(table.userId),
+    achievementIdx: index('user_achievements_achievement_idx').on(table.achievementId),
+    userAchievementUnique: uniqueIndex('user_achievements_unique').on(table.userId, table.achievementId),
+  })
+);
+
+// User profiles table (extended profile settings)
+export const userProfiles = pgTable(
+  'user_profiles',
+  {
+    userId: text('user_id')
+      .primaryKey()
+      .references(() => users.id),
+    isPublic: integer('is_public').notNull().default(1), // 1 = public, 0 = private
+    currentStreak: integer('current_streak').notNull().default(0),
+    longestStreak: integer('longest_streak').notNull().default(0),
+    totalCheckmates: integer('total_checkmates').notNull().default(0),
+    quickestWin: integer('quickest_win'), // moves to win
+    biggestStakeWin: decimal('biggest_stake_win', { precision: 12, scale: 2 }).default('0'),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  }
+);
+
+// Spectator chat table
+export const spectatorChat = pgTable(
+  'spectator_chat',
+  {
+    id: text('id').primaryKey(),
+    gameId: text('game_id')
+      .notNull()
+      .references(() => games.id),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id),
+    message: text('message').notNull(),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  (table) => ({
+    gameIdx: index('spectator_chat_game_idx').on(table.gameId),
+    createdAtIdx: index('spectator_chat_created_at_idx').on(table.createdAt),
+  })
+);
+
 // Relations
-export const usersRelations = relations(users, ({ many }) => ({
+export const usersRelations = relations(users, ({ one, many }) => ({
   whiteGames: many(games, { relationName: 'whitePlayer' }),
   blackGames: many(games, { relationName: 'blackPlayer' }),
   wonGames: many(games, { relationName: 'winner' }),
@@ -192,6 +310,16 @@ export const usersRelations = relations(users, ({ many }) => ({
   betsOn: many(bets, { relationName: 'betOn' }),
   transactions: many(transactions),
   sessions: many(sessions),
+  createdChallenges: many(challenges, { relationName: 'creator' }),
+  acceptedChallenges: many(challenges, { relationName: 'acceptor' }),
+  spectatorPredictionsCreated: many(spectatorPredictions, { relationName: 'predictionCreator' }),
+  spectatorPredictionsAccepted: many(spectatorPredictions, { relationName: 'predictionAcceptor' }),
+  spectatorChatMessages: many(spectatorChat),
+  achievements: many(userAchievements),
+  profile: one(userProfiles, {
+    fields: [users.id],
+    references: [userProfiles.userId],
+  }),
 }));
 
 export const gamesRelations = relations(games, ({ one, many }) => ({
@@ -211,6 +339,8 @@ export const gamesRelations = relations(games, ({ one, many }) => ({
     relationName: 'winner',
   }),
   bets: many(bets),
+  spectatorPredictions: many(spectatorPredictions),
+  spectatorChatMessages: many(spectatorChat),
 }));
 
 export const betsRelations = relations(bets, ({ one }) => ({
@@ -244,6 +374,65 @@ export const sessionsRelations = relations(sessions, ({ one }) => ({
   }),
 }));
 
+export const challengesRelations = relations(challenges, ({ one }) => ({
+  creator: one(users, {
+    fields: [challenges.creatorId],
+    references: [users.id],
+    relationName: 'creator',
+  }),
+  acceptedBy: one(users, {
+    fields: [challenges.acceptedById],
+    references: [users.id],
+    relationName: 'acceptor',
+  }),
+}));
+
+export const spectatorPredictionsRelations = relations(spectatorPredictions, ({ one }) => ({
+  game: one(games, {
+    fields: [spectatorPredictions.gameId],
+    references: [games.id],
+  }),
+  creator: one(users, {
+    fields: [spectatorPredictions.creatorId],
+    references: [users.id],
+    relationName: 'predictionCreator',
+  }),
+  acceptor: one(users, {
+    fields: [spectatorPredictions.acceptorId],
+    references: [users.id],
+    relationName: 'predictionAcceptor',
+  }),
+  predictedWinner: one(users, {
+    fields: [spectatorPredictions.predictedWinnerId],
+    references: [users.id],
+  }),
+}));
+
+export const spectatorChatRelations = relations(spectatorChat, ({ one }) => ({
+  game: one(games, {
+    fields: [spectatorChat.gameId],
+    references: [games.id],
+  }),
+  user: one(users, {
+    fields: [spectatorChat.userId],
+    references: [users.id],
+  }),
+}));
+
+export const userAchievementsRelations = relations(userAchievements, ({ one }) => ({
+  user: one(users, {
+    fields: [userAchievements.userId],
+    references: [users.id],
+  }),
+}));
+
+export const userProfilesRelations = relations(userProfiles, ({ one }) => ({
+  user: one(users, {
+    fields: [userProfiles.userId],
+    references: [users.id],
+  }),
+}));
+
 // Type exports
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
@@ -257,3 +446,13 @@ export type MatchmakingEntry = typeof matchmakingQueue.$inferSelect;
 export type NewMatchmakingEntry = typeof matchmakingQueue.$inferInsert;
 export type Session = typeof sessions.$inferSelect;
 export type NewSession = typeof sessions.$inferInsert;
+export type Challenge = typeof challenges.$inferSelect;
+export type NewChallenge = typeof challenges.$inferInsert;
+export type SpectatorPrediction = typeof spectatorPredictions.$inferSelect;
+export type NewSpectatorPrediction = typeof spectatorPredictions.$inferInsert;
+export type SpectatorChatMessage = typeof spectatorChat.$inferSelect;
+export type NewSpectatorChatMessage = typeof spectatorChat.$inferInsert;
+export type UserAchievement = typeof userAchievements.$inferSelect;
+export type NewUserAchievement = typeof userAchievements.$inferInsert;
+export type UserProfile = typeof userProfiles.$inferSelect;
+export type NewUserProfile = typeof userProfiles.$inferInsert;

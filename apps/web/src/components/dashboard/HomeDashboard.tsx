@@ -1,23 +1,29 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import Link from 'next/link';
 import { useAuthStore } from '@/store/auth';
 import { useGameStore } from '@/store/game';
 import { useApi } from '@/hooks/useApi';
 import { useWallet } from '@/hooks/useWallet';
-import { MatchmakingPanel } from '../matchmaking/MatchmakingPanel';
+import { ChallengeMarketplace } from '../marketplace/ChallengeMarketplace';
 import { GameBoard } from '../chess/GameBoard';
 import { LocalGame } from '../chess/LocalGame';
 import { ActiveGamesLobby } from '../spectator/ActiveGamesLobby';
 import { Leaderboard } from './Leaderboard';
-import { GameHistory } from './GameHistory';
+import { HistoryPage } from '../history/HistoryPage';
 import { USDCAmount } from '../wallet/USDCAmount';
 import { WalletButton } from '../wallet/WalletButton';
 import { BalanceDisplay } from '../wallet/BalanceDisplay';
+import { RankBadge, RankBadgeCompact } from '../profile/RankBadge';
+import { AchievementBadge } from '../profile/AchievementBadge';
+import { getRankTier, getProgressToNextRank, getNextRankTier } from '@chess-game/shared';
 
 type Tab = 'home' | 'practice' | 'play' | 'watch' | 'history' | 'leaderboard';
 
-// Random player stats for home screen
+// ============================================================================
+// MOCK DATA - See MOCK_DATA.md for all mock data locations
+// ============================================================================
 const RANDOM_PLAYERS = [
   { username: 'GrandMaster_X', elo: 2450, wins: 342, winRate: 78 },
   { username: 'KnightRider99', elo: 2280, wins: 256, winRate: 71 },
@@ -27,12 +33,25 @@ const RANDOM_PLAYERS = [
   { username: 'RookieKing', elo: 1950, wins: 112, winRate: 58 },
 ];
 
-// Featured matches for home screen
 const LIVE_MATCHES = [
   { white: 'GrandMaster_X', black: 'QueenGambit', pool: 500, viewers: 124 },
   { white: 'KnightRider99', black: 'BishopSlayer', pool: 250, viewers: 67 },
   { white: 'PawnStorm', black: 'RookieKing', pool: 100, viewers: 23 },
 ];
+
+const MOCK_PROFILE_DATA = {
+  currentStreak: 4,
+  longestStreak: 12,
+  unlockedAchievements: 20,
+  totalAchievements: 27,
+  recentAchievements: [
+    { id: 'wins_100' },
+    { id: 'elo_1800' },
+    { id: 'streak_10' },
+    { id: 'high_roller' },
+  ],
+};
+// ============================================================================
 
 function PlayerStatsCard({ player, rank }: { player: typeof RANDOM_PLAYERS[0]; rank: number }) {
   return (
@@ -91,6 +110,16 @@ function HomeContent({ onNavigate }: { onNavigate: (tab: Tab) => void }) {
     total: 3,
   });
 
+  // Memoize rank calculations
+  const { rank, nextRank, progress } = useMemo(() => {
+    const elo = user?.eloRating ?? 1200;
+    return {
+      rank: getRankTier(elo),
+      nextRank: getNextRankTier(elo),
+      progress: getProgressToNextRank(elo),
+    };
+  }, [user?.eloRating]);
+
   // Auto-init dev mode in development
   useEffect(() => {
     if (process.env.NODE_ENV === 'development' && !isDevMode && !isConnected) {
@@ -102,44 +131,110 @@ function HomeContent({ onNavigate }: { onNavigate: (tab: Tab) => void }) {
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
       {/* Left Column - Player Profile */}
       <div className="lg:col-span-3 space-y-6">
-        {/* Player Card */}
-        <div className="card">
-          <div className="flex items-center gap-4 mb-6">
-            <div className="w-16 h-16 bg-pure-white flex items-center justify-center text-pure-black text-2xl font-mono">
-              {user?.username?.[0]?.toLowerCase()}
+        {/* Unified Profile Card */}
+        <Link href="/profile" className="block">
+          <div className="bg-off-black border border-mid/30 hover:border-mid/50 transition-colors">
+            {/* Header with View Profile */}
+            <div className="p-4 border-b border-mid/30 flex items-center justify-between">
+              <p className="text-xs font-mono text-mid-light">your_profile</p>
+              <span className="text-xs font-mono text-mid-light hover:text-pure-white transition-colors">
+                view_details →
+              </span>
             </div>
-            <div>
-              <p className="text-xl font-mono text-pure-white">{user?.username}</p>
-              <p className="text-mid-light font-mono text-sm">{user?.eloRating} elo</p>
-            </div>
-          </div>
 
-          <div className="grid grid-cols-2 gap-4 mb-6">
-            <div>
-              <p className="text-xs font-mono text-mid-light mb-1">balance</p>
-              <BalanceDisplay size="lg" />
-            </div>
-            <div>
-              <p className="text-xs font-mono text-mid-light mb-1">peak_elo</p>
-              <p className="text-2xl font-mono text-pure-white">{user?.peakEloRating}</p>
-            </div>
-          </div>
+            <div className="p-4">
+              {/* Avatar + Name + ELO */}
+              <div className="flex items-center gap-4 mb-4">
+                <div className="w-14 h-14 bg-pure-white flex items-center justify-center text-pure-black text-xl font-mono flex-shrink-0">
+                  {user?.username?.[0]?.toLowerCase()}
+                </div>
+                <div className="min-w-0">
+                  <p className="text-lg font-mono text-pure-white truncate">{user?.username}</p>
+                  <p className="text-mid-light font-mono text-sm">{user?.eloRating} elo</p>
+                </div>
+              </div>
 
-          <div className="grid grid-cols-3 gap-2 pt-4 border-t border-mid/30">
-            <div className="text-center">
-              <p className="text-lg font-mono text-pure-white">{user?.gamesWon || 0}</p>
-              <p className="text-xs font-mono text-mid-light">wins</p>
-            </div>
-            <div className="text-center">
-              <p className="text-lg font-mono text-pure-white">{user?.gamesLost || 0}</p>
-              <p className="text-xs font-mono text-mid-light">losses</p>
-            </div>
-            <div className="text-center">
-              <p className="text-lg font-mono text-pure-white">{user?.gamesDraw || 0}</p>
-              <p className="text-xs font-mono text-mid-light">draws</p>
+              {/* Balance & Peak ELO Row */}
+              <div className="grid grid-cols-2 gap-3 mb-4">
+                <div className="p-3 bg-pure-black border border-mid/30">
+                  <p className="text-xs font-mono text-mid-light mb-1">balance</p>
+                  <BalanceDisplay size="md" />
+                </div>
+                <div className="p-3 bg-pure-black border border-mid/30">
+                  <p className="text-xs font-mono text-mid-light mb-1">peak_elo</p>
+                  <p className="text-lg font-mono text-pure-white">{user?.peakEloRating}</p>
+                </div>
+              </div>
+
+              {/* Win/Loss/Draw */}
+              <div className="grid grid-cols-3 gap-2 mb-4">
+                <div className="p-2 bg-pure-black border border-mid/30 text-center">
+                  <p className="text-lg font-mono text-pure-white">{user?.gamesWon || 0}</p>
+                  <p className="text-xs font-mono text-mid-light">wins</p>
+                </div>
+                <div className="p-2 bg-pure-black border border-mid/30 text-center">
+                  <p className="text-lg font-mono text-pure-white">{user?.gamesLost || 0}</p>
+                  <p className="text-xs font-mono text-mid-light">losses</p>
+                </div>
+                <div className="p-2 bg-pure-black border border-mid/30 text-center">
+                  <p className="text-lg font-mono text-pure-white">{user?.gamesDraw || 0}</p>
+                  <p className="text-xs font-mono text-mid-light">draws</p>
+                </div>
+              </div>
+
+              {/* Rank Badge */}
+              <div className="pt-4 border-t border-mid/30 mb-4">
+                <RankBadge elo={user?.eloRating ?? 1200} size="md" showLabel showElo />
+              </div>
+
+              {/* Progress to Next Rank */}
+              {nextRank && (
+                <div className="mb-4">
+                  <div className="flex justify-between text-xs font-mono text-mid-light mb-1">
+                    <span>progress to {nextRank.name}</span>
+                    <span>{progress}%</span>
+                  </div>
+                  <div className="h-1.5 bg-pure-black border border-mid/30 overflow-hidden">
+                    <div
+                      className="h-full transition-all"
+                      style={{ width: `${progress}%`, backgroundColor: rank.color }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Quick Stats */}
+              <div className="grid grid-cols-2 gap-2 mb-4">
+                <div className="p-3 bg-pure-black border border-mid/30 text-center">
+                  <span className="text-lg font-mono text-pure-white">{MOCK_PROFILE_DATA.currentStreak}</span>
+                  <span className="text-xs font-mono text-mid-light block">streak</span>
+                </div>
+                <div className="p-3 bg-pure-black border border-mid/30 text-center">
+                  <span className="text-lg font-mono text-pure-white">{MOCK_PROFILE_DATA.unlockedAchievements}</span>
+                  <span className="text-xs font-mono text-mid-light block">badges</span>
+                </div>
+              </div>
+
+              {/* Recent Achievements */}
+              {MOCK_PROFILE_DATA.recentAchievements.length > 0 && (
+                <div>
+                  <p className="text-xs font-mono text-mid-light mb-2">recent_badges</p>
+                  <div className="flex gap-2">
+                    {MOCK_PROFILE_DATA.recentAchievements.map((a) => (
+                      <AchievementBadge
+                        key={a.id}
+                        achievementId={a.id}
+                        unlocked={true}
+                        size="sm"
+                        showTooltip={false}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
-        </div>
+        </Link>
 
         {/* Daily Challenge */}
         <div className="card">
@@ -334,15 +429,15 @@ export function HomeDashboard() {
               <div className="flex items-center gap-4">
                 <WalletButton />
 
-                <div className="flex items-center gap-3">
+                <Link href="/profile" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
                   <div className="text-right hidden sm:block">
                     <p className="text-pure-white font-mono text-sm">{user.username}</p>
-                    <p className="text-mid-light font-mono text-xs">{user.eloRating} elo</p>
+                    <RankBadgeCompact elo={user.eloRating} />
                   </div>
                   <div className="w-10 h-10 bg-pure-white flex items-center justify-center text-pure-black font-mono">
                     {user.username?.[0]?.toLowerCase()}
                   </div>
-                </div>
+                </Link>
 
                 <button
                   onClick={logout}
@@ -376,14 +471,19 @@ export function HomeDashboard() {
       </nav>
 
       {/* Main Content */}
-      <main className="container mx-auto px-6 py-8">
-        {activeTab === 'home' && <HomeContent onNavigate={setActiveTab} />}
-        {activeTab === 'practice' && <LocalGame />}
-        {activeTab === 'play' && <MatchmakingPanel />}
-        {activeTab === 'watch' && <ActiveGamesLobby />}
-        {activeTab === 'history' && <GameHistory />}
-        {activeTab === 'leaderboard' && <Leaderboard />}
-      </main>
+      {activeTab === 'practice' ? (
+        <main className="h-[calc(100vh-64px)]">
+          <LocalGame />
+        </main>
+      ) : (
+        <main className="container mx-auto px-6 py-8">
+          {activeTab === 'home' && <HomeContent onNavigate={setActiveTab} />}
+          {activeTab === 'play' && <ChallengeMarketplace />}
+          {activeTab === 'watch' && <ActiveGamesLobby />}
+          {activeTab === 'history' && <HistoryPage />}
+          {activeTab === 'leaderboard' && <Leaderboard />}
+        </main>
+      )}
     </div>
   );
 }

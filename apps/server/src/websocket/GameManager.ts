@@ -12,12 +12,32 @@ import type {
   OddsUpdatePayload,
   MatchFoundPayload,
   ErrorPayload,
+  ChallengeCreatePayload,
+  ChallengeAcceptPayload,
+  ChallengeConfirmPayload,
+  ChallengeDeclinePayload,
+  ChallengeCreatedPayload,
+  ChallengeListUpdatePayload,
+  ChallengeAcceptedPayload,
+  ChallengeConfirmedPayload,
+  SpectatorChatSendPayload,
+  SpectatorChatMessagePayload,
+  SpectatorPredictionCreatePayload,
+  SpectatorPredictionAcceptPayload,
+  SpectatorPredictionCreatedPayload,
+  SpectatorPredictionMatchedPayload,
+  SpectatorPredictionsListPayload,
+  GameMode,
 } from '@chess-game/shared';
-import { CLOCK_SYNC_INTERVAL } from '@chess-game/shared';
+import { CLOCK_SYNC_INTERVAL, CHALLENGE_CONFIRM_TIMEOUT } from '@chess-game/shared';
 import * as gameService from '../services/game';
 import * as matchmakingService from '../services/matchmaking';
 import * as bettingService from '../services/betting';
 import * as authService from '../services/auth';
+import * as challengeService from '../services/challenge';
+import * as spectatorChatService from '../services/spectatorChat';
+import * as spectatorPredictionService from '../services/spectatorPrediction';
+import * as achievementService from '../services/achievements';
 
 export interface WebSocketData {
   userId: string;
@@ -405,6 +425,66 @@ class GameManager {
       this.clockIntervals.delete(gameId);
     }
 
+    // Settle spectator predictions
+    try {
+      await spectatorPredictionService.settlePredictionsForGame(gameId, winnerId);
+    } catch (error) {
+      console.error('Failed to settle spectator predictions:', error);
+    }
+
+    // Check achievements for both players
+    const isCheckmate = result === 'white_wins' || result === 'black_wins';
+    const moveCount = Array.isArray(game.moves) ? game.moves.length : 0;
+    const stakeAmount = parseFloat(game.stakeAmount);
+
+    try {
+      // Update profile stats and check game achievements for white player
+      const whiteWon = winnerId === game.whitePlayerId;
+      await achievementService.updateProfileStats(
+        game.whitePlayerId,
+        whiteWon,
+        whiteWon && isCheckmate,
+        moveCount,
+        stakeAmount
+      );
+      await achievementService.checkGameAchievements(
+        game.whitePlayerId,
+        whiteWon,
+        whiteWon && isCheckmate,
+        moveCount,
+        stakeAmount
+      );
+      // Check ELO achievements
+      if (eloChanges.whiteChange > 0) {
+        const whiteNewElo = game.whiteEloAtStart + eloChanges.whiteChange;
+        await achievementService.checkEloAchievements(game.whitePlayerId, whiteNewElo);
+      }
+
+      // Update profile stats and check game achievements for black player
+      const blackWon = winnerId === game.blackPlayerId;
+      await achievementService.updateProfileStats(
+        game.blackPlayerId,
+        blackWon,
+        blackWon && isCheckmate,
+        moveCount,
+        stakeAmount
+      );
+      await achievementService.checkGameAchievements(
+        game.blackPlayerId,
+        blackWon,
+        blackWon && isCheckmate,
+        moveCount,
+        stakeAmount
+      );
+      // Check ELO achievements
+      if (eloChanges.blackChange > 0) {
+        const blackNewElo = game.blackEloAtStart + eloChanges.blackChange;
+        await achievementService.checkEloAchievements(game.blackPlayerId, blackNewElo);
+      }
+    } catch (error) {
+      console.error('Failed to process achievements:', error);
+    }
+
     // Broadcast game end
     const payload: GameEndedPayload = {
       gameId,
@@ -622,6 +702,262 @@ class GameManager {
       spectators: Array.from(this.spectatorRooms.values()).reduce((sum, room) => sum + room.size, 0),
     };
   }
+
+  // Challenge Management
+  private confirmTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
+
+  async handleChallengeCreate(userId: string, payload: ChallengeCreatePayload) {
+    try {
+      const challenge = await challengeService.createChallenge(
+        userId,
+        payload.gameMode,
+        payload.timeControlKey,
+        payload.stakeAmount,
+        payload.minElo,
+        payload.maxElo
+      );
+
+      // Send confirmation to creator
+      this.sendToUser(userId, 'challenge:created', { challenge });
+
+      // Broadcast updated challenge list to all connected users
+      this.broadcastChallengeList();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to create challenge';
+      this.sendError(userId, 'CHALLENGE_ERROR', message);
+    }
+  }
+
+  async handleChallengeCancel(userId: string, challengeId: string) {
+    try {
+      await challengeService.cancelChallenge(challengeId, userId);
+
+      // Clear any confirmation timeout
+      const timeout = this.confirmTimeouts.get(challengeId);
+      if (timeout) {
+        clearTimeout(timeout);
+        this.confirmTimeouts.delete(challengeId);
+      }
+
+      this.sendToUser(userId, 'challenge:cancelled', { challengeId });
+      this.broadcastChallengeList();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to cancel challenge';
+      this.sendError(userId, 'CHALLENGE_ERROR', message);
+    }
+  }
+
+  async handleChallengeAccept(userId: string, challengeId: string) {
+    try {
+      const challenge = await challengeService.acceptChallenge(challengeId, userId);
+
+      // Notify both players
+      const acceptedPayload: ChallengeAcceptedPayload = {
+        challenge,
+        acceptedBy: challenge.acceptedBy!,
+      };
+
+      this.sendToUser(challenge.creatorId, 'challenge:accepted', acceptedPayload);
+      this.sendToUser(userId, 'challenge:accepted', acceptedPayload);
+
+      // Start confirmation timeout
+      const timeout = setTimeout(async () => {
+        try {
+          await challengeService.declineChallenge(challengeId, challenge.creatorId);
+          this.sendToUser(challenge.creatorId, 'challenge:expired', { challengeId });
+          this.sendToUser(userId, 'challenge:expired', { challengeId });
+          this.broadcastChallengeList();
+        } catch {
+          // Ignore errors during timeout handling
+        }
+      }, CHALLENGE_CONFIRM_TIMEOUT);
+
+      this.confirmTimeouts.set(challengeId, timeout);
+      this.broadcastChallengeList();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to accept challenge';
+      this.sendError(userId, 'CHALLENGE_ERROR', message);
+    }
+  }
+
+  async handleChallengeConfirm(userId: string, challengeId: string) {
+    try {
+      const { confirmed, challenge } = await challengeService.confirmChallenge(challengeId, userId);
+
+      if (confirmed) {
+        // Clear confirmation timeout
+        const timeout = this.confirmTimeouts.get(challengeId);
+        if (timeout) {
+          clearTimeout(timeout);
+          this.confirmTimeouts.delete(challengeId);
+        }
+
+        // Create the game
+        const game = await challengeService.createGameFromChallenge(challengeId);
+        const gameData = await gameService.getGameWithPlayers(game.id);
+
+        if (gameData) {
+          const confirmedPayload: ChallengeConfirmedPayload = {
+            challenge,
+            game: {
+              id: game.id,
+              whitePlayerId: game.whitePlayerId,
+              blackPlayerId: game.blackPlayerId,
+              winnerId: game.winnerId,
+              status: game.status as any,
+              result: game.result as any,
+              currentFen: game.currentFen,
+              pgn: game.pgn,
+              moves: game.moves as Move[],
+              timeControl: {
+                initial: game.timeControlInitial,
+                increment: game.timeControlIncrement,
+              },
+              whiteTimeRemaining: game.whiteTimeRemaining,
+              blackTimeRemaining: game.blackTimeRemaining,
+              stakeAmount: parseFloat(game.stakeAmount),
+              totalPot: parseFloat(game.totalPot),
+              whiteEloAtStart: game.whiteEloAtStart,
+              blackEloAtStart: game.blackEloAtStart,
+              eloChange: game.eloChange,
+              createdAt: game.createdAt,
+              updatedAt: game.updatedAt,
+              startedAt: game.startedAt,
+              endedAt: game.endedAt,
+            },
+            whitePlayer: authService.toPublicUser(gameData.whitePlayer),
+            blackPlayer: authService.toPublicUser(gameData.blackPlayer),
+          };
+
+          // Notify both players
+          this.sendToUser(challenge.creatorId, 'challenge:confirmed', confirmedPayload);
+          if (challenge.acceptedById) {
+            this.sendToUser(challenge.acceptedById, 'challenge:confirmed', confirmedPayload);
+          }
+        }
+
+        this.broadcastChallengeList();
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to confirm challenge';
+      this.sendError(userId, 'CHALLENGE_ERROR', message);
+    }
+  }
+
+  async handleChallengeDecline(userId: string, challengeId: string) {
+    try {
+      const challenge = await challengeService.getChallenge(challengeId);
+      if (!challenge) {
+        throw new Error('Challenge not found');
+      }
+
+      await challengeService.declineChallenge(challengeId, userId);
+
+      // Clear confirmation timeout
+      const timeout = this.confirmTimeouts.get(challengeId);
+      if (timeout) {
+        clearTimeout(timeout);
+        this.confirmTimeouts.delete(challengeId);
+      }
+
+      // Notify both players
+      this.sendToUser(challenge.creatorId, 'challenge:declined', { challengeId });
+      if (challenge.acceptedById) {
+        this.sendToUser(challenge.acceptedById, 'challenge:declined', { challengeId });
+      }
+
+      this.broadcastChallengeList();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to decline challenge';
+      this.sendError(userId, 'CHALLENGE_ERROR', message);
+    }
+  }
+
+  private async broadcastChallengeList() {
+    try {
+      const challenges = await challengeService.getOpenChallenges();
+      const payload: ChallengeListUpdatePayload = { challenges };
+
+      // Broadcast to all connected users
+      for (const [userId] of this.connections) {
+        this.sendToUser(userId, 'challenge:list_update', payload);
+      }
+    } catch {
+      // Ignore errors
+    }
+  }
+
+  // Spectator Chat
+  async handleSpectatorChatSend(userId: string, payload: SpectatorChatSendPayload) {
+    try {
+      const message = await spectatorChatService.sendMessage(
+        payload.gameId,
+        userId,
+        payload.message
+      );
+
+      const chatPayload: SpectatorChatMessagePayload = { message };
+
+      // Broadcast to spectators only (not players)
+      this.broadcastToSpectators(payload.gameId, 'spectator:chat_message', chatPayload);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to send message';
+      this.sendError(userId, 'CHAT_ERROR', message);
+    }
+  }
+
+  // Spectator Predictions
+  async handleSpectatorPredictionCreate(userId: string, payload: SpectatorPredictionCreatePayload) {
+    try {
+      const prediction = await spectatorPredictionService.createPrediction(
+        payload.gameId,
+        userId,
+        payload.predictedWinnerId,
+        payload.amount
+      );
+
+      const createdPayload: SpectatorPredictionCreatedPayload = { prediction };
+
+      // Notify creator
+      this.sendToUser(userId, 'spectator:prediction_created', createdPayload);
+
+      // Broadcast to all spectators
+      this.broadcastPredictionsList(payload.gameId);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to create prediction';
+      this.sendError(userId, 'PREDICTION_ERROR', message);
+    }
+  }
+
+  async handleSpectatorPredictionAccept(userId: string, predictionId: string) {
+    try {
+      const prediction = await spectatorPredictionService.acceptPrediction(predictionId, userId);
+
+      const matchedPayload: SpectatorPredictionMatchedPayload = { prediction };
+
+      // Notify both users
+      this.sendToUser(prediction.creatorId, 'spectator:prediction_matched', matchedPayload);
+      this.sendToUser(userId, 'spectator:prediction_matched', matchedPayload);
+
+      // Broadcast updated predictions list
+      this.broadcastPredictionsList(prediction.gameId);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to accept prediction';
+      this.sendError(userId, 'PREDICTION_ERROR', message);
+    }
+  }
+
+  private async broadcastPredictionsList(gameId: string) {
+    try {
+      const predictions = await spectatorPredictionService.getGamePredictions(gameId);
+      const payload: SpectatorPredictionsListPayload = { predictions };
+
+      this.broadcastToSpectators(gameId, 'spectator:predictions_list', payload);
+    } catch {
+      // Ignore errors
+    }
+  }
+
 }
 
 export const gameManager = new GameManager();

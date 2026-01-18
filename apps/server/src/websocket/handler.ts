@@ -105,6 +105,41 @@ export async function handleWebSocketMessage(ws: ServerWebSocket<WebSocketData>,
         }
         break;
 
+      // Challenge actions
+      case 'challenge:create':
+        await gameManager.handleChallengeCreate(userId, payload as any);
+        break;
+
+      case 'challenge:cancel':
+        await gameManager.handleChallengeCancel(userId, (payload as any).challengeId);
+        break;
+
+      case 'challenge:accept':
+        await gameManager.handleChallengeAccept(userId, (payload as any).challengeId);
+        break;
+
+      case 'challenge:confirm':
+        await gameManager.handleChallengeConfirm(userId, (payload as any).challengeId);
+        break;
+
+      case 'challenge:decline':
+        await gameManager.handleChallengeDecline(userId, (payload as any).challengeId);
+        break;
+
+      // Spectator chat
+      case 'spectator:chat_send':
+        await gameManager.handleSpectatorChatSend(userId, payload as any);
+        break;
+
+      // Spectator predictions
+      case 'spectator:prediction_create':
+        await gameManager.handleSpectatorPredictionCreate(userId, payload as any);
+        break;
+
+      case 'spectator:prediction_accept':
+        await gameManager.handleSpectatorPredictionAccept(userId, (payload as any).predictionId);
+        break;
+
       // Keepalive
       case 'ping':
         gameManager.handlePing(userId);

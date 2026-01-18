@@ -35,6 +35,8 @@ const createTablesSql = `
     winner_id TEXT REFERENCES users(id),
     status TEXT NOT NULL DEFAULT 'pending',
     result TEXT,
+    game_mode TEXT NOT NULL DEFAULT 'standard',
+    starting_fen TEXT NOT NULL DEFAULT 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
     current_fen TEXT NOT NULL DEFAULT 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
     pgn TEXT NOT NULL DEFAULT '',
     moves TEXT NOT NULL DEFAULT '[]',
@@ -94,6 +96,44 @@ const createTablesSql = `
     id TEXT PRIMARY KEY,
     user_id TEXT NOT NULL REFERENCES users(id),
     expires_at INTEGER NOT NULL,
+    created_at INTEGER NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS challenges (
+    id TEXT PRIMARY KEY,
+    creator_id TEXT NOT NULL REFERENCES users(id),
+    game_mode TEXT NOT NULL DEFAULT 'standard',
+    time_control_key TEXT NOT NULL,
+    time_control_initial INTEGER NOT NULL,
+    time_control_increment INTEGER NOT NULL DEFAULT 0,
+    stake_amount REAL NOT NULL,
+    min_elo INTEGER,
+    max_elo INTEGER,
+    status TEXT NOT NULL DEFAULT 'open',
+    accepted_by_id TEXT REFERENCES users(id),
+    creator_confirmed INTEGER NOT NULL DEFAULT 0,
+    acceptor_confirmed INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS spectator_predictions (
+    id TEXT PRIMARY KEY,
+    game_id TEXT NOT NULL REFERENCES games(id),
+    creator_id TEXT NOT NULL REFERENCES users(id),
+    acceptor_id TEXT REFERENCES users(id),
+    predicted_winner_id TEXT NOT NULL REFERENCES users(id),
+    amount REAL NOT NULL,
+    status TEXT NOT NULL DEFAULT 'open',
+    created_at INTEGER NOT NULL,
+    settled_at INTEGER
+  );
+
+  CREATE TABLE IF NOT EXISTS spectator_chat (
+    id TEXT PRIMARY KEY,
+    game_id TEXT NOT NULL REFERENCES games(id),
+    user_id TEXT NOT NULL REFERENCES users(id),
+    message TEXT NOT NULL,
     created_at INTEGER NOT NULL
   );
 `;

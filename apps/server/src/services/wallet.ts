@@ -97,6 +97,21 @@ export async function awardWinnings(
   return newBalance;
 }
 
+export async function refundStake(
+  userId: string,
+  amount: number,
+  referenceId: string
+): Promise<number> {
+  const { newBalance } = await updateBalance(
+    userId,
+    amount,
+    'bet_refunded',
+    referenceId,
+    `Stake refunded: ${referenceId}`
+  );
+  return newBalance;
+}
+
 export async function placeBet(userId: string, amount: number, betId: string): Promise<number> {
   const { newBalance } = await updateBalance(
     userId,

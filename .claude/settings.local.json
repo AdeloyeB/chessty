@@ -5,7 +5,10 @@
       "mcp__plugin_context7_context7__query-docs",
       "mcp__plugin_context7_context7__resolve-library-id",
       "Bash(pnpm install)",
-      "Bash(pnpm dev)"
+      "Bash(pnpm dev)",
+      "Bash(npx tsc:*)",
+      "Bash(pnpm dev:web:*)",
+      "Bash(pnpm next build:*)"
     ]
   }
 }

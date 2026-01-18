@@ -30,6 +30,8 @@ export const games = sqliteTable('games', {
   winnerId: text('winner_id').references(() => users.id),
   status: text('status').notNull().default('pending'),
   result: text('result'),
+  gameMode: text('game_mode').notNull().default('standard'),
+  startingFen: text('starting_fen').notNull().default('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'),
   currentFen: text('current_fen').notNull().default('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'),
   pgn: text('pgn').notNull().default(''),
   moves: text('moves', { mode: 'json' }).notNull().$type<any[]>().default([]),
@@ -96,6 +98,47 @@ export const sessions = sqliteTable('sessions', {
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
 });
 
+// Challenges table for marketplace
+export const challenges = sqliteTable('challenges', {
+  id: text('id').primaryKey(),
+  creatorId: text('creator_id').notNull().references(() => users.id),
+  gameMode: text('game_mode').notNull().default('standard'),
+  timeControlKey: text('time_control_key').notNull(),
+  timeControlInitial: integer('time_control_initial').notNull(),
+  timeControlIncrement: integer('time_control_increment').notNull().default(0),
+  stakeAmount: real('stake_amount').notNull(),
+  minElo: integer('min_elo'),
+  maxElo: integer('max_elo'),
+  status: text('status').notNull().default('open'),
+  acceptedById: text('accepted_by_id').references(() => users.id),
+  creatorConfirmed: integer('creator_confirmed').notNull().default(0),
+  acceptorConfirmed: integer('acceptor_confirmed').notNull().default(0),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
+  expiresAt: integer('expires_at', { mode: 'timestamp' }).notNull(),
+});
+
+// Spectator predictions table (P2P betting between spectators)
+export const spectatorPredictions = sqliteTable('spectator_predictions', {
+  id: text('id').primaryKey(),
+  gameId: text('game_id').notNull().references(() => games.id),
+  creatorId: text('creator_id').notNull().references(() => users.id),
+  acceptorId: text('acceptor_id').references(() => users.id),
+  predictedWinnerId: text('predicted_winner_id').notNull().references(() => users.id),
+  amount: real('amount').notNull(),
+  status: text('status').notNull().default('open'),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
+  settledAt: integer('settled_at', { mode: 'timestamp' }),
+});
+
+// Spectator chat table
+export const spectatorChat = sqliteTable('spectator_chat', {
+  id: text('id').primaryKey(),
+  gameId: text('game_id').notNull().references(() => games.id),
+  userId: text('user_id').notNull().references(() => users.id),
+  message: text('message').notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   whiteGames: many(games, { relationName: 'whitePlayer' }),
@@ -105,6 +148,11 @@ export const usersRelations = relations(users, ({ many }) => ({
   betsOn: many(bets, { relationName: 'betOn' }),
   transactions: many(transactions),
   sessions: many(sessions),
+  createdChallenges: many(challenges, { relationName: 'creator' }),
+  acceptedChallenges: many(challenges, { relationName: 'acceptor' }),
+  spectatorPredictionsCreated: many(spectatorPredictions, { relationName: 'predictionCreator' }),
+  spectatorPredictionsAccepted: many(spectatorPredictions, { relationName: 'predictionAcceptor' }),
+  spectatorChatMessages: many(spectatorChat),
 }));
 
 export const gamesRelations = relations(games, ({ one, many }) => ({
@@ -124,6 +172,8 @@ export const gamesRelations = relations(games, ({ one, many }) => ({
     relationName: 'winner',
   }),
   bets: many(bets),
+  spectatorPredictions: many(spectatorPredictions),
+  spectatorChatMessages: many(spectatorChat),
 }));
 
 export const betsRelations = relations(bets, ({ one }) => ({
@@ -157,6 +207,51 @@ export const sessionsRelations = relations(sessions, ({ one }) => ({
   }),
 }));
 
+export const challengesRelations = relations(challenges, ({ one }) => ({
+  creator: one(users, {
+    fields: [challenges.creatorId],
+    references: [users.id],
+    relationName: 'creator',
+  }),
+  acceptedBy: one(users, {
+    fields: [challenges.acceptedById],
+    references: [users.id],
+    relationName: 'acceptor',
+  }),
+}));
+
+export const spectatorPredictionsRelations = relations(spectatorPredictions, ({ one }) => ({
+  game: one(games, {
+    fields: [spectatorPredictions.gameId],
+    references: [games.id],
+  }),
+  creator: one(users, {
+    fields: [spectatorPredictions.creatorId],
+    references: [users.id],
+    relationName: 'predictionCreator',
+  }),
+  acceptor: one(users, {
+    fields: [spectatorPredictions.acceptorId],
+    references: [users.id],
+    relationName: 'predictionAcceptor',
+  }),
+  predictedWinner: one(users, {
+    fields: [spectatorPredictions.predictedWinnerId],
+    references: [users.id],
+  }),
+}));
+
+export const spectatorChatRelations = relations(spectatorChat, ({ one }) => ({
+  game: one(games, {
+    fields: [spectatorChat.gameId],
+    references: [games.id],
+  }),
+  user: one(users, {
+    fields: [spectatorChat.userId],
+    references: [users.id],
+  }),
+}));
+
 // Type exports
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
@@ -170,3 +265,9 @@ export type MatchmakingEntry = typeof matchmakingQueue.$inferSelect;
 export type NewMatchmakingEntry = typeof matchmakingQueue.$inferInsert;
 export type Session = typeof sessions.$inferSelect;
 export type NewSession = typeof sessions.$inferInsert;
+export type Challenge = typeof challenges.$inferSelect;
+export type NewChallenge = typeof challenges.$inferInsert;
+export type SpectatorPrediction = typeof spectatorPredictions.$inferSelect;
+export type NewSpectatorPrediction = typeof spectatorPredictions.$inferInsert;
+export type SpectatorChatMessage = typeof spectatorChat.$inferSelect;
+export type NewSpectatorChatMessage = typeof spectatorChat.$inferInsert;

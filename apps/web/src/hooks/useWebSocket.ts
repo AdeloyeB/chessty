@@ -1,10 +1,12 @@
 'use client';
 
 import { useEffect, useRef, useCallback, useState } from 'react';
-import type { WSMessage, WSMessageType } from '@chess-game/shared';
+import type { WSMessage, WSMessageType, GameMode, ChallengeCreatePayload } from '@chess-game/shared';
 import { useAuthStore } from '@/store/auth';
 import { useGameStore } from '@/store/game';
 import { useSpectatorStore } from '@/store/spectator';
+import { useChallengeStore } from '@/store/challenge';
+import { useSpectatorChatStore } from '@/store/spectatorChat';
 
 const WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:3001/ws';
 const RECONNECT_DELAY = 1000;
@@ -19,6 +21,8 @@ export function useWebSocket() {
   const { token } = useAuthStore();
   const gameStore = useGameStore();
   const spectatorStore = useSpectatorStore();
+  const challengeStore = useChallengeStore();
+  const spectatorChatStore = useSpectatorChatStore();
 
   const handleMessage = useCallback(
     (event: MessageEvent) => {
@@ -109,6 +113,79 @@ export function useWebSocket() {
             break;
           }
 
+          // Challenge events
+          case 'challenge:created': {
+            const data = payload as any;
+            challengeStore.challengeCreated(data.challenge);
+            break;
+          }
+
+          case 'challenge:list_update': {
+            const data = payload as any;
+            challengeStore.setChallenges(data.challenges);
+            break;
+          }
+
+          case 'challenge:accepted': {
+            const data = payload as any;
+            challengeStore.challengeAccepted(data.challenge);
+            break;
+          }
+
+          case 'challenge:confirmed': {
+            const data = payload as any;
+            challengeStore.setUIState('starting');
+            // Set up game
+            gameStore.setGame(data.game);
+            gameStore.setPlayers(data.whitePlayer, data.blackPlayer);
+            const myId = useAuthStore.getState().user?.id;
+            if (myId === data.whitePlayer.id) {
+              gameStore.setPlayerColor('white');
+            } else {
+              gameStore.setPlayerColor('black');
+            }
+            gameStore.setStatus('playing');
+            challengeStore.reset();
+            break;
+          }
+
+          case 'challenge:declined':
+          case 'challenge:cancelled': {
+            challengeStore.challengeDeclined();
+            break;
+          }
+
+          case 'challenge:expired': {
+            challengeStore.challengeExpired();
+            break;
+          }
+
+          // Spectator chat events
+          case 'spectator:chat_message': {
+            const data = payload as any;
+            spectatorChatStore.addMessage(data.message);
+            break;
+          }
+
+          // Spectator prediction events
+          case 'spectator:prediction_created': {
+            const data = payload as any;
+            spectatorChatStore.addPrediction(data.prediction);
+            break;
+          }
+
+          case 'spectator:prediction_matched': {
+            const data = payload as any;
+            spectatorChatStore.updatePrediction(data.prediction);
+            break;
+          }
+
+          case 'spectator:predictions_list': {
+            const data = payload as any;
+            spectatorChatStore.setPredictions(data.predictions);
+            break;
+          }
+
           // Keepalive
           case 'pong':
             break;
@@ -124,7 +201,7 @@ export function useWebSocket() {
         console.error('Failed to parse WebSocket message:', error);
       }
     },
-    [gameStore, spectatorStore]
+    [gameStore, spectatorStore, challengeStore, spectatorChatStore]
   );
 
   const connect = useCallback(() => {
@@ -247,6 +324,60 @@ export function useWebSocket() {
     spectatorStore.stopSpectating();
   }, [send, spectatorStore]);
 
+  // Challenge actions
+  const createChallenge = useCallback(
+    (params: {
+      gameMode: GameMode;
+      timeControlKey: string;
+      stakeAmount: number;
+      minElo?: number;
+      maxElo?: number;
+    }) => {
+      challengeStore.setUIState('creating');
+      send('challenge:create', params);
+    },
+    [send, challengeStore]
+  );
+
+  const cancelChallenge = useCallback(
+    (challengeId: string) => send('challenge:cancel', { challengeId }),
+    [send]
+  );
+
+  const acceptChallenge = useCallback(
+    (challengeId: string) => send('challenge:accept', { challengeId }),
+    [send]
+  );
+
+  const confirmChallenge = useCallback(
+    (challengeId: string) => send('challenge:confirm', { challengeId }),
+    [send]
+  );
+
+  const declineChallenge = useCallback(
+    (challengeId: string) => send('challenge:decline', { challengeId }),
+    [send]
+  );
+
+  // Spectator chat actions
+  const sendSpectatorChat = useCallback(
+    (gameId: string, message: string) =>
+      send('spectator:chat_send', { gameId, message }),
+    [send]
+  );
+
+  // Spectator prediction actions
+  const createSpectatorPrediction = useCallback(
+    (gameId: string, predictedWinnerId: string, amount: number) =>
+      send('spectator:prediction_create', { gameId, predictedWinnerId, amount }),
+    [send]
+  );
+
+  const acceptSpectatorPrediction = useCallback(
+    (predictionId: string) => send('spectator:prediction_accept', { predictionId }),
+    [send]
+  );
+
   // Auto-connect when token is available
   useEffect(() => {
     if (token) {
@@ -284,5 +415,16 @@ export function useWebSocket() {
     leaveQueue: leaveQueueWs,
     spectateGame,
     stopSpectating,
+    // Challenge actions
+    createChallenge,
+    cancelChallenge,
+    acceptChallenge,
+    confirmChallenge,
+    declineChallenge,
+    // Spectator chat actions
+    sendSpectatorChat,
+    // Spectator prediction actions
+    createSpectatorPrediction,
+    acceptSpectatorPrediction,
   };
 }

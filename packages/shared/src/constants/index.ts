@@ -33,6 +33,18 @@ export const TIME_CONTROLS = {
   classical_30: { initial: 1800, increment: 0 },
 } as const;
 
+// Challenge marketplace time controls (simplified)
+export const CHALLENGE_TIME_CONTROLS = {
+  bullet_1: { initial: 60, increment: 0, label: '1 min' },
+  blitz_3: { initial: 180, increment: 0, label: '3 min' },
+  blitz_5: { initial: 300, increment: 0, label: '5 min' },
+  rapid_10: { initial: 600, increment: 0, label: '10 min' },
+  rapid_15: { initial: 900, increment: 0, label: '15 min' },
+  classical_30: { initial: 1800, increment: 0, label: '30 min' },
+} as const;
+
+export type ChallengeTimeControlKey = keyof typeof CHALLENGE_TIME_CONTROLS;
+
 // Stake presets
 export const STAKE_PRESETS = [10, 25, 50, 100, 250, 500, 1000];
 
@@ -52,6 +64,10 @@ export const RECONNECT_DELAY_BASE = 1000; // exponential backoff base
 
 // Game abandonment
 export const ABANDONMENT_TIMEOUT = 120000; // 2 minutes disconnect = abandonment
+
+// Challenge marketplace
+export const CHALLENGE_EXPIRATION = 30 * 60 * 1000; // 30 minutes
+export const CHALLENGE_CONFIRM_TIMEOUT = 60 * 1000; // 60 seconds to confirm after acceptance
 
 // WebSocket
 export const WS_PING_INTERVAL = 30000; // 30 seconds
@@ -95,4 +111,13 @@ export const API_ROUTES = {
     ELO: '/api/leaderboard/elo',
     WINNINGS: '/api/leaderboard/winnings',
   },
+  PROFILE: {
+    GET: '/api/profile',
+    UPDATE: '/api/profile',
+    ACHIEVEMENTS: '/api/profile/achievements',
+  },
 } as const;
+
+// Re-export rank and achievement constants
+export * from './ranks';
+export * from './achievements';
