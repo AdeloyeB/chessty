@@ -1,0 +1,70 @@
+{
+  "name": "@chess-game/desktop",
+  "version": "1.0.0",
+  "private": true,
+  "main": "dist/main.js",
+  "scripts": {
+    "dev": "concurrently \"pnpm build:electron --watch\" \"pnpm wait-on tcp:${DEV_PORT:-3001} && DEV_PORT=${DEV_PORT:-3001} electron .\"",
+    "build": "pnpm build:electron && pnpm build:next",
+    "build:electron": "tsc -p tsconfig.electron.json",
+    "build:next": "pnpm --filter @chess-game/web build",
+    "start": "electron .",
+    "package": "electron-builder",
+    "package:mac": "electron-builder --mac",
+    "package:win": "electron-builder --win",
+    "package:linux": "electron-builder --linux"
+  },
+  "dependencies": {
+    "@chess-game/web": "workspace:*",
+    "electron-store": "^8.2.0"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.0",
+    "electron": "^29.0.0",
+    "electron-builder": "^24.13.0",
+    "typescript": "^5.4.0",
+    "wait-on": "^7.2.0"
+  },
+  "build": {
+    "appId": "com.chessgamble.app",
+    "productName": "Chess Gamble",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "node_modules/**/*"
+    ],
+    "mac": {
+      "icon": "assets/icon.icns",
+      "category": "public.app-category.games",
+      "target": [
+        "dmg",
+        "zip"
+      ]
+    },
+    "win": {
+      "icon": "assets/icon.ico",
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "linux": {
+      "icon": "assets/icon.png",
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Game"
+    },
+    "protocols": [
+      {
+        "name": "Chess Gamble",
+        "schemes": [
+          "chessgamble"
+        ]
+      }
+    ]
+  }
+}

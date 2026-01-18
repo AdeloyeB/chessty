@@ -1,0 +1,161 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --pure-black: #000000;
+  --off-black: #0a0a0a;
+  --dark: #111111;
+  --mid-dark: #1a1a1a;
+  --mid: #333333;
+  --mid-light: #666666;
+  --light: #999999;
+  --off-white: #e5e5e5;
+  --pure-white: #ffffff;
+}
+
+body {
+  background-color: var(--pure-black);
+  color: var(--pure-white);
+  min-height: 100vh;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+/* Custom scrollbar - minimal */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--pure-black);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--mid);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--light);
+}
+
+/* Chess board - pure black and white */
+.chess-board {
+  border-radius: 0;
+  overflow: hidden;
+  border: 1px solid var(--mid);
+}
+
+@layer components {
+  /* Buttons - minimal */
+  .btn {
+    @apply px-5 py-2.5 font-mono text-sm transition-all duration-150 lowercase;
+  }
+
+  .btn-primary {
+    @apply bg-pure-white text-pure-black hover:bg-off-white;
+  }
+
+  .btn-secondary {
+    @apply border border-mid text-light hover:border-light hover:text-pure-white bg-transparent;
+  }
+
+  .btn-danger {
+    @apply border border-mid-light text-mid-light hover:bg-mid-light/10;
+  }
+
+  .btn-success {
+    @apply bg-pure-white/10 text-pure-white border border-pure-white/20;
+  }
+
+  /* Cards - minimal */
+  .card {
+    @apply bg-off-black border border-mid/30 p-5;
+  }
+
+  .card-hover {
+    @apply card hover:border-light/50 transition-all duration-150;
+  }
+
+  /* Inputs - minimal */
+  .input {
+    @apply w-full px-3 py-2 bg-pure-black border border-mid/50 text-pure-white font-mono
+           placeholder-mid-light focus:outline-none focus:border-light transition-colors duration-150 lowercase;
+  }
+
+  /* Tab navigation - minimal */
+  .tab {
+    @apply pb-2 text-sm font-mono transition-all duration-150 lowercase;
+  }
+
+  .tab-active {
+    @apply tab text-pure-white border-b border-pure-white;
+  }
+
+  .tab-inactive {
+    @apply tab text-mid-light hover:text-light border-b border-transparent;
+  }
+
+  /* Stats display */
+  .stat-value {
+    @apply text-3xl font-mono text-pure-white;
+  }
+
+  .stat-label {
+    @apply text-xs font-mono text-mid-light lowercase;
+  }
+
+  /* Score display */
+  .score-box {
+    @apply px-3 py-1 bg-pure-black border border-mid/50 font-mono text-lg;
+  }
+}
+
+/* Selection highlight */
+::selection {
+  background-color: var(--pure-white);
+  color: var(--pure-black);
+}
+
+/* Floating animation for chess pieces */
+@keyframes float {
+  0%, 100% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+  25% {
+    transform: translate(10px, -20px) rotate(5deg);
+  }
+  50% {
+    transform: translate(-5px, -40px) rotate(-3deg);
+  }
+  75% {
+    transform: translate(15px, -20px) rotate(2deg);
+  }
+}
+
+.animate-float {
+  animation: float 20s ease-in-out infinite;
+}
+
+/* Fade in animation */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.5s ease-out forwards;
+}
+
+/* Stagger animation delays */
+.stagger-1 { animation-delay: 0.1s; }
+.stagger-2 { animation-delay: 0.2s; }
+.stagger-3 { animation-delay: 0.3s; }
+.stagger-4 { animation-delay: 0.4s; }
+.stagger-5 { animation-delay: 0.5s; }

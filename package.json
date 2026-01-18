@@ -1,0 +1,23 @@
+{
+  "name": "the-chess-game",
+  "version": "1.0.0",
+  "private": true,
+  "packageManager": "pnpm@9.0.0",
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "lint": "turbo lint",
+    "clean": "turbo clean",
+    "dev:web": "turbo dev --filter=@chess-game/web",
+    "dev:server": "turbo dev --filter=@chess-game/server",
+    "dev:desktop": "turbo dev --filter=@chess-game/desktop",
+    "build:desktop": "turbo build --filter=@chess-game/desktop",
+    "db:generate": "pnpm --filter=@chess-game/server db:generate",
+    "db:migrate": "pnpm --filter=@chess-game/server db:migrate",
+    "db:studio": "pnpm --filter=@chess-game/server db:studio"
+  },
+  "devDependencies": {
+    "turbo": "^2.0.0",
+    "typescript": "^5.4.0"
+  }
+}
