@@ -4,11 +4,11 @@
   "private": true,
   "main": "dist/main.js",
   "scripts": {
-    "dev": "concurrently \"pnpm build:electron --watch\" \"pnpm wait-on tcp:${DEV_PORT:-3000} && DEV_PORT=${DEV_PORT:-3000} electron .\"",
+    "dev": "concurrently \"pnpm build:electron --watch\" \"pnpm wait-on tcp:${DEV_PORT:-3000} && DEV_PORT=${DEV_PORT:-3000} ELECTRON_RUN_AS_NODE= electron .\"",
     "build": "pnpm build:electron && pnpm build:next",
     "build:electron": "tsc -p tsconfig.electron.json",
     "build:next": "pnpm --filter @chess-game/web build",
-    "start": "electron .",
+    "start": "ELECTRON_RUN_AS_NODE= electron .",
     "package": "electron-builder",
     "package:mac": "electron-builder --mac",
     "package:win": "electron-builder --win",
@@ -20,7 +20,7 @@
   },
   "devDependencies": {
     "concurrently": "^8.2.0",
-    "electron": "^29.0.0",
+    "electron": "^40.0.0",
     "electron-builder": "^24.13.0",
     "typescript": "^5.4.0",
     "wait-on": "^7.2.0"

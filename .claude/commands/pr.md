@@ -51,7 +51,6 @@ gh pr create --title "<concise title>" --body "$(cat <<'EOF'
 - [ ] Server starts without errors
 - [ ] Manually tested the affected feature
 
-🤖 Generated with [Claude Code](https://claude.com/claude-code)
 EOF
 )"
 ```
