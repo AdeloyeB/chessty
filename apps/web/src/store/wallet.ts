@@ -126,7 +126,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
   // Initial state - auto-enable dev mode when USE_MOCK_DATA is true
   isConnected: USE_MOCK_DATA,
   address: USE_MOCK_DATA ? '0x742d35Cc6634C0532925a3b844Bc9e7595f2bD2e' : null,
-  chainId: USE_MOCK_DATA ? 8453 : null, // Base chain
+  chainId: USE_MOCK_DATA ? 137 : null, // Polygon
   usdcBalance: USE_MOCK_DATA ? '1250.00' : '0',
   isLoadingBalance: false,
   isWalletModalOpen: false,
@@ -196,7 +196,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
     set({
       isConnected: true,
       address: '0x1234567890abcdef1234567890abcdef12345678',
-      chainId: 8453, // Base
+      chainId: 137, // Polygon
       usdcBalance: '645.00',
       balanceHistory: DEV_BALANCE_HISTORY,
       isDevMode: true,

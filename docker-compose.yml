@@ -1,0 +1,130 @@
+# ──────────────────────────────────────────────────────────────
+# docker-compose.yml — Defines all services for the chess game
+#
+# USAGE:
+#   docker compose up --build     Start everything (rebuilds if changed)
+#   docker compose up -d          Start in background (detached)
+#   docker compose down           Stop everything
+#   docker compose logs server    See server logs
+#   docker compose ps             See what's running
+#
+# WHAT IS DOCKER COMPOSE?
+#   Instead of running each container manually with long "docker run"
+#   commands, Compose lets you define everything in this one file.
+#   One command starts your entire stack.
+# ──────────────────────────────────────────────────────────────
+
+name: chess-game
+
+services:
+
+  # ─── BUN SERVER ────────────────────────────────────────────────
+  # The main game server — handles HTTP API + WebSocket connections
+  server:
+    # "build: ." means "use the Dockerfile in the current directory"
+    build: .
+
+    # Map port 3001 on your machine → port 3001 in the container
+    # After starting, visit http://localhost:3001 to hit the API
+    ports:
+      - "3001:3001"
+
+    # Environment variables injected into the container.
+    # Your code accesses these via process.env.VARIABLE_NAME
+    environment:
+      - NODE_ENV=development
+      - PORT=3001
+      - JWT_SECRET=dev-secret-change-in-production
+      # ── Future: Uncomment when Redis/PostgreSQL services are added ──
+      # - REDIS_HOST=redis
+      # - REDIS_PORT=6379
+      # - DATABASE_URL=postgresql://postgres:chess_password@postgres:5432/chess_db
+
+    # Mount local source code into the container for development.
+    # This means changes to your code show up instantly without rebuilding.
+    # Format: ./local/path:/container/path
+    volumes:
+      - ./apps/server/src:/app/apps/server/src
+      - ./packages/shared/src:/app/packages/shared/src
+      - ./packages/chess-engine/src:/app/packages/chess-engine/src
+
+    # "Start these other services before starting the server"
+    # Uncomment when you add Redis/PostgreSQL below.
+    # depends_on:
+    #   - redis
+    #   - postgres
+
+  # ──────────────────────────────────────────────────────────────
+  # FUTURE SERVICES
+  # Uncomment these when you're ready to integrate them.
+  # Each runs in its own container, connected via Docker's network.
+  # ──────────────────────────────────────────────────────────────
+
+  # ─── REDIS (In-Memory Store) ───────────────────────────────────
+  # Used for: Active game state, clocks, session cache, pub/sub
+  # Redis stores data in RAM so it's extremely fast (microseconds).
+  # Game state lives here so it survives server restarts and
+  # multiple server instances can share state.
+  #
+  # redis:
+  #   image: redis:7-alpine
+  #   ports:
+  #     - "6379:6379"
+  #   # --appendonly yes = persist data to disk (so restarts don't lose data)
+  #   command: redis-server --appendonly yes
+  #   volumes:
+  #     - redis_data:/data
+  #   # Healthcheck — Docker will know if Redis is actually ready
+  #   healthcheck:
+  #     test: ["CMD", "redis-cli", "ping"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 3
+
+  # ─── POSTGRESQL (Production Database) ─────────────────────────
+  # Used for: Users, game history, bets, achievements, wallets
+  # Replaces SQLite when you need real multi-user concurrency.
+  # PostgreSQL handles many readers/writers at the same time safely.
+  #
+  # postgres:
+  #   image: postgres:16-alpine
+  #   ports:
+  #     - "5432:5432"
+  #   environment:
+  #     - POSTGRES_USER=postgres
+  #     - POSTGRES_PASSWORD=chess_password
+  #     - POSTGRES_DB=chess_db
+  #   volumes:
+  #     - pg_data:/var/lib/postgresql/data
+  #   # Healthcheck — ensures Postgres is accepting connections
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U postgres"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 3
+
+  # ─── FUTURE: WEB APP (Next.js) ────────────────────────────────
+  # If you want to serve the web frontend from Docker too.
+  # For now, run it locally with "pnpm dev:web" since Next.js
+  # has great hot-reload that works better outside Docker.
+  #
+  # web:
+  #   build:
+  #     context: .
+  #     dockerfile: apps/web/Dockerfile   # Would need its own Dockerfile
+  #   ports:
+  #     - "3000:3000"
+  #   environment:
+  #     - NEXT_PUBLIC_WS_URL=ws://localhost:3001
+  #   depends_on:
+  #     - server
+
+# ─── NAMED VOLUMES ──────────────────────────────────────────────
+# Volumes persist data between container restarts.
+# Without these, stopping a container would wipe your database!
+# Think of them as USB drives that Docker manages for you.
+#
+# Uncomment when you add Redis/PostgreSQL above.
+# volumes:
+#   redis_data:
+#   pg_data:
