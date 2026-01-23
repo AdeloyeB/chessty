@@ -18,14 +18,24 @@ gh pr view --json number,title,body,baseRefName
 
 If no PR exists for the current branch, inform the user and stop.
 
-### 2. Get the Full Diff
+### 2. Run Build & Lint
+
+Run the build to capture any type errors or lint failures. This is objective evidence — if the build fails, the PR has issues regardless of what the code looks like.
+
+```bash
+pnpm build 2>&1
+```
+
+Capture the output. If there are errors, include them verbatim in the review.
+
+### 3. Get the Full Diff
 
 ```bash
 # Get the complete diff against base branch
 gh pr diff
 ```
 
-### 3. Review the Diff
+### 4. Review the Diff
 
 Examine every changed file with fresh eyes. For each file, consider:
 
@@ -59,22 +69,40 @@ Examine every changed file with fresh eyes. For each file, consider:
 - Business logic in the wrong layer
 - Breaking the dependency direction (shared ← server/web)
 
-### 4. Output Format
+### 5. Determine Verdict
 
-```
+Based on build output + code review:
+
+- **APPROVE** — Build passes, no critical issues, code is solid
+- **REQUEST_CHANGES** — Build fails OR critical issues found that must be fixed
+- **COMMENT** — No blockers but has warnings worth discussing
+
+### 6. Post the Review on GitHub
+
+Compose the review body, then post it directly on the PR using the `gh` CLI.
+
+```bash
+gh pr review --<verdict> --body "$(cat <<'EOF'
 ## Code Review: PR #<number> — <title>
 
-### Verdict: APPROVE | CHANGES REQUESTED | NEEDS DISCUSSION
+### Build Status
+<✅ Build passes | ❌ Build fails — include error output>
+
+### Verdict: <APPROVE | CHANGES REQUESTED | COMMENT>
 
 ### Critical Issues (must fix before merge)
 | File | Line(s) | Issue |
 |------|---------|-------|
 | ... | ... | ... |
 
+*(or "None")*
+
 ### Warnings (should fix, not blocking)
 | File | Line(s) | Issue |
 |------|---------|-------|
 | ... | ... | ... |
+
+*(or "None")*
 
 ### Suggestions (optional improvements)
 - ...
@@ -84,11 +112,24 @@ Examine every changed file with fresh eyes. For each file, consider:
 
 ### Summary
 [2-3 sentences: overall quality, biggest concern, recommendation]
+
+---
+🤖 Reviewed by Claude Code (`/code-review`)
+EOF
+)"
 ```
 
-### 5. If No Issues Found
+The `--<verdict>` flag should be one of:
+- `--approve` — if APPROVE
+- `--request-changes` — if REQUEST_CHANGES
+- `--comment` — if COMMENT
 
-If the code is clean, say so clearly with a short explanation of what you checked. Don't invent issues to seem thorough.
+### 7. Report Back
+
+Tell the user:
+- The verdict (approve/changes requested/comment)
+- Link to the review on the PR
+- A brief summary of critical issues (if any)
 
 ## Rules
 
@@ -97,5 +138,6 @@ If the code is clean, say so clearly with a short explanation of what you checke
 - If unsure whether something is a bug, read the surrounding code to verify before flagging.
 - Reference specific line numbers from the diff.
 - Don't suggest refactors that aren't related to the PR's purpose.
+- If the build passes and code is clean, approve it. Don't invent issues to seem thorough.
 
 $ARGUMENTS
