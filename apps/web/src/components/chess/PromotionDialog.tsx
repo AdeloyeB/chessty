@@ -15,9 +15,9 @@ const PIECES = [
 
 export function PromotionDialog({ color, onSelect, onCancel }: PromotionDialogProps) {
   return (
-    <div className="fixed inset-0 bg-pure-black/95 flex items-center justify-center z-50">
-      <div className="card max-w-xs w-full">
-        <p className="text-xs font-mono text-mid-light mb-4 text-center">
+    <div className="fixed inset-0 bg-retro-dark/95 flex items-center justify-center z-50">
+      <div className="bg-retro-mid border border-retro-blue/30 p-4 max-w-xs w-full shadow-[0_0_30px_rgba(59,130,246,0.3)]">
+        <p className="text-xs font-mono text-retro-glow mb-4 text-center">
           choose_promotion
         </p>
 
@@ -26,7 +26,7 @@ export function PromotionDialog({ color, onSelect, onCancel }: PromotionDialogPr
             <button
               key={piece.key}
               onClick={() => onSelect(piece.key)}
-              className="p-3 bg-pure-black border border-mid hover:border-pure-white transition-colors"
+              className="p-3 bg-retro-dark border border-retro-blue/30 hover:border-retro-blue hover:shadow-[0_0_15px_rgba(59,130,246,0.5)] transition-all"
             >
               <div className="text-3xl text-center">
                 {color === 'white' ? piece.white : piece.black}
@@ -35,7 +35,7 @@ export function PromotionDialog({ color, onSelect, onCancel }: PromotionDialogPr
           ))}
         </div>
 
-        <button onClick={onCancel} className="w-full btn btn-secondary">
+        <button onClick={onCancel} className="w-full px-4 py-2 bg-retro-dark text-retro-muted border border-retro-blue/30 font-mono hover:border-retro-blue hover:text-pure-white hover:shadow-[0_0_10px_rgba(59,130,246,0.3)] transition-all">
           cancel
         </button>
       </div>

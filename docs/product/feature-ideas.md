@@ -1,0 +1,1 @@
+- Play moves directly from Discord. Responses on enemies current pieces and play it directly from Discord. Review what capability discords has.

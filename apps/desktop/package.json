@@ -4,7 +4,7 @@
   "private": true,
   "main": "dist/main.js",
   "scripts": {
-    "dev": "concurrently \"pnpm build:electron --watch\" \"pnpm wait-on tcp:${DEV_PORT:-3001} && DEV_PORT=${DEV_PORT:-3001} electron .\"",
+    "dev": "concurrently \"pnpm build:electron --watch\" \"pnpm wait-on tcp:${DEV_PORT:-3000} && DEV_PORT=${DEV_PORT:-3000} electron .\"",
     "build": "pnpm build:electron && pnpm build:next",
     "build:electron": "tsc -p tsconfig.electron.json",
     "build:next": "pnpm --filter @chess-game/web build",

@@ -5,6 +5,17 @@ import {
   handleMe,
 } from './routes/auth';
 import {
+  apiLimiter,
+  rateLimitResponse,
+  getClientIp,
+} from './services/rateLimit';
+import {
+  applySecurityHeaders,
+  botDetection,
+  logSecurityWarning,
+  validate,
+} from './services/security';
+import {
   handleGetActiveGames,
   handleGetGame,
   handleGetUserGameHistory,
@@ -44,12 +55,18 @@ import {
   handleGetPublicProfile,
 } from './routes/profile';
 import {
+  handleGetFlags,
+  handleGetFlag,
+  handleUpdateFlag,
+} from './routes/flags';
+import {
   handleWebSocketUpgrade,
   handleWebSocketOpen,
   handleWebSocketClose,
   handleWebSocketMessage,
 } from './websocket/handler';
-import type { WebSocketData } from './websocket/GameManager';
+import { initializeFeatureFlags } from './services/featureFlags';
+import type { WebSocketData } from './websocket/handler';
 
 const PORT = parseInt(process.env.PORT || '3001');
 const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:3000';
@@ -96,6 +113,8 @@ const server = Bun.serve<WebSocketData>({
     const url = new URL(req.url);
     const path = url.pathname;
     const method = req.method;
+    const clientIp = getClientIp(req);
+    const userAgent = req.headers.get('user-agent');
 
     // Handle CORS preflight
     if (method === 'OPTIONS') {
@@ -105,10 +124,39 @@ const server = Bun.serve<WebSocketData>({
       });
     }
 
-    // WebSocket upgrade
+    // WebSocket upgrade (skip most middleware - handled separately)
     if (path === '/ws') {
       const response = await handleWebSocketUpgrade(req, server);
       return response || new Response(null, { status: 101 });
+    }
+
+    // Bot detection - log suspicious requests
+    if (botDetection.isKnownBot(userAgent) && !path.startsWith('/health')) {
+      logSecurityWarning('Bot detected', { ip: clientIp, userAgent, path });
+    }
+
+    // Global API rate limiting (skip for auth endpoints - they have their own limits)
+    const skipRateLimit = ['/api/auth/login', '/api/auth/register', '/health'];
+    if (!skipRateLimit.includes(path)) {
+      const rateLimitResult = apiLimiter.consume(clientIp);
+      if (!rateLimitResult.allowed) {
+        return applySecurityHeaders(
+          jsonResponse(rateLimitResponse(rateLimitResult.retryAfter!))
+        );
+      }
+    }
+
+    // Path traversal protection
+    if (validate.isPathTraversal(path)) {
+      logSecurityWarning('Path traversal attempt blocked', { ip: clientIp, path });
+      return applySecurityHeaders(
+        jsonResponse(
+          Response.json(
+            { success: false, error: { code: 'FORBIDDEN', message: 'Invalid request' } },
+            { status: 403 }
+          )
+        )
+      );
     }
 
     // Route handling
@@ -214,6 +262,17 @@ const server = Bun.serve<WebSocketData>({
           response = await handleGetUser(req, userId);
         }
       }
+      // Feature flags routes
+      else if (path === '/api/flags' && method === 'GET') {
+        response = await handleGetFlags();
+      } else if (path.match(/^\/api\/flags\/[^/]+$/) && method === 'GET') {
+        const flagId = path.split('/')[3];
+        response = await handleGetFlag(flagId);
+      } else if (path.match(/^\/api\/flags\/[^/]+$/) && method === 'PATCH') {
+        const flagId = path.split('/')[3];
+        const body = await req.json().catch(() => null);
+        response = await handleUpdateFlag(flagId, body);
+      }
       // Health check
       else if (path === '/health' && method === 'GET') {
         response = Response.json({ status: 'ok', timestamp: new Date().toISOString() });
@@ -233,7 +292,8 @@ const server = Bun.serve<WebSocketData>({
       );
     }
 
-    return jsonResponse(response);
+    // Apply CORS and security headers to response
+    return applySecurityHeaders(jsonResponse(response));
   },
 
   websocket: {
@@ -241,6 +301,11 @@ const server = Bun.serve<WebSocketData>({
     close: handleWebSocketClose,
     message: handleWebSocketMessage,
   },
+});
+
+// Initialize feature flags on server start
+initializeFeatureFlags().catch((error) => {
+  console.error('[FeatureFlags] Failed to initialize:', error);
 });
 
 console.log(`🚀 Chess Game Server running on http://localhost:${PORT}`);

@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { getRankTier, type RankTier } from '@chess-game/shared';
 
 interface RankBadgeProps {
@@ -17,7 +18,7 @@ const sizeConfig = {
 };
 
 // Chess piece SVG paths for each rank
-const rankIcons: Record<string, (color: string) => JSX.Element> = {
+const rankIcons: Record<string, (color: string) => React.JSX.Element> = {
   pawn: (color) => (
     <path
       d="M22 9c-1.5 0-3 .5-4 1.5-1-1-2.5-1.5-4-1.5s-3 .5-4 1.5c-1-1-2.5-1.5-4-1.5v3c1 0 2 .5 2.5 1.5.5 1 .5 2 0 3-.5 1-1.5 1.5-2.5 1.5v3h20v-3c-1 0-2-.5-2.5-1.5-.5-1-.5-2 0-3 .5-1 1.5-1.5 2.5-1.5V9zM12 6a3 3 0 100-6 3 3 0 000 6z"

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { Chessboard } from 'react-chessboard';
+import { ChessBoard } from '@/components/chess/ChessBoard';
 import type { HistoryGame } from '@chess-game/shared';
 import { useMoveViewer } from '@/hooks/useMoveViewer';
 import { MoveNavigator } from './MoveNavigator';
@@ -79,19 +79,9 @@ export function GameDetailDrawer({ game, onClose }: GameDetailDrawerProps) {
             {/* Chess Board */}
             <div className="space-y-4">
               <div className="aspect-square bg-pure-black border border-mid/30 p-2">
-                <Chessboard
+                <ChessBoard
                   position={moveViewer.currentFen}
-                  boardOrientation={game.playerColor}
-                  arePiecesDraggable={false}
-                  customBoardStyle={{
-                    borderRadius: '0',
-                  }}
-                  customDarkSquareStyle={{
-                    backgroundColor: '#4d4d4d',
-                  }}
-                  customLightSquareStyle={{
-                    backgroundColor: '#f0f0f0',
-                  }}
+                  orientation={game.playerColor}
                 />
               </div>
 

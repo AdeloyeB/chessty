@@ -1,6 +1,6 @@
 'use client';
 
-import { Chessboard } from 'react-chessboard';
+import { ChessBoard } from './ChessBoard';
 import { useGameStore } from '@/store/game';
 import { useChessGame } from '@/hooks/useChessGame';
 import { useWebSocket } from '@/hooks/useWebSocket';
@@ -10,6 +10,7 @@ import { GameControls } from './GameControls';
 import { PromotionDialog } from './PromotionDialog';
 import { GameEndDialog } from './GameEndDialog';
 import { USDCAmount } from '../wallet/USDCAmount';
+import type { Square } from '@chess-game/shared/chess';
 
 export function GameBoard() {
   const {
@@ -56,14 +57,14 @@ export function GameBoard() {
           {/* Opponent Info */}
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-pure-black border border-mid flex items-center justify-center text-pure-white font-mono">
+              <div className="w-10 h-10 bg-board-dark border border-retro-blue/50 flex items-center justify-center text-pure-white font-mono">
                 {(playerColor === 'white' ? blackPlayer : whitePlayer)?.username?.[0]?.toLowerCase()}
               </div>
               <div>
                 <div className="text-pure-white font-mono">
                   {(playerColor === 'white' ? blackPlayer : whitePlayer)?.username}
                 </div>
-                <div className="text-xs text-light font-mono">
+                <div className="text-xs text-retro-muted font-mono">
                   {(playerColor === 'white' ? blackPlayer : whitePlayer)?.eloRating}
                 </div>
               </div>
@@ -75,34 +76,26 @@ export function GameBoard() {
           </div>
 
           {/* Board */}
-          <div className="chess-board relative">
-            <Chessboard
+          <div className="aspect-square relative">
+            <ChessBoard
               position={currentFen}
-              onPieceDrop={onDrop}
-              onSquareClick={onSquareClick}
-              boardOrientation={boardOrientation}
-              customSquareStyles={getSquareStyles}
-              animationDuration={200}
-              areArrowsAllowed={true}
-              customBoardStyle={{
-                borderRadius: '0',
-              }}
-              customDarkSquareStyle={{ backgroundColor: '#000000' }}
-              customLightSquareStyle={{ backgroundColor: '#ffffff' }}
+              onPieceDrop={onDrop as (from: Square, to: Square) => boolean}
+              onSquareClick={onSquareClick as (square: Square) => void}
+              orientation={boardOrientation}
             />
 
             {/* Check indicator */}
             {isCheck && (
-              <div className="absolute top-2 left-1/2 -translate-x-1/2 px-4 py-1 bg-pure-white text-pure-black text-sm font-mono border border-pure-white">
-                check
+              <div className="absolute top-2 left-1/2 -translate-x-1/2 px-4 py-1 bg-red-500 text-pure-white text-sm font-mono border border-red-400 shadow-[0_0_15px_rgba(239,68,68,0.7)] z-10">
+                CHECK
               </div>
             )}
 
             {/* Turn indicator */}
-            <div className={`absolute bottom-2 left-1/2 -translate-x-1/2 px-4 py-1 text-sm font-mono border ${
+            <div className={`absolute bottom-2 left-1/2 -translate-x-1/2 px-4 py-1 text-sm font-mono border z-10 ${
               isMyTurn
-                ? 'bg-pure-white text-pure-black border-pure-white'
-                : 'bg-pure-black text-mid-light border-mid/50'
+                ? 'bg-retro-blue text-pure-white border-retro-blue shadow-[0_0_15px_rgba(59,130,246,0.5)]'
+                : 'bg-retro-dark text-retro-muted border-retro-blue/30'
             }`}>
               {isMyTurn ? 'your_turn' : 'opponent_turn'}
             </div>
@@ -111,15 +104,15 @@ export function GameBoard() {
           {/* Player Info */}
           <div className="flex items-center justify-between mt-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-pure-white border border-mid flex items-center justify-center text-pure-black font-mono">
+              <div className="w-10 h-10 bg-pure-white border border-retro-blue/50 flex items-center justify-center text-pure-black font-mono">
                 {(playerColor === 'white' ? whitePlayer : blackPlayer)?.username?.[0]?.toLowerCase()}
               </div>
               <div>
                 <div className="text-pure-white font-mono">
                   {(playerColor === 'white' ? whitePlayer : blackPlayer)?.username}
-                  <span className="ml-2 text-xs text-light">(you)</span>
+                  <span className="ml-2 text-xs text-retro-cyan">(you)</span>
                 </div>
-                <div className="text-xs text-light font-mono">
+                <div className="text-xs text-retro-muted font-mono">
                   {(playerColor === 'white' ? whitePlayer : blackPlayer)?.eloRating}
                 </div>
               </div>
@@ -132,8 +125,8 @@ export function GameBoard() {
 
           {/* Pool Info */}
           {game && (
-            <div className="mt-6 p-4 bg-off-black border border-mid/30 text-center">
-              <p className="text-xs font-mono text-mid-light mb-1">total_pool</p>
+            <div className="mt-6 p-4 bg-retro-mid border border-retro-blue/30 text-center">
+              <p className="text-xs font-mono text-retro-muted mb-1">total_pool</p>
               <USDCAmount amount={game.totalPot} size="lg" className="justify-center" />
             </div>
           )}

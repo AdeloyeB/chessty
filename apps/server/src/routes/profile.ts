@@ -4,7 +4,7 @@ import { getRankTier, getProgressToNextRank, getNextRankTier } from '@chess-game
 import * as achievementService from '../services/achievements';
 import { authenticateRequest } from './auth';
 import { db } from '../drizzle';
-import { users, userProfiles } from '../drizzle/schema';
+import { users, userProfiles } from '../drizzle';
 import { eq } from 'drizzle-orm';
 
 const UpdateProfileSchema = z.object({

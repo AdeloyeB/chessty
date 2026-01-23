@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useMemo } from 'react';
-import { Chess, type Square } from 'chess.js';
+import { Chess, type Square, type Move } from '@chess-game/shared/chess';
 import { useGameStore } from '@/store/game';
 import { useWebSocket } from './useWebSocket';
 
@@ -13,9 +13,9 @@ export function useChessGame() {
 
   const chess = useMemo(() => new Chess(currentFen), [currentFen]);
 
-  const legalMoves = useMemo(() => {
+  const legalMoves = useMemo((): Move[] => {
     if (!selectedSquare) return [];
-    return chess.moves({ square: selectedSquare, verbose: true });
+    return chess.moves({ square: selectedSquare, verbose: true }) as Move[];
   }, [chess, selectedSquare]);
 
   const isPromotion = useCallback(
@@ -64,7 +64,7 @@ export function useChessGame() {
       if (!isMyTurn || !game) return false;
 
       // Validate move
-      const moves = chess.moves({ square: sourceSquare, verbose: true });
+      const moves = chess.moves({ square: sourceSquare, verbose: true }) as Move[];
       const move = moves.find((m) => m.to === targetSquare);
 
       if (!move) return false;

@@ -8,7 +8,7 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        // Pure black and white palette
+        // Pure black and white palette (legacy)
         'pure-black': '#000000',
         'off-black': '#0a0a0a',
         'dark': '#111111',
@@ -18,6 +18,16 @@ module.exports = {
         'light': '#999999',
         'off-white': '#e5e5e5',
         'pure-white': '#ffffff',
+
+        // Retro blue/white theme
+        'retro-dark': '#0a0f1a',      // Deep navy background
+        'retro-mid': '#111827',       // Slightly lighter navy
+        'retro-blue': '#3b82f6',      // Electric blue accent
+        'retro-cyan': '#06b6d4',      // Cyan highlight
+        'retro-glow': '#60a5fa',      // Lighter blue for glows
+        'retro-muted': '#64748b',     // Muted text
+        'board-light': '#1e3a5f',     // Light squares - muted blue
+        'board-dark': '#0f172a',      // Dark squares - deep navy
 
         // Accent (subtle)
         'accent': '#ffffff',

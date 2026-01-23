@@ -121,3 +121,6 @@ export const API_ROUTES = {
 // Re-export rank and achievement constants
 export * from './ranks';
 export * from './achievements';
+
+// Re-export feature flag constants
+export * from './flags';
