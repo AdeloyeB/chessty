@@ -166,14 +166,32 @@ export const sanitize = {
   },
 
   /**
-   * Remove potentially dangerous characters from paths
+   * Resolve a path canonically, collapsing traversal sequences.
+   * Repeatedly resolves '..' segments until none remain (prevents ....// bypass).
    */
   path(input: string): string {
-    // Remove path traversal sequences
-    return input
-      .replace(/\.\./g, '')
-      .replace(/[<>:"|?*]/g, '')
-      .replace(/\\/g, '/');
+    // Normalize backslashes to forward slashes
+    let normalized = input.replace(/\\/g, '/');
+    // Remove dangerous characters
+    normalized = normalized.replace(/[<>:"|?*]/g, '');
+    // Collapse repeated slashes
+    normalized = normalized.replace(/\/+/g, '/');
+
+    // Resolve '..' by splitting into segments and walking
+    const segments = normalized.split('/');
+    const resolved: string[] = [];
+
+    for (const segment of segments) {
+      if (segment === '..') {
+        resolved.pop(); // go up one level (or do nothing if at root)
+      } else if (segment !== '.' && segment !== '') {
+        resolved.push(segment);
+      }
+    }
+
+    // Preserve leading slash if original had one
+    const prefix = normalized.startsWith('/') ? '/' : '';
+    return prefix + resolved.join('/');
   },
 
   /**

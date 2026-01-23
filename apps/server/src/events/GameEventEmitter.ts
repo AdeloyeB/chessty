@@ -43,10 +43,19 @@ export class GameEventEmitter {
     }
 
     const list = this.handlers.get(event)!;
-    list.push(entry);
 
-    // Keep sorted by priority (lower first)
-    list.sort((a, b) => a.options.priority - b.options.priority);
+    // Binary insert by priority (lower first) — O(log n) vs O(n log n) sort
+    let lo = 0;
+    let hi = list.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >>> 1;
+      if (list[mid].options.priority <= resolved.priority) {
+        lo = mid + 1;
+      } else {
+        hi = mid;
+      }
+    }
+    list.splice(lo, 0, entry);
 
     return () => {
       const idx = list.indexOf(entry);
