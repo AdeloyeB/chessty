@@ -121,6 +121,7 @@ Custom slash commands are available in `.claude/commands/`:
 | `/technical-review [scope]` | Code quality, performance, architecture review |
 | `/security-audit [scope]` | Security vulnerability analysis |
 | `/architect [feature]` | Feature design and implementation planning |
+| `/code-review` | Independent PR review (fresh context, no bias) |
 | `/pr [description]` | Commit, push, and open a PR with standard format |
 | `/setup-github` | One-time repo setup (branch protection, rules) |
 
