@@ -32,8 +32,13 @@ git push -u origin <branch-name>
 
 Use the `gh` CLI to create the PR with this exact format:
 
+Title must start with a type prefix:
+- `feat:` — New functionality
+- `fix:` — Bug fixes
+- `chore:` — Deps, config, cleanup, CI
+
 ```bash
-gh pr create --title "<concise title>" --body "$(cat <<'EOF'
+gh pr create --title "<type>: <concise title>" --body "$(cat <<'EOF'
 ## Feature
 <Feature name derived from branch, 1 sentence description>
 
