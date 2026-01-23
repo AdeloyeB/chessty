@@ -35,3 +35,23 @@ export function formatProbability(odds: number): string {
   const probability = (1 / odds) * 100;
   return `${probability.toFixed(0)}%`;
 }
+
+/**
+ * Address formatting utilities for wallet display
+ */
+export function truncateAddress(address: string | null | undefined): string {
+  if (!address) return '';
+  return `${address.slice(0, 6)}...${address.slice(-4)}`;
+}
+
+export function maskAddress(address: string | null | undefined): string {
+  if (!address) return '';
+  // Show first 6 and last 4 chars with dots in between
+  return `${address.slice(0, 6)}${'•'.repeat(8)}${address.slice(-4)}`;
+}
+
+export function maskTruncatedAddress(truncatedAddress: string | null | undefined): string {
+  if (!truncatedAddress) return '';
+  // For already truncated addresses (0x1234...5678), mask the middle
+  return `${truncatedAddress.slice(0, 4)}••••${truncatedAddress.slice(-2)}`;
+}

@@ -10,8 +10,10 @@
     "outDir": "./dist",
     "rootDir": "./electron",
     "moduleResolution": "node",
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "types": ["node"],
+    "typeRoots": ["./node_modules/@types", "../../node_modules/@types"]
   },
-  "include": ["electron/**/*"],
+  "include": ["electron/main.ts", "electron/preload.ts"],
   "exclude": ["node_modules", "dist"]
 }

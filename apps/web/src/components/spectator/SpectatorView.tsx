@@ -1,6 +1,6 @@
 'use client';
 
-import { Chessboard } from 'react-chessboard';
+import { ChessBoard } from '../chess/ChessBoard';
 import { useSpectatorStore } from '@/store/spectator';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { PredictionPanel } from '../predictions/PredictionPanel';
@@ -84,16 +84,10 @@ export function SpectatorView() {
 
         {/* Center: Board */}
         <div className="order-1 lg:order-2">
-          <div className="chess-board">
-            <Chessboard
+          <div className="aspect-square">
+            <ChessBoard
               position={currentFen}
-              boardOrientation="white"
-              arePiecesDraggable={false}
-              customBoardStyle={{
-                borderRadius: '0',
-              }}
-              customDarkSquareStyle={{ backgroundColor: '#000000' }}
-              customLightSquareStyle={{ backgroundColor: '#ffffff' }}
+              orientation="white"
             />
           </div>
         </div>

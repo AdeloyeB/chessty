@@ -1,10 +1,12 @@
 'use client'
 
 import { useState, useCallback } from 'react'
-import { cn } from '@/lib/utils'
+import { cn, maskTruncatedAddress } from '@/lib/utils'
 import { useWallet } from '@/hooks/useWallet'
 import { USDCAmount } from './USDCAmount'
 import { BalanceHistoryTooltip } from './BalanceHistoryTooltip'
+import { ConnectButton } from './ConnectButton'
+import { walletButtonConnected, walletButtonConnectedActive } from './styles'
 
 interface WalletButtonProps {
   className?: string
@@ -16,10 +18,8 @@ export function WalletButton({ className }: WalletButtonProps) {
   const [isPinned, setIsPinned] = useState(false)
   const [showAddress, setShowAddress] = useState(false)
 
-  // Mask the address: show first 2 and last 2 chars with dots
-  const maskedAddress = truncatedAddress
-    ? `${truncatedAddress.slice(0, 4)}••••${truncatedAddress.slice(-2)}`
-    : ''
+  // Mask the address for privacy (show first 4 and last 2 chars)
+  const maskedAddress = maskTruncatedAddress(truncatedAddress)
 
   const handleClick = useCallback((e: React.MouseEvent) => {
     if (isPinned) {
@@ -41,20 +41,9 @@ export function WalletButton({ className }: WalletButtonProps) {
     setIsHovered(false)
   }, [])
 
+  // Not connected - use ConnectButton (handles dev mode vs RainbowKit)
   if (!isConnected) {
-    return (
-      <button
-        onClick={openWalletModal}
-        className={cn(
-          'px-4 py-2 bg-usdc text-white font-medium rounded-lg',
-          'hover:bg-usdc-light transition-colors',
-          'flex items-center gap-2',
-          className
-        )}
-      >
-        Connect Wallet
-      </button>
-    )
+    return <ConnectButton className={className} />
   }
 
   return (
@@ -66,10 +55,7 @@ export function WalletButton({ className }: WalletButtonProps) {
       <button
         onClick={handleClick}
         className={cn(
-          'px-4 py-2 bg-mid-dark/80 backdrop-blur-sm border border-mid/50 rounded-lg',
-          'hover:bg-mid/80 hover:border-mid-light/60 transition-colors',
-          'flex items-center gap-3',
-          (isHovered || isPinned) && 'bg-mid/80 border-mid-light/60',
+          (isHovered || isPinned) ? walletButtonConnectedActive : walletButtonConnected,
           className
         )}
       >

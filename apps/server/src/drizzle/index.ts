@@ -24,6 +24,9 @@ const createTablesSql = `
     balance REAL NOT NULL DEFAULT 1000,
     total_wagered REAL NOT NULL DEFAULT 0,
     total_won REAL NOT NULL DEFAULT 0,
+    failed_login_attempts INTEGER NOT NULL DEFAULT 0,
+    locked_until INTEGER,
+    last_failed_login_at INTEGER,
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL
   );
@@ -96,6 +99,8 @@ const createTablesSql = `
     id TEXT PRIMARY KEY,
     user_id TEXT NOT NULL REFERENCES users(id),
     expires_at INTEGER NOT NULL,
+    ip_address TEXT,
+    user_agent TEXT,
     created_at INTEGER NOT NULL
   );
 
@@ -136,6 +141,50 @@ const createTablesSql = `
     message TEXT NOT NULL,
     created_at INTEGER NOT NULL
   );
+
+  CREATE TABLE IF NOT EXISTS user_achievements (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id),
+    achievement_id TEXT NOT NULL,
+    category TEXT NOT NULL,
+    unlocked_at INTEGER NOT NULL,
+    UNIQUE(user_id, achievement_id)
+  );
+
+  CREATE TABLE IF NOT EXISTS user_profiles (
+    user_id TEXT PRIMARY KEY REFERENCES users(id),
+    is_public INTEGER NOT NULL DEFAULT 1,
+    current_streak INTEGER NOT NULL DEFAULT 0,
+    longest_streak INTEGER NOT NULL DEFAULT 0,
+    total_checkmates INTEGER NOT NULL DEFAULT 0,
+    quickest_win INTEGER,
+    biggest_stake_win REAL DEFAULT 0,
+    updated_at INTEGER NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS security_audit_log (
+    id TEXT PRIMARY KEY,
+    event_type TEXT NOT NULL,
+    user_id TEXT REFERENCES users(id),
+    ip_address TEXT,
+    user_agent TEXT,
+    details TEXT,
+    created_at INTEGER NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS feature_flags (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    description TEXT,
+    enabled INTEGER NOT NULL DEFAULT 0,
+    metadata TEXT,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_security_audit_log_user_id ON security_audit_log(user_id);
+  CREATE INDEX IF NOT EXISTS idx_security_audit_log_event_type ON security_audit_log(event_type);
+  CREATE INDEX IF NOT EXISTS idx_security_audit_log_ip_address ON security_audit_log(ip_address);
 `;
 
 sqlite.run(createTablesSql);

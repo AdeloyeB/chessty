@@ -18,6 +18,10 @@ export const users = sqliteTable('users', {
   balance: real('balance').notNull().default(1000),
   totalWagered: real('total_wagered').notNull().default(0),
   totalWon: real('total_won').notNull().default(0),
+  // Account lockout fields
+  failedLoginAttempts: integer('failed_login_attempts').notNull().default(0),
+  lockedUntil: integer('locked_until', { mode: 'timestamp' }),
+  lastFailedLoginAt: integer('last_failed_login_at', { mode: 'timestamp' }),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
 });
@@ -95,6 +99,9 @@ export const sessions = sqliteTable('sessions', {
   id: text('id').primaryKey(),
   userId: text('user_id').notNull().references(() => users.id),
   expiresAt: integer('expires_at', { mode: 'timestamp' }).notNull(),
+  // Security tracking fields
+  ipAddress: text('ip_address'),
+  userAgent: text('user_agent'),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
 });
 
@@ -139,8 +146,40 @@ export const spectatorChat = sqliteTable('spectator_chat', {
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
 });
 
+// User achievements table
+export const userAchievements = sqliteTable('user_achievements', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull().references(() => users.id),
+  achievementId: text('achievement_id').notNull(),
+  category: text('category').notNull(), // games, elo, streaks, special_moves, milestones
+  unlockedAt: integer('unlocked_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
+});
+
+// User profiles table (extended profile stats)
+export const userProfiles = sqliteTable('user_profiles', {
+  userId: text('user_id').primaryKey().references(() => users.id),
+  isPublic: integer('is_public').notNull().default(1), // 1 = public, 0 = private
+  currentStreak: integer('current_streak').notNull().default(0),
+  longestStreak: integer('longest_streak').notNull().default(0),
+  totalCheckmates: integer('total_checkmates').notNull().default(0),
+  quickestWin: integer('quickest_win'), // fewest moves to win
+  biggestStakeWin: real('biggest_stake_win').default(0),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
+});
+
+// Security audit log table
+export const securityAuditLog = sqliteTable('security_audit_log', {
+  id: text('id').primaryKey(),
+  eventType: text('event_type').notNull(), // login_failed, login_success, account_locked, account_unlocked, etc.
+  userId: text('user_id').references(() => users.id),
+  ipAddress: text('ip_address'),
+  userAgent: text('user_agent'),
+  details: text('details', { mode: 'json' }).$type<Record<string, unknown>>(),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
+});
+
 // Relations
-export const usersRelations = relations(users, ({ many }) => ({
+export const usersRelations = relations(users, ({ one, many }) => ({
   whiteGames: many(games, { relationName: 'whitePlayer' }),
   blackGames: many(games, { relationName: 'blackPlayer' }),
   wonGames: many(games, { relationName: 'winner' }),
@@ -153,6 +192,12 @@ export const usersRelations = relations(users, ({ many }) => ({
   spectatorPredictionsCreated: many(spectatorPredictions, { relationName: 'predictionCreator' }),
   spectatorPredictionsAccepted: many(spectatorPredictions, { relationName: 'predictionAcceptor' }),
   spectatorChatMessages: many(spectatorChat),
+  securityAuditLogs: many(securityAuditLog),
+  achievements: many(userAchievements),
+  profile: one(userProfiles, {
+    fields: [users.id],
+    references: [userProfiles.userId],
+  }),
 }));
 
 export const gamesRelations = relations(games, ({ one, many }) => ({
@@ -252,7 +297,41 @@ export const spectatorChatRelations = relations(spectatorChat, ({ one }) => ({
   }),
 }));
 
+export const securityAuditLogRelations = relations(securityAuditLog, ({ one }) => ({
+  user: one(users, {
+    fields: [securityAuditLog.userId],
+    references: [users.id],
+  }),
+}));
+
+export const userAchievementsRelations = relations(userAchievements, ({ one }) => ({
+  user: one(users, {
+    fields: [userAchievements.userId],
+    references: [users.id],
+  }),
+}));
+
+export const userProfilesRelations = relations(userProfiles, ({ one }) => ({
+  user: one(users, {
+    fields: [userProfiles.userId],
+    references: [users.id],
+  }),
+}));
+
+// Feature flags table
+export const featureFlags = sqliteTable('feature_flags', {
+  id: text('id').primaryKey(), // e.g., 'betting_enabled', 'matchmaking_v2'
+  name: text('name').notNull(),
+  description: text('description'),
+  enabled: integer('enabled').notNull().default(0), // 0 = false, 1 = true
+  metadata: text('metadata', { mode: 'json' }).$type<Record<string, unknown>>(), // For future extensibility
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
+});
+
 // Type exports
+export type FeatureFlag = typeof featureFlags.$inferSelect;
+export type NewFeatureFlag = typeof featureFlags.$inferInsert;
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type Game = typeof games.$inferSelect;
@@ -271,3 +350,9 @@ export type SpectatorPrediction = typeof spectatorPredictions.$inferSelect;
 export type NewSpectatorPrediction = typeof spectatorPredictions.$inferInsert;
 export type SpectatorChatMessage = typeof spectatorChat.$inferSelect;
 export type NewSpectatorChatMessage = typeof spectatorChat.$inferInsert;
+export type SecurityAuditLogEntry = typeof securityAuditLog.$inferSelect;
+export type NewSecurityAuditLogEntry = typeof securityAuditLog.$inferInsert;
+export type UserAchievement = typeof userAchievements.$inferSelect;
+export type NewUserAchievement = typeof userAchievements.$inferInsert;
+export type UserProfile = typeof userProfiles.$inferSelect;
+export type NewUserProfile = typeof userProfiles.$inferInsert;

@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { cn } from '@/lib/utils'
+import { cn, maskAddress } from '@/lib/utils'
 import { useWallet } from '@/hooks/useWallet'
 import { USDCAmount } from './USDCAmount'
 
@@ -9,7 +9,6 @@ export function WalletModal() {
   const {
     isConnected,
     address,
-    truncatedAddress,
     usdcBalance,
     isLoadingBalance,
     isConnecting,
@@ -18,15 +17,14 @@ export function WalletModal() {
     connectWallet,
     disconnectWallet,
     closeWalletModal,
+    isDevMode,
   } = useWallet()
 
   const modalRef = useRef<HTMLDivElement>(null)
   const [showFullAddress, setShowFullAddress] = useState(false)
 
-  // Mask the address for privacy
-  const maskedAddress = address
-    ? `${address.slice(0, 6)}${'•'.repeat(32)}${address.slice(-4)}`
-    : ''
+  // Mask the address for privacy (show first 6 and last 4 chars with dots)
+  const maskedAddress = maskAddress(address)
 
   // Close on escape key
   useEffect(() => {
@@ -54,7 +52,12 @@ export function WalletModal() {
     }
   }
 
+  // Don't show modal if not open
   if (!isWalletModalOpen) return null
+
+  // In production mode, only show modal when connected (RainbowKit handles connection)
+  // In dev mode, show modal for both connection and account management
+  if (!isConnected && !isDevMode) return null
 
   // Get connector display info
   const getConnectorInfo = (connectorId: string) => {
@@ -83,7 +86,7 @@ export function WalletModal() {
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-mid">
           <h2 className="text-lg font-semibold text-pure-white">
-            {isConnected ? 'Wallet' : 'Connect Wallet'}
+            {isConnected ? 'Wallet' : isDevMode ? 'Connect Wallet (Dev)' : 'Wallet'}
           </h2>
           <button
             onClick={closeWalletModal}
@@ -166,7 +169,7 @@ export function WalletModal() {
               </button>
             </div>
           ) : (
-            // Connect view
+            // Dev mode connect view (production uses RainbowKit modal instead)
             <div className="space-y-3">
               {isConnecting && (
                 <div className="p-4 bg-mid-dark rounded-lg text-center">

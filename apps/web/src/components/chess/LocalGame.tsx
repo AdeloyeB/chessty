@@ -1,17 +1,16 @@
 'use client';
 
 import { useState, useCallback, useMemo, useEffect } from 'react';
-import { Chess, type Square } from 'chess.js';
-import { Chessboard } from 'react-chessboard';
+import { ChessEngine, type Square, type Move, type PieceType } from '@chess-game/shared/chess';
+import { ChessBoard } from './ChessBoard';
 import { useAuthStore } from '@/store/auth';
 import { nanoid } from 'nanoid';
 
-// Piece values for scoring
-const PIECE_VALUES: Record<string, number> = {
+const PIECE_VALUES: Record<PieceType, number> = {
   p: 1, n: 3, b: 3, r: 5, q: 9, k: 0,
 };
 
-function calculateScore(game: Chess, color: 'w' | 'b'): number {
+function calculateScore(game: ChessEngine, color: 'w' | 'b'): number {
   const board = game.board();
   let score = 0;
   for (const row of board) {
@@ -24,7 +23,7 @@ function calculateScore(game: Chess, color: 'w' | 'b'): number {
   return score;
 }
 
-function getCapturedPieces(game: Chess, color: 'w' | 'b'): string[] {
+function getCapturedPieces(game: ChessEngine, color: 'w' | 'b'): string[] {
   const startingPieces = { p: 8, n: 2, b: 2, r: 2, q: 1 };
   const currentPieces: Record<string, number> = { p: 0, n: 0, b: 0, r: 0, q: 0 };
 
@@ -54,15 +53,16 @@ function getCapturedPieces(game: Chess, color: 'w' | 'b'): string[] {
 
 export function LocalGame() {
   const { user } = useAuthStore();
-  const [game, setGame] = useState(new Chess());
+  const [game, setGame] = useState(() => new ChessEngine());
   const [selectedSquare, setSelectedSquare] = useState<Square | null>(null);
   const [moveHistory, setMoveHistory] = useState<string[]>([]);
+  const [lastMove, setLastMove] = useState<{ from: Square; to: Square } | null>(null);
   const [promotionMove, setPromotionMove] = useState<{ from: Square; to: Square } | null>(null);
   const [sessionId] = useState(() => nanoid(8));
   const [sessionStart] = useState(() => new Date());
   const [elapsedTime, setElapsedTime] = useState(0);
 
-  const playerName = user?.username || 'player';
+  const playerName = user?.username || 'Player';
   const currentTurn = game.turn() === 'w' ? 'white' : 'black';
   const isGameOver = game.isGameOver();
 
@@ -72,7 +72,6 @@ export function LocalGame() {
   const blackCaptured = useMemo(() => getCapturedPieces(game, 'w'), [game]);
   const scoreDiff = whiteScore - blackScore;
 
-  // Session timer
   useEffect(() => {
     const interval = setInterval(() => {
       setElapsedTime(Math.floor((Date.now() - sessionStart.getTime()) / 1000));
@@ -81,17 +80,17 @@ export function LocalGame() {
   }, [sessionStart]);
 
   const formatElapsed = (seconds: number) => {
-    const h = Math.floor(seconds / 3600);
-    const m = Math.floor((seconds % 3600) / 60);
+    const m = Math.floor(seconds / 60);
     const s = seconds % 60;
-    if (h > 0) return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
     return `${m}:${s.toString().padStart(2, '0')}`;
   };
 
   const legalMoves = useMemo(() => {
     if (!selectedSquare) return [];
-    return game.moves({ square: selectedSquare, verbose: true });
+    return game.moves({ square: selectedSquare, verbose: true }) as Move[];
   }, [game, selectedSquare]);
+
+  const legalMoveSquares = useMemo(() => legalMoves.map(m => m.to), [legalMoves]);
 
   const isPromotion = useCallback(
     (from: Square, to: Square): boolean => {
@@ -105,16 +104,14 @@ export function LocalGame() {
 
   const makeMove = useCallback(
     (from: Square, to: Square, promotion?: string) => {
-      try {
-        const move = game.move({ from, to, promotion });
-        if (move) {
-          setGame(new Chess(game.fen()));
-          setMoveHistory((prev) => [...prev, move.san]);
-          setSelectedSquare(null);
-          return true;
-        }
-      } catch {
-        // Invalid move
+      const move = game.move({ from, to, promotion });
+      if (move) {
+        const newGame = new ChessEngine(game.fen());
+        setGame(newGame);
+        setMoveHistory((prev) => [...prev, move.san]);
+        setLastMove({ from, to });
+        setSelectedSquare(null);
+        return true;
       }
       return false;
     },
@@ -155,6 +152,8 @@ export function LocalGame() {
   const onDrop = useCallback(
     (sourceSquare: Square, targetSquare: Square): boolean => {
       if (isGameOver) return false;
+      const piece = game.get(sourceSquare);
+      if (!piece || piece.color !== game.turn()) return false;
 
       if (isPromotion(sourceSquare, targetSquare)) {
         setPromotionMove({ from: sourceSquare, to: targetSquare });
@@ -163,56 +162,50 @@ export function LocalGame() {
 
       return makeMove(sourceSquare, targetSquare);
     },
-    [isPromotion, makeMove, isGameOver]
+    [game, isPromotion, makeMove, isGameOver]
   );
 
-  const onPromotionSelect = (piece: string) => {
+  const onPromotionSelect = (pieceType: string) => {
     if (promotionMove) {
-      makeMove(promotionMove.from, promotionMove.to, piece);
+      makeMove(promotionMove.from, promotionMove.to, pieceType);
       setPromotionMove(null);
     }
   };
 
-  const squareStyles = useMemo(() => {
-    const styles: Record<string, React.CSSProperties> = {};
-
-    if (selectedSquare) {
-      styles[selectedSquare] = { backgroundColor: 'rgba(255, 255, 255, 0.3)' };
-    }
-
-    legalMoves.forEach((move) => {
-      styles[move.to] = {
-        background: game.get(move.to as Square)
-          ? 'radial-gradient(circle, rgba(255, 255, 255, 0.4) 85%, transparent 85%)'
-          : 'radial-gradient(circle, rgba(255, 255, 255, 0.3) 25%, transparent 25%)',
-        borderRadius: '50%',
-      };
-    });
-
-    if (game.isCheck()) {
-      const kingSquare = game
-        .board()
-        .flat()
-        .find((p) => p?.type === 'k' && p.color === game.turn())?.square;
-      if (kingSquare) {
-        styles[kingSquare] = { backgroundColor: 'rgba(255, 255, 255, 0.5)' };
+  const checkSquare = useMemo(() => {
+    if (!game.isCheck()) return null;
+    const board = game.board();
+    for (const row of board) {
+      for (const piece of row) {
+        if (piece && piece.type === 'k' && piece.color === game.turn()) {
+          return piece.square || null;
+        }
       }
     }
-
-    return styles;
-  }, [selectedSquare, legalMoves, game]);
+    return null;
+  }, [game]);
 
   const resetGame = () => {
-    setGame(new Chess());
+    setGame(new ChessEngine());
     setMoveHistory([]);
     setSelectedSquare(null);
+    setLastMove(null);
   };
 
   const undoMove = () => {
-    game.undo();
-    setGame(new Chess(game.fen()));
-    setMoveHistory((prev) => prev.slice(0, -1));
-    setSelectedSquare(null);
+    const move = game.undo();
+    if (move) {
+      setGame(new ChessEngine(game.fen()));
+      setMoveHistory((prev) => prev.slice(0, -1));
+      setSelectedSquare(null);
+      const history = game.history();
+      if (history.length > 0) {
+        const lastHistoryMove = history[history.length - 1];
+        setLastMove({ from: lastHistoryMove.from, to: lastHistoryMove.to });
+      } else {
+        setLastMove(null);
+      }
+    }
   };
 
   const getStatusMessage = () => {
@@ -233,186 +226,151 @@ export function LocalGame() {
   }
 
   return (
-    <div className="h-full bg-pure-black flex flex-col overflow-hidden">
-      {/* Main Content Area */}
-      <div className="flex-1 flex min-h-0">
-        {/* Left Sidebar */}
-        <div className="w-64 border-r border-mid/30 flex flex-col bg-off-black">
-          {/* Sidebar Header */}
-          <div className="p-3 border-b border-mid/30">
-            <div className="flex items-center gap-2">
-              <span className="text-lg">♔</span>
-              <span className="text-xs font-mono text-mid-light">PRACTICE MODE</span>
+    <div className="h-full bg-slate-950 flex overflow-hidden">
+      {/* Left Sidebar - Compact */}
+      <div className="w-56 border-r border-slate-800 flex flex-col bg-slate-900">
+        {/* Header */}
+        <div className="px-3 py-2 border-b border-slate-800 flex items-center gap-2">
+          <span className="text-blue-400">♔</span>
+          <span className="text-xs font-mono text-slate-400 uppercase tracking-wider">Practice</span>
+        </div>
+
+        {/* Stats */}
+        <div className="px-3 py-2 border-b border-slate-800 space-y-2">
+          <div className="flex gap-2">
+            <div className="flex-1 p-2 bg-slate-950 rounded text-center">
+              <div className="text-lg font-mono text-cyan-400">{moveHistory.length}</div>
+              <div className="text-[10px] text-slate-500 uppercase">Moves</div>
+            </div>
+            <div className="flex-1 p-2 bg-slate-950 rounded text-center">
+              <div className="text-lg font-mono text-slate-300">{formatElapsed(elapsedTime)}</div>
+              <div className="text-[10px] text-slate-500 uppercase">Time</div>
             </div>
           </div>
 
-          {/* Game Stats */}
-          <div className="p-3 border-b border-mid/30 space-y-3">
-            <div className="text-xs font-mono text-mid-light">GAME STATS</div>
-
-            <div className="grid grid-cols-2 gap-2">
-              <div className="p-2 bg-pure-black border border-mid/30">
-                <div className="text-xs font-mono text-mid-light">MOVES</div>
-                <div className="text-lg font-mono text-pure-white">{moveHistory.length}</div>
-              </div>
-              <div className="p-2 bg-pure-black border border-mid/30">
-                <div className="text-xs font-mono text-mid-light">STATUS</div>
-                <div className={`text-xs font-mono ${isGameOver ? 'text-pure-white' : 'text-mid-light'}`}>
-                  {isGameOver ? 'ENDED' : 'ACTIVE'}
-                </div>
-              </div>
+          {/* Material */}
+          <div className="flex items-center justify-between text-xs font-mono px-1">
+            <div className="flex items-center gap-1">
+              <span className="w-2 h-2 bg-white rounded-sm" />
+              <span className="text-slate-300">{whiteScore}</span>
             </div>
-
-            <div className="p-2 bg-pure-black border border-mid/30">
-              <div className="text-xs font-mono text-mid-light mb-1">MATERIAL</div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="w-3 h-3 bg-pure-white" />
-                  <span className="font-mono text-pure-white">{whiteScore}</span>
-                </div>
-                <span className={`font-mono text-xs ${scoreDiff > 0 ? 'text-pure-white' : scoreDiff < 0 ? 'text-mid-light' : 'text-mid'}`}>
-                  {scoreDiff > 0 ? `+${scoreDiff}` : scoreDiff < 0 ? `${scoreDiff}` : '='}
-                </span>
-                <div className="flex items-center gap-2">
-                  <span className="font-mono text-pure-white">{blackScore}</span>
-                  <span className="w-3 h-3 bg-pure-black border border-mid" />
-                </div>
-              </div>
+            <span className={`text-xs ${scoreDiff > 0 ? 'text-cyan-400' : scoreDiff < 0 ? 'text-red-400' : 'text-slate-500'}`}>
+              {scoreDiff > 0 ? `+${scoreDiff}` : scoreDiff < 0 ? `${scoreDiff}` : '='}
+            </span>
+            <div className="flex items-center gap-1">
+              <span className="text-slate-300">{blackScore}</span>
+              <span className="w-2 h-2 bg-slate-700 rounded-sm border border-slate-600" />
             </div>
-          </div>
-
-          {/* Move History */}
-          <div className="flex-1 flex flex-col min-h-0">
-            <div className="p-3 border-b border-mid/30">
-              <div className="text-xs font-mono text-mid-light">MOVE HISTORY</div>
-            </div>
-            <div className="flex-1 overflow-y-auto p-3">
-              {moveHistory.length === 0 ? (
-                <div className="text-center py-4">
-                  <p className="text-xs font-mono text-mid">No moves yet</p>
-                </div>
-              ) : (
-                <div className="space-y-1 font-mono text-xs">
-                  {movePairs.map((pair) => (
-                    <div key={pair.number} className="flex items-center">
-                      <span className="w-6 text-mid">{pair.number}.</span>
-                      <span className="w-14 text-pure-white">{pair.white || '...'}</span>
-                      <span className="w-14 text-mid-light">{pair.black || ''}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Sidebar Actions */}
-          <div className="p-3 border-t border-mid/30 space-y-2">
-            <button
-              onClick={undoMove}
-              disabled={moveHistory.length === 0}
-              className="w-full px-3 py-2 text-xs font-mono border border-mid/50 text-mid-light hover:border-pure-white hover:text-pure-white disabled:opacity-30 disabled:cursor-not-allowed transition-all"
-            >
-              ← UNDO
-            </button>
-            <button
-              onClick={resetGame}
-              className="w-full px-3 py-2 text-xs font-mono border border-mid/50 text-mid-light hover:border-pure-white hover:text-pure-white transition-all"
-            >
-              ↺ NEW GAME
-            </button>
           </div>
         </div>
 
-        {/* Main Chess Board Area */}
-        <div className="flex-1 flex flex-col min-h-0 bg-pure-black">
-          {/* Board Header - Player Info */}
-          <div className="p-3 border-b border-mid/30 flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <span className="w-4 h-4 bg-pure-black border border-mid" />
-                <span className="text-xs font-mono text-pure-white">{playerName}_black</span>
+        {/* Move History */}
+        <div className="flex-1 flex flex-col min-h-0">
+          <div className="px-3 py-1 text-[10px] text-slate-500 uppercase tracking-wider">History</div>
+          <div className="flex-1 overflow-y-auto px-3 pb-2">
+            {moveHistory.length === 0 ? (
+              <div className="text-xs text-slate-600 text-center py-4">No moves yet</div>
+            ) : (
+              <div className="space-y-0.5 font-mono text-xs">
+                {movePairs.map((pair) => (
+                  <div key={pair.number} className="flex items-center hover:bg-slate-800/50 rounded px-1">
+                    <span className="w-5 text-slate-600">{pair.number}.</span>
+                    <span className="w-12 text-slate-300">{pair.white || '...'}</span>
+                    <span className="w-12 text-slate-400">{pair.black || ''}</span>
+                  </div>
+                ))}
               </div>
-              <div className="text-xs font-mono text-mid-light">
-                {blackCaptured.length > 0 && `captured: ${blackCaptured.join(' ')}`}
-              </div>
-            </div>
-            <div className={`px-3 py-1 text-xs font-mono ${
-              game.turn() === 'b' ? 'bg-pure-white text-pure-black' : 'text-mid-light'
-            }`}>
-              {game.turn() === 'b' ? '● THINKING' : '○'}
-            </div>
+            )}
           </div>
+        </div>
 
-          {/* Chess Board Container */}
-          <div className="flex-1 flex items-center justify-center p-6 min-h-0">
-            <div className="aspect-square max-h-full max-w-full" style={{ height: 'min(100%, calc(100vw - 320px))' }}>
-              <Chessboard
-                position={game.fen()}
-                onPieceDrop={onDrop}
-                onSquareClick={onSquareClick}
-                customSquareStyles={squareStyles}
-                animationDuration={150}
-                areArrowsAllowed={true}
-                customBoardStyle={{
-                  borderRadius: '0',
-                  boxShadow: 'none',
-                }}
-                customDarkSquareStyle={{ backgroundColor: '#1a1a1a' }}
-                customLightSquareStyle={{ backgroundColor: '#e5e5e5' }}
-              />
-            </div>
+        {/* Actions */}
+        <div className="p-2 border-t border-slate-800 space-y-1">
+          <button
+            onClick={undoMove}
+            disabled={moveHistory.length === 0}
+            className="w-full px-2 py-1.5 text-xs font-mono bg-slate-950 border border-slate-700 text-slate-400 rounded hover:border-blue-500 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+          >
+            ← Undo
+          </button>
+          <button
+            onClick={resetGame}
+            className="w-full px-2 py-1.5 text-xs font-mono bg-slate-950 border border-slate-700 text-slate-400 rounded hover:border-blue-500 hover:text-white transition-all"
+          >
+            ↺ New Game
+          </button>
+        </div>
+      </div>
+
+      {/* Main Board Area - Maximized */}
+      <div className="flex-1 flex flex-col min-h-0">
+        {/* Top Player Bar - Minimal */}
+        <div className="h-10 px-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/50">
+          <div className="flex items-center gap-3">
+            <div className="w-3 h-3 bg-slate-700 rounded-sm border border-slate-600" />
+            <span className="text-sm font-medium text-slate-300">{playerName}</span>
+            {blackCaptured.length > 0 && (
+              <span className="text-xs text-slate-500">{blackCaptured.join(' ')}</span>
+            )}
           </div>
+          <div className={`px-2 py-0.5 text-xs font-mono rounded ${
+            game.turn() === 'b' ? 'bg-blue-500/20 text-blue-400' : 'text-slate-600'
+          }`}>
+            {game.turn() === 'b' ? '● TURN' : '○'}
+          </div>
+        </div>
 
-          {/* Board Footer - Player Info */}
-          <div className="p-3 border-t border-mid/30 flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <span className="w-4 h-4 bg-pure-white" />
-                <span className="text-xs font-mono text-pure-white">{playerName}_white</span>
-              </div>
-              <div className="text-xs font-mono text-mid-light">
-                {whiteCaptured.length > 0 && `captured: ${whiteCaptured.join(' ')}`}
-              </div>
-            </div>
-            <div className={`px-3 py-1 text-xs font-mono ${
-              game.turn() === 'w' ? 'bg-pure-white text-pure-black' : 'text-mid-light'
-            }`}>
-              {game.turn() === 'w' ? '● THINKING' : '○'}
-            </div>
+        {/* Chess Board - FILL THE SPACE */}
+        <div className="flex-1 p-2 min-h-0">
+          <ChessBoard
+            position={game.fen()}
+            onSquareClick={onSquareClick}
+            onPieceDrop={onDrop}
+            selectedSquare={selectedSquare}
+            legalMoves={legalMoveSquares}
+            lastMove={lastMove}
+            checkSquare={checkSquare}
+            orientation="white"
+          />
+        </div>
+
+        {/* Bottom Player Bar - Minimal */}
+        <div className="h-10 px-4 border-t border-slate-800 flex items-center justify-between bg-slate-900/50">
+          <div className="flex items-center gap-3">
+            <div className="w-3 h-3 bg-white rounded-sm" />
+            <span className="text-sm font-medium text-slate-300">{playerName}</span>
+            {whiteCaptured.length > 0 && (
+              <span className="text-xs text-slate-500">{whiteCaptured.join(' ')}</span>
+            )}
+          </div>
+          <div className={`px-2 py-0.5 text-xs font-mono rounded ${
+            game.turn() === 'w' ? 'bg-blue-500/20 text-blue-400' : 'text-slate-600'
+          }`}>
+            {game.turn() === 'w' ? '● TURN' : '○'}
           </div>
         </div>
       </div>
 
-      {/* Bottom Status Bar */}
-      <div className="h-8 border-t border-mid/30 bg-off-black flex items-center px-3 gap-6">
-        <div className="flex items-center gap-2">
-          <span className={`w-2 h-2 rounded-full ${isGameOver ? 'bg-mid' : 'bg-pure-white animate-pulse'}`} />
-          <span className="text-xs font-mono text-mid-light">{getStatusMessage()}</span>
+      {/* Status Bar - Bottom */}
+      <div className="absolute bottom-0 left-0 right-0 h-6 border-t border-slate-800 bg-slate-900 flex items-center px-3 gap-4 text-[10px] font-mono text-slate-500">
+        <div className="flex items-center gap-1.5">
+          <span className={`w-1.5 h-1.5 rounded-full ${isGameOver ? 'bg-slate-600' : 'bg-cyan-400 animate-pulse'}`} />
+          <span className="text-slate-400">{getStatusMessage()}</span>
         </div>
-
-        <div className="h-4 w-px bg-mid/30" />
-
-        <div className="flex items-center gap-4 text-xs font-mono text-mid">
-          <span>SESSION: {sessionId}</span>
-          <span>TIME: {formatElapsed(elapsedTime)}</span>
-          <span>HALF-MOVES: {moveHistory.length}</span>
-          <span>WHITE: {whiteScore} pts</span>
-          <span>BLACK: {blackScore} pts</span>
-        </div>
-
-        <div className="ml-auto flex items-center gap-4 text-xs font-mono text-mid">
-          <span>FEN: {game.fen().slice(0, 20)}...</span>
-        </div>
+        <span className="text-slate-700">|</span>
+        <span>Session: {sessionId}</span>
+        <span>Moves: {moveHistory.length}</span>
+        <span className="ml-auto text-slate-600 truncate max-w-48">FEN: {game.fen().slice(0, 30)}...</span>
       </div>
 
       {/* Promotion Dialog */}
       {promotionMove && (
-        <div className="fixed inset-0 bg-pure-black/95 flex items-center justify-center z-50">
-          <div className="bg-off-black border border-mid/30 p-4 max-w-xs w-full">
-            <p className="text-xs font-mono text-mid-light mb-4 text-center">
-              SELECT PROMOTION
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+          <div className="bg-slate-900 border border-slate-700 rounded-lg p-4 shadow-2xl">
+            <p className="text-xs font-mono text-slate-400 mb-3 text-center uppercase tracking-wider">
+              Select Promotion
             </p>
-            <div className="grid grid-cols-4 gap-2 mb-4">
+            <div className="flex gap-2 mb-3">
               {[
                 { key: 'q', symbol: game.turn() === 'w' ? '♕' : '♛' },
                 { key: 'r', symbol: game.turn() === 'w' ? '♖' : '♜' },
@@ -422,17 +380,17 @@ export function LocalGame() {
                 <button
                   key={piece.key}
                   onClick={() => onPromotionSelect(piece.key)}
-                  className="p-3 bg-pure-black border border-mid hover:border-pure-white transition-colors"
+                  className="w-14 h-14 bg-slate-800 border border-slate-600 rounded hover:border-blue-500 hover:bg-slate-700 transition-all"
                 >
-                  <div className="text-3xl text-center">{piece.symbol}</div>
+                  <span className="text-4xl">{piece.symbol}</span>
                 </button>
               ))}
             </div>
             <button
               onClick={() => setPromotionMove(null)}
-              className="w-full px-3 py-2 text-xs font-mono border border-mid/50 text-mid-light hover:border-pure-white hover:text-pure-white transition-all"
+              className="w-full px-3 py-1.5 text-xs font-mono text-slate-400 hover:text-white transition-colors"
             >
-              CANCEL
+              Cancel
             </button>
           </div>
         </div>

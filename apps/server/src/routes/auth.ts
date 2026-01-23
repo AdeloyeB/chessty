@@ -1,7 +1,31 @@
 import { LoginSchema, RegisterSchema, type ApiResponse, type AuthResponse } from '@chess-game/shared';
 import * as authService from '../services/auth';
+import {
+  loginLimiter,
+  registerLimiter,
+  rateLimitResponse,
+  getClientIp,
+} from '../services/rateLimit';
+
+/**
+ * Extract request context (IP, user agent) for security tracking
+ */
+function getRequestContext(req: Request): authService.LoginContext {
+  return {
+    ipAddress: getClientIp(req),
+    userAgent: req.headers.get('user-agent'),
+  };
+}
 
 export async function handleRegister(req: Request): Promise<Response> {
+  const context = getRequestContext(req);
+
+  // Rate limit by IP
+  const rateLimitResult = registerLimiter.consume(context.ipAddress || 'unknown');
+  if (!rateLimitResult.allowed) {
+    return rateLimitResponse(rateLimitResult.retryAfter!);
+  }
+
   try {
     const body = await req.json();
     const parsed = RegisterSchema.safeParse(body);
@@ -17,7 +41,7 @@ export async function handleRegister(req: Request): Promise<Response> {
     }
 
     const { email, username, password } = parsed.data;
-    const { user, token } = await authService.register(email, username, password);
+    const { user, token } = await authService.register(email, username, password, context);
 
     const response: ApiResponse<AuthResponse> = {
       success: true,
@@ -45,6 +69,14 @@ export async function handleRegister(req: Request): Promise<Response> {
 }
 
 export async function handleLogin(req: Request): Promise<Response> {
+  const context = getRequestContext(req);
+
+  // Rate limit by IP
+  const rateLimitResult = loginLimiter.consume(context.ipAddress || 'unknown');
+  if (!rateLimitResult.allowed) {
+    return rateLimitResponse(rateLimitResult.retryAfter!);
+  }
+
   try {
     const body = await req.json();
     const parsed = LoginSchema.safeParse(body);
@@ -60,29 +92,40 @@ export async function handleLogin(req: Request): Promise<Response> {
     }
 
     const { email, password } = parsed.data;
-    const { user, token } = await authService.login(email, password);
+    const result = await authService.login(email, password, context);
+
+    // Reset rate limiter on successful login
+    loginLimiter.reset(context.ipAddress || 'unknown');
 
     const response: ApiResponse<AuthResponse> = {
       success: true,
       data: {
         user: {
-          ...authService.toPublicUser(user),
-          email: user.email,
-          balance: Number(user.balance),
+          ...authService.toPublicUser(result.user),
+          email: result.user.email,
+          balance: Number(result.user.balance),
         },
-        token,
+        token: result.token,
       },
     };
 
     return Response.json(response);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Login failed';
+
+    // Determine status code based on error type
+    const isLocked = message.includes('temporarily locked');
+    const statusCode = isLocked ? 423 : 401; // 423 Locked for account lockout
+
     return Response.json(
       {
         success: false,
-        error: { code: 'LOGIN_ERROR', message },
+        error: {
+          code: isLocked ? 'ACCOUNT_LOCKED' : 'LOGIN_ERROR',
+          message,
+        },
       } satisfies ApiResponse<never>,
-      { status: 401 }
+      { status: statusCode }
     );
   }
 }

@@ -1,5 +1,5 @@
 import { db } from '../drizzle';
-import { userAchievements, userProfiles, users, games } from '../drizzle/schema';
+import { userAchievements, userProfiles, users, games } from '../drizzle';
 import { eq, and, desc, count, sql } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 import { ACHIEVEMENTS, getAchievementById, type AchievementCategory } from '@chess-game/shared';

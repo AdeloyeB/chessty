@@ -1,11 +1,38 @@
 import { eq } from 'drizzle-orm';
-import bcrypt from 'bcrypt';
 import { SignJWT, jwtVerify } from 'jose';
 import { nanoid } from 'nanoid';
 import { db, users, sessions, type User } from '../drizzle';
+import {
+  isAccountLockedByEmail,
+  recordFailedAttempt,
+  recordSuccessfulLogin,
+  getLockoutMessage,
+  getAttemptsWarningMessage,
+} from './accountLockout';
 
-const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || 'default-secret-change-me');
-const SALT_ROUNDS = 12;
+// Validate JWT secret at startup
+const JWT_SECRET_RAW = Bun.env.JWT_SECRET;
+const isDevelopment = Bun.env.NODE_ENV !== 'production';
+
+if (!JWT_SECRET_RAW) {
+  if (isDevelopment) {
+    console.warn('⚠️  WARNING: JWT_SECRET not set. Using development fallback. DO NOT use in production!');
+  } else {
+    console.error('FATAL: JWT_SECRET environment variable is required in production');
+    process.exit(1);
+  }
+}
+
+if (JWT_SECRET_RAW && JWT_SECRET_RAW.length < 32) {
+  if (isDevelopment) {
+    console.warn('⚠️  WARNING: JWT_SECRET should be at least 32 characters for security');
+  } else {
+    console.error('FATAL: JWT_SECRET must be at least 32 characters');
+    process.exit(1);
+  }
+}
+
+const JWT_SECRET = new TextEncoder().encode(JWT_SECRET_RAW || 'dev-only-secret-not-for-production');
 const TOKEN_EXPIRY = '7d';
 
 export interface AuthPayload {
@@ -14,14 +41,25 @@ export interface AuthPayload {
 }
 
 export async function hashPassword(password: string): Promise<string> {
-  return bcrypt.hash(password, SALT_ROUNDS);
+  // Using Bun's built-in password hashing (Argon2id by default, more secure than bcrypt)
+  return Bun.password.hash(password, {
+    algorithm: 'argon2id',
+    memoryCost: 65536, // 64 MB
+    timeCost: 2,
+  });
 }
 
 export async function verifyPassword(password: string, hash: string): Promise<boolean> {
-  return bcrypt.compare(password, hash);
+  // Bun.password.verify auto-detects the algorithm from the hash
+  // This means it can verify both old bcrypt hashes and new argon2id hashes
+  return Bun.password.verify(password, hash);
 }
 
-export async function generateToken(userId: string): Promise<string> {
+export async function generateToken(
+  userId: string,
+  ipAddress?: string | null,
+  userAgent?: string | null
+): Promise<string> {
   const sessionId = nanoid();
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
 
@@ -29,6 +67,8 @@ export async function generateToken(userId: string): Promise<string> {
     id: sessionId,
     userId,
     expiresAt,
+    ipAddress: ipAddress || null,
+    userAgent: userAgent || null,
   });
 
   const token = await new SignJWT({ userId, sessionId })
@@ -67,8 +107,12 @@ export async function invalidateSession(sessionId: string): Promise<void> {
 export async function register(
   email: string,
   username: string,
-  password: string
+  password: string,
+  context?: LoginContext
 ): Promise<{ user: User; token: string }> {
+  const ipAddress = context?.ipAddress || null;
+  const userAgent = context?.userAgent || null;
+
   // Check if user already exists
   const existingUser = await db.query.users.findFirst({
     where: eq(users.email, email),
@@ -99,27 +143,67 @@ export async function register(
     })
     .returning();
 
-  const token = await generateToken(user.id);
+  const token = await generateToken(user.id, ipAddress, userAgent);
 
   return { user, token };
 }
 
-export async function login(email: string, password: string): Promise<{ user: User; token: string }> {
+export interface LoginResult {
+  user: User;
+  token: string;
+  warning?: string;
+}
+
+export interface LoginContext {
+  ipAddress?: string | null;
+  userAgent?: string | null;
+}
+
+export async function login(
+  email: string,
+  password: string,
+  context?: LoginContext
+): Promise<LoginResult> {
+  const ipAddress = context?.ipAddress || null;
+  const userAgent = context?.userAgent || null;
+
+  // Check if account is locked before proceeding
+  const lockStatus = await isAccountLockedByEmail(email);
+  if (lockStatus.locked && lockStatus.remainingMs) {
+    throw new Error(getLockoutMessage(lockStatus.remainingMs));
+  }
+
   const user = await db.query.users.findFirst({
     where: eq(users.email, email),
   });
 
   if (!user || !user.passwordHash) {
+    // If user exists but we got here, record the failed attempt
+    if (lockStatus.userId) {
+      await recordFailedAttempt(lockStatus.userId, ipAddress, userAgent);
+    }
     throw new Error('Invalid credentials');
   }
 
   const isValid = await verifyPassword(password, user.passwordHash);
 
   if (!isValid) {
-    throw new Error('Invalid credentials');
+    // Record failed attempt
+    const { locked, attemptsRemaining } = await recordFailedAttempt(user.id, ipAddress, userAgent);
+
+    if (locked) {
+      throw new Error(getLockoutMessage(30 * 60 * 1000)); // 30 minutes
+    }
+
+    // Include warning in error if close to lockout
+    const warning = getAttemptsWarningMessage(attemptsRemaining);
+    throw new Error(warning ? `Invalid credentials. ${warning}` : 'Invalid credentials');
   }
 
-  const token = await generateToken(user.id);
+  // Successful login - reset failed attempts
+  await recordSuccessfulLogin(user.id, ipAddress, userAgent);
+
+  const token = await generateToken(user.id, ipAddress, userAgent);
 
   return { user, token };
 }
@@ -144,8 +228,11 @@ export async function findOrCreateOAuthUser(
   provider: 'google' | 'github',
   providerId: string,
   email: string,
-  username: string
+  username: string,
+  context?: LoginContext
 ): Promise<{ user: User; token: string }> {
+  const ipAddress = context?.ipAddress || null;
+  const userAgent = context?.userAgent || null;
   const providerIdColumn = provider === 'google' ? users.googleId : users.githubId;
 
   // Try to find by provider ID
@@ -190,7 +277,10 @@ export async function findOrCreateOAuthUser(
     }
   }
 
-  const token = await generateToken(user.id);
+  // Record successful OAuth login
+  await recordSuccessfulLogin(user.id, ipAddress, userAgent);
+
+  const token = await generateToken(user.id, ipAddress, userAgent);
 
   return { user, token };
 }

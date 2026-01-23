@@ -14,34 +14,34 @@ export function GameControls() {
   }
 
   return (
-    <div className="card">
-      <p className="text-xs font-mono text-mid-light mb-6">actions</p>
+    <div className="bg-retro-mid border border-retro-blue/20 p-4">
+      <p className="text-xs font-mono text-retro-muted mb-6">actions</p>
 
       <div className="space-y-4">
         {/* Draw Offer */}
         {drawOffered && !drawOfferedByMe ? (
-          <div className="p-4 bg-pure-black border border-light">
+          <div className="p-4 bg-retro-dark border border-retro-cyan shadow-[0_0_15px_rgba(6,182,212,0.3)]">
             <p className="text-pure-white font-mono mb-4">
               opponent offers a draw
             </p>
             <div className="flex gap-3">
-              <button onClick={acceptDraw} className="flex-1 btn btn-primary">
+              <button onClick={acceptDraw} className="flex-1 px-4 py-2 bg-retro-blue text-pure-white border border-retro-blue font-mono hover:shadow-[0_0_15px_rgba(59,130,246,0.5)] transition-all">
                 accept
               </button>
-              <button onClick={declineDraw} className="flex-1 btn btn-secondary">
+              <button onClick={declineDraw} className="flex-1 px-4 py-2 bg-retro-dark text-retro-muted border border-retro-blue/30 font-mono hover:border-retro-blue hover:text-pure-white transition-all">
                 decline
               </button>
             </div>
           </div>
         ) : drawOfferedByMe ? (
-          <div className="p-4 bg-pure-black border border-mid/30 text-center">
-            <p className="text-mid-light font-mono">draw offer sent</p>
-            <p className="text-xs text-mid font-mono mt-1">waiting for opponent...</p>
+          <div className="p-4 bg-retro-dark border border-retro-blue/30 text-center">
+            <p className="text-retro-glow font-mono">draw offer sent</p>
+            <p className="text-xs text-retro-muted font-mono mt-1">waiting for opponent...</p>
           </div>
         ) : (
           <button
             onClick={offerDraw}
-            className="w-full btn btn-secondary"
+            className="w-full px-4 py-2 bg-retro-dark text-retro-muted border border-retro-blue/30 font-mono hover:border-retro-blue hover:text-pure-white hover:shadow-[0_0_10px_rgba(59,130,246,0.3)] transition-all"
           >
             offer_draw
           </button>
@@ -49,8 +49,8 @@ export function GameControls() {
 
         {/* Resign */}
         {showResignConfirm ? (
-          <div className="p-4 bg-pure-black border border-mid">
-            <p className="text-mid-light font-mono mb-4">
+          <div className="p-4 bg-retro-dark border border-red-500/50 shadow-[0_0_15px_rgba(239,68,68,0.3)]">
+            <p className="text-retro-glow font-mono mb-4">
               are you sure you want to resign?
             </p>
             <div className="flex gap-3">
@@ -59,13 +59,13 @@ export function GameControls() {
                   resign();
                   setShowResignConfirm(false);
                 }}
-                className="flex-1 btn btn-danger"
+                className="flex-1 px-4 py-2 bg-red-500/20 text-red-400 border border-red-500/50 font-mono hover:bg-red-500 hover:text-pure-white hover:shadow-[0_0_15px_rgba(239,68,68,0.5)] transition-all"
               >
                 confirm
               </button>
               <button
                 onClick={() => setShowResignConfirm(false)}
-                className="flex-1 btn btn-secondary"
+                className="flex-1 px-4 py-2 bg-retro-dark text-retro-muted border border-retro-blue/30 font-mono hover:border-retro-blue hover:text-pure-white transition-all"
               >
                 cancel
               </button>
@@ -74,7 +74,7 @@ export function GameControls() {
         ) : (
           <button
             onClick={() => setShowResignConfirm(true)}
-            className="w-full btn btn-danger"
+            className="w-full px-4 py-2 bg-red-500/10 text-red-400 border border-red-500/30 font-mono hover:bg-red-500/20 hover:border-red-500/50 transition-all"
           >
             resign
           </button>
@@ -82,9 +82,9 @@ export function GameControls() {
       </div>
 
       {/* Tips */}
-      <div className="mt-8 pt-6 border-t border-mid/30">
-        <p className="text-xs font-mono text-mid-light mb-4">controls</p>
-        <ul className="text-sm text-mid font-mono space-y-2">
+      <div className="mt-8 pt-6 border-t border-retro-blue/20">
+        <p className="text-xs font-mono text-retro-muted mb-4">controls</p>
+        <ul className="text-sm text-retro-glow/70 font-mono space-y-2">
           <li>click piece to select</li>
           <li>click destination to move</li>
           <li>or drag and drop</li>

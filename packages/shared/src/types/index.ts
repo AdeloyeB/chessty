@@ -502,3 +502,6 @@ export interface AchievementProgress {
 
 // Re-export history types
 export * from './history';
+
+// Re-export feature flag types
+export * from './flags';
