@@ -60,7 +60,15 @@ EOF
 )"
 ```
 
-### 5. Report Back
+### 5. Open in Browser
+
+After creating the PR, immediately open it in the user's browser:
+
+```bash
+open <PR_URL>   # macOS — opens the PR page automatically
+```
+
+### 6. Report Back
 
 Output the PR URL and a brief summary of what was submitted.
 

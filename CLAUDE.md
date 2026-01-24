@@ -127,6 +127,16 @@ Custom slash commands are available in `.claude/commands/`:
 
 Development prompts for common features are in `.claude/prompts/`.
 
+### Mandatory: Use `/pr` for All Pull Requests
+
+**Always use the `/pr` command** when committing, pushing, or opening pull requests. Never manually run `gh pr create` — the `/pr` command enforces:
+
+1. **Type-prefixed titles** — `feat:`, `fix:`, `chore:` (required)
+2. **Standard body format** — Feature, Changes, Bugs/Known Issues, Testing sections
+3. **Auto-opens in browser** — The PR page opens automatically after creation
+
+If you need to push and open a PR, run `/pr` and it handles everything (commit, push, create, open browser).
+
 ---
 
 ## UI/UX Principles
@@ -456,3 +466,93 @@ const MOCK_EXAMPLE = {
 };
 // ============================================================================
 ```
+
+---
+
+## NB CLI Voice Commands (Wispr Flow → Claude Code)
+
+The user dictates commands via **Wispr Flow** (voice-to-text). When you recognize any of the phrases below (or close variations), execute the corresponding `nb` CLI command using Bash. The user's current notebook is `home`.
+
+### Quick Reference
+
+| Voice Phrase | Command |
+|-------------|---------|
+| "create a note about [topic]" | `nb add --title "[topic]"` |
+| "new note titled [title]" | `nb add --title "[title]"` |
+| "add a note with content [text]" | `nb add --title "Untitled" --content "[text]"` |
+| "write a note about [topic] saying [content]" | `nb add --title "[topic]" --content "[content]"` |
+| "create a todo [task]" | `nb todo add "[task]"` |
+| "add a task [task]" | `nb todo add "[task]"` |
+| "mark todo [number] as done" | `nb do [number]` |
+| "complete task [number]" | `nb do [number]` |
+| "show my notes" | `nb ls` |
+| "list my notes" | `nb ls` |
+| "list all notes" | `nb ls -a` |
+| "show note [id or title]" | `nb show [id or title]` |
+| "open note [id or title]" | `nb show [id or title]` |
+| "read note [id or title]" | `nb show [id or title]` |
+| "search notes for [query]" | `nb search "[query]"` |
+| "find notes about [query]" | `nb search "[query]"` |
+| "edit note [id or title]" | `nb edit [id or title]` |
+| "update note [id or title]" | `nb edit [id or title]` |
+| "delete note [id or title]" | `nb delete [id or title] --force` |
+| "remove note [id or title]" | `nb delete [id or title] --force` |
+| "bookmark [url]" | `nb bookmark [url]` |
+| "save this link [url]" | `nb bookmark [url]` |
+| "bookmark [url] tagged [tags]" | `nb bookmark [url] --tags [tags]` |
+| "tag note [id] with [tags]" | `nb edit [id] --content "$(nb show [id] --no-color)" --overwrite` (append tags) |
+| "create a folder called [name]" | `nb folders add [name]` |
+| "new folder [name]" | `nb folders add [name]` |
+| "move note [id] to [folder]" | `nb move [id] [folder]/` |
+| "list notebooks" | `nb notebooks` |
+| "create notebook [name]" | `nb notebooks add [name]` |
+| "switch to notebook [name]" | `nb use [name]` |
+| "sync notes" | `nb sync` |
+| "count my notes" | `nb count` |
+| "pin note [id]" | `nb pin [id]` |
+| "unpin note [id]" | `nb unpin [id]` |
+| "show my todos" | `nb tasks` |
+| "list tasks" | `nb tasks` |
+| "export note [id] as PDF" | `nb export [id] ./export.pdf` |
+| "show note history" | `nb history` |
+
+### Interpretation Rules
+
+1. **Fuzzy matching** — The user won't say these phrases exactly. Match intent, not exact wording. For example, "jot down a note about Docker" = `nb add --title "Docker"`.
+2. **Title extraction** — Whatever the user says the note is "about" or "titled" becomes the `--title` value.
+3. **Content extraction** — If the user provides body content ("saying...", "with content...", "that says..."), pass it via `--content`.
+4. **Tags** — If the user mentions "tagged with" or "tag it as", use `--tags tag1,tag2`.
+5. **IDs vs titles** — If the user says a number, treat it as an ID. If they say words, treat it as a title search.
+6. **Confirmation for destructive actions** — Always confirm before `delete`. Ask "Delete note [id/title]?" before running.
+7. **Show output** — After creating or modifying a note, show the result using `nb show` or `nb ls` so the user sees confirmation.
+8. **Multi-step notes** — If the user dictates a long note with multiple points, combine them into one `--content` string with newlines.
+
+### Example Voice → Command Flows
+
+**User says:** "Create a note about the Docker setup we just did"
+```bash
+nb add --title "Docker setup" --content "Notes on Docker configuration for the chess game Bun server."
+```
+
+**User says:** "Add a todo to set up Redis"
+```bash
+nb todo add "Set up Redis for game state persistence"
+```
+
+**User says:** "Find my notes about Polygon"
+```bash
+nb search "Polygon"
+```
+
+**User says:** "Show me note 3"
+```bash
+nb show 3
+```
+
+**User says:** "Bookmark this link https://docs.polygon.technology tagged crypto,polygon"
+```bash
+nb bookmark "https://docs.polygon.technology" --tags crypto,polygon
+```
+
+**User says:** "Delete note 5"
+→ First confirm: "Delete note 5?" → Then: `nb delete 5 --force`
