@@ -112,20 +112,19 @@ This helps track what broke, why, and how it was fixed — useful for learning a
 
 ---
 
-## Claude Sub-Agents
+## Claude Skills
 
-Custom slash commands are available in `.claude/commands/`:
+Skills live in `.claude/commands/` and are auto-routable — you can invoke them explicitly (`/skill-name`) or just describe what you want and Claude will route to the right skill.
 
-| Command | Purpose |
-|---------|---------|
-| `/technical-review [scope]` | Code quality, performance, architecture review |
-| `/security-audit [scope]` | Security vulnerability analysis |
-| `/architect [feature]` | Feature design and implementation planning |
-| `/code-review` | Independent PR review (fresh context, no bias) |
-| `/pr [description]` | Commit, push, and open a PR with standard format |
-| `/setup-github` | One-time repo setup (branch protection, rules) |
-
-Development prompts for common features are in `.claude/prompts/`.
+| Skill | Purpose | Example Triggers |
+|-------|---------|-----------------|
+| `/technical-review [scope]` | Code quality, performance, architecture review | "review the code quality" |
+| `/security-audit [scope]` | Security vulnerability analysis | "check for security issues" |
+| `/architect [feature]` | Feature design and implementation planning | "design the spectator system" |
+| `/code-review` | Independent PR review (fresh context, no bias) | "review my PR" |
+| `/fetch-review [PR#]` | Fetch Code Rabbit AI review, explain issues, offer fixes | "what did Code Rabbit say" |
+| `/crypto-review [scope]` | Betting mechanics, tokenomics, exploit analysis | "review the betting logic" |
+| `/pr [description]` | Commit, push, and open a PR with standard format | "open a pull request" |
 
 ### Mandatory: Use `/pr` for All Pull Requests
 
