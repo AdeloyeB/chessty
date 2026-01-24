@@ -29,8 +29,6 @@ Changes:
 - <Be specific: "Replace inline backgroundColor styles with Tailwind classes" not "Update styles">
 - <Include root causes of bugs fixed: "Status bar used absolute positioning which removed it from document flow, overlapping sidebar buttons">
 - <Note any side effects or related fixes bundled in>
-
-Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>
 ```
 
 Type prefixes: `feat:` (new functionality), `fix:` (bug fix), `chore:` (deps/config/cleanup), `refactor:` (restructuring), `docs:` (documentation only)

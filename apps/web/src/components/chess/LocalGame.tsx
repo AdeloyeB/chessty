@@ -226,11 +226,11 @@ export function LocalGame() {
   }
 
   return (
-    <div className="h-full bg-[#0a0a0a] flex flex-col overflow-hidden">
+    <div className="h-full bg-black flex flex-col overflow-hidden">
       {/* Content Row: Sidebar + Board */}
       <div className="flex-1 flex min-h-0">
       {/* Left Sidebar - Compact */}
-      <div className="w-56 border-r border-[#666666]/30 flex flex-col bg-[#0a0a0a]">
+      <div className="w-56 border-r border-[#666666]/30 flex flex-col bg-black">
         {/* Header */}
         <div className="px-3 py-2 border-b border-[#666666]/30 flex items-center gap-2">
           <span className="text-white">♔</span>
@@ -240,11 +240,11 @@ export function LocalGame() {
         {/* Stats */}
         <div className="px-3 py-2 border-b border-[#666666]/30 space-y-2">
           <div className="flex gap-2">
-            <div className="flex-1 p-2 bg-black rounded text-center">
+            <div className="flex-1 p-2 bg-[#0a0a0a] rounded text-center">
               <div className="text-lg font-mono text-white">{moveHistory.length}</div>
               <div className="text-[10px] text-[#666666] uppercase">Moves</div>
             </div>
-            <div className="flex-1 p-2 bg-black rounded text-center">
+            <div className="flex-1 p-2 bg-[#0a0a0a] rounded text-center">
               <div className="text-lg font-mono text-[#cccccc]">{formatElapsed(elapsedTime)}</div>
               <div className="text-[10px] text-[#666666] uppercase">Time</div>
             </div>
@@ -291,13 +291,13 @@ export function LocalGame() {
           <button
             onClick={undoMove}
             disabled={moveHistory.length === 0}
-            className="w-full px-2 py-1.5 text-xs font-mono bg-black border border-[#666666]/50 text-[#888888] rounded hover:border-white hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+            className="w-full px-2 py-1.5 text-xs font-mono bg-[#0a0a0a] border border-[#666666]/50 text-[#888888] rounded hover:border-white hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-all"
           >
             ← Undo
           </button>
           <button
             onClick={resetGame}
-            className="w-full px-2 py-1.5 text-xs font-mono bg-black border border-[#666666]/50 text-[#888888] rounded hover:border-white hover:text-white transition-all"
+            className="w-full px-2 py-1.5 text-xs font-mono bg-[#0a0a0a] border border-[#666666]/50 text-[#888888] rounded hover:border-white hover:text-white transition-all"
           >
             ↺ New Game
           </button>
@@ -307,7 +307,7 @@ export function LocalGame() {
       {/* Main Board Area - Maximized */}
       <div className="flex-1 flex flex-col min-h-0">
         {/* Top Player Bar - Minimal */}
-        <div className="h-10 px-4 border-b border-[#666666]/30 flex items-center justify-between bg-[#0a0a0a]">
+        <div className="h-10 px-4 border-b border-[#666666]/30 flex items-center justify-between bg-black">
           <div className="flex items-center gap-3">
             <div className="w-3 h-3 bg-[#3b82f6] rounded-sm" />
             <span className="text-sm font-medium text-[#cccccc]">{playerName}</span>
@@ -337,7 +337,7 @@ export function LocalGame() {
         </div>
 
         {/* Bottom Player Bar - Minimal */}
-        <div className="h-10 px-4 border-t border-[#666666]/30 flex items-center justify-between bg-[#0a0a0a]">
+        <div className="h-10 px-4 border-t border-[#666666]/30 flex items-center justify-between bg-black">
           <div className="flex items-center gap-3">
             <div className="w-3 h-3 bg-white rounded-sm" />
             <span className="text-sm font-medium text-[#cccccc]">{playerName}</span>
@@ -356,7 +356,7 @@ export function LocalGame() {
       </div>{/* end content row */}
 
       {/* Status Bar - Bottom (normal flow, not absolute) */}
-      <div className="h-6 shrink-0 border-t border-[#666666]/30 bg-black flex items-center px-3 gap-4 text-[10px] font-mono text-[#666666]">
+      <div className="h-6 shrink-0 border-t border-[#666666]/30 bg-[#0a0a0a] flex items-center px-3 gap-4 text-[10px] font-mono text-[#666666]">
         <div className="flex items-center gap-1.5">
           <span className={`w-1.5 h-1.5 rounded-full ${isGameOver ? 'bg-[#666666]' : 'bg-white animate-pulse'}`} />
           <span className="text-[#888888]">{getStatusMessage()}</span>
@@ -369,8 +369,8 @@ export function LocalGame() {
 
       {/* Promotion Dialog */}
       {promotionMove && (
-        <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50">
-          <div className="bg-[#0a0a0a] border border-[#666666]/30 rounded-lg p-4 shadow-2xl">
+        <div className="fixed inset-0 bg-[#0a0a0a]/90 flex items-center justify-center z-50">
+          <div className="bg-black border border-[#666666]/30 rounded-lg p-4 shadow-2xl">
             <p className="text-xs font-mono text-[#888888] mb-3 text-center uppercase tracking-wider">
               Select Promotion
             </p>
@@ -384,7 +384,7 @@ export function LocalGame() {
                 <button
                   key={piece.key}
                   onClick={() => onPromotionSelect(piece.key)}
-                  className="w-14 h-14 bg-black border border-[#666666]/50 rounded hover:border-white hover:bg-[#141414] transition-all"
+                  className="w-14 h-14 bg-[#0a0a0a] border border-[#666666]/50 rounded hover:border-white hover:bg-[#141414] transition-all"
                 >
                   <span className="text-4xl">{piece.symbol}</span>
                 </button>
