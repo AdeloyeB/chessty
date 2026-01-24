@@ -63,7 +63,7 @@ export async function getUserProfile(userId: string): Promise<UserProfileData> {
 
     if (existing.length > 0) {
       return {
-        isPublic: existing[0].isPublic === 1,
+        isPublic: existing[0].isPublic,
         currentStreak: existing[0].currentStreak,
         longestStreak: existing[0].longestStreak,
         totalCheckmates: existing[0].totalCheckmates,
@@ -75,7 +75,7 @@ export async function getUserProfile(userId: string): Promise<UserProfileData> {
     // Create default profile
     await db.insert(userProfiles).values({
       userId,
-      isPublic: 1,
+      isPublic: true,
       currentStreak: 0,
       longestStreak: 0,
       totalCheckmates: 0,
@@ -95,7 +95,7 @@ export async function updateProfileVisibility(userId: string, isPublic: boolean)
   try {
     await db
       .update(userProfiles)
-      .set({ isPublic: isPublic ? 1 : 0, updatedAt: new Date() })
+      .set({ isPublic, updatedAt: new Date() })
       .where(eq(userProfiles.userId, userId));
   } catch (error) {
     console.warn('updateProfileVisibility failed (table may not exist):', error);

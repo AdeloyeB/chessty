@@ -66,6 +66,8 @@ import {
   handleWebSocketMessage,
 } from './websocket/handler';
 import { initializeFeatureFlags } from './services/featureFlags';
+import { db } from './drizzle';
+import { sql } from 'drizzle-orm';
 import type { WebSocketData } from './websocket/handler';
 
 const PORT = parseInt(process.env.PORT || '3001');
@@ -303,6 +305,11 @@ const server = Bun.serve<WebSocketData>({
     message: handleWebSocketMessage,
   },
 });
+
+// Wake Neon's compute node on server start (avoids cold-start on first real request)
+db.execute(sql`SELECT 1`)
+  .then(() => console.log('[Database] Neon connection established'))
+  .catch((error) => console.error('[Database] Failed to connect to Neon:', error));
 
 // Initialize feature flags on server start
 initializeFeatureFlags().catch((error) => {
