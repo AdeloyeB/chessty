@@ -3,7 +3,7 @@
 import { WagmiProvider } from 'wagmi'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { RainbowKitProvider } from '@rainbow-me/rainbowkit'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { config } from '@/config/wagmi'
 import { chesstyTheme } from '@/config/rainbowkit-theme'
 import { WalletModal } from './WalletModal'
@@ -16,6 +16,7 @@ interface WalletProviderProps {
 }
 
 export function WalletProvider({ children }: WalletProviderProps) {
+  const [mounted, setMounted] = useState(false)
   const [queryClient] = useState(
     () =>
       new QueryClient({
@@ -28,13 +29,17 @@ export function WalletProvider({ children }: WalletProviderProps) {
       })
   )
 
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
   return (
     <WagmiProvider config={config}>
       <QueryClientProvider client={queryClient}>
         <RainbowKitProvider theme={chesstyTheme} modalSize="compact">
           {children}
         </RainbowKitProvider>
-        <WalletModal />
+        {mounted && <WalletModal />}
       </QueryClientProvider>
     </WagmiProvider>
   )
