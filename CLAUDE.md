@@ -549,7 +549,7 @@ nb search "Polygon"
 nb show 3
 ```
 
-**User says:** "Bookmark this link https://docs.polygon.technology tagged crypto,polygon"
+**User says:** "Bookmark this link <https://docs.polygon.technology> tagged crypto,polygon"
 ```bash
 nb bookmark "https://docs.polygon.technology" --tags crypto,polygon
 ```

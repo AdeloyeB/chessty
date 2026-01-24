@@ -21,7 +21,7 @@ Core user accounts. Stores auth credentials, ELO ratings, game stats, and wallet
 | username | `text` UNIQUE | |
 | password_hash | `text` | nullable (OAuth users) |
 | google_id | `text` UNIQUE | OAuth |
-| github_id | `text` UNIQUE | OAuth |
+| github_id | `text` UNIQUE | GitHub OAuth |
 | elo_rating | `integer` | default 1200 |
 | peak_elo_rating | `integer` | default 1200 |
 | games_played | `integer` | default 0 |
