@@ -14,7 +14,18 @@ git diff --stat
 git log --oneline main..HEAD
 ```
 
-If there are uncommitted changes, stage and commit them with a clear message before proceeding.
+If there are uncommitted changes, stage and commit them following the commit message format:
+
+```
+<type>: <concise description of what changed>
+
+- <bullet point details if needed>
+- <additional context>
+
+Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>
+```
+
+Type prefixes: `feat:` (new functionality), `fix:` (bug fix), `chore:` (deps/config/cleanup), `refactor:` (restructuring), `docs:` (documentation only)
 
 ### 2. Determine Branch and Feature
 

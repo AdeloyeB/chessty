@@ -112,20 +112,31 @@ This helps track what broke, why, and how it was fixed — useful for learning a
 
 ---
 
-## Claude Sub-Agents
+## Claude Skills
 
-Custom slash commands are available in `.claude/commands/`:
+Custom slash commands (skills) are in `.claude/commands/`. These are auto-routable by intent — you don't always need the slash command, just describe what you want.
 
-| Command | Purpose |
-|---------|---------|
-| `/technical-review [scope]` | Code quality, performance, architecture review |
-| `/security-audit [scope]` | Security vulnerability analysis |
-| `/architect [feature]` | Feature design and implementation planning |
-| `/code-review` | Independent PR review (fresh context, no bias) |
-| `/pr [description]` | Commit, push, and open a PR with standard format |
-| `/setup-github` | One-time repo setup (branch protection, rules) |
+| Command | Purpose | Example Triggers |
+|---------|---------|-----------------|
+| `/pr [description]` | Commit, push, and open a PR with standard format | "commit and push", "open a PR", "submit this" |
+| `/fetch-review` | Fetch Code Rabbit AI review from GitHub PR | "fetch code review", "what did Code Rabbit say" |
+| `/crypto-review` | Crypto/betting mechanics security review | "review the betting logic", "check tokenomics" |
+| `/technical-review [scope]` | Code quality, performance, architecture review | "review this code", "check performance" |
+| `/security-audit [scope]` | Security vulnerability analysis | "security check", "audit for vulnerabilities" |
+| `/architect [feature]` | Feature design and implementation planning | "design the matchmaking system" |
+| `/code-review` | Independent PR review (fresh context, no bias) | "review this PR" |
 
-Development prompts for common features are in `.claude/prompts/`.
+### PR and Commit Workflow (IMPORTANT)
+
+**Always use the `/pr` command** for any commit, push, or PR operations. Do NOT use built-in commit-push-pr skills — they don't follow our standards.
+
+The `/pr` command ensures:
+- Commit messages follow our type prefix convention (`feat:`, `fix:`, `chore:`)
+- PR titles use the same type prefix format
+- PR body includes Feature, Changes, Bugs/Known Issues, and Testing sections
+- Branch naming conventions are validated
+- Base branch is always `main`
+- Squash merge strategy is documented
 
 ---
 
