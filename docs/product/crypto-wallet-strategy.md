@@ -99,7 +99,7 @@ Source: [Blockchain Fee Comparison](https://www.bleap.finance/blog/which-blockch
 
 ### Network Decision: Polygon Only
 
-```
+```text
 Primary (and only): Polygon → Polymarket-proven, mature, deep USDC liquidity
 ```
 
