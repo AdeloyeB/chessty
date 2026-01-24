@@ -14,9 +14,9 @@ export interface GameWithPlayers {
 }
 
 export async function getGame(gameId: string): Promise<typeof games.$inferSelect | null> {
-  return db.query.games.findFirst({
+  return await db.query.games.findFirst({
     where: eq(games.id, gameId),
-  });
+  }) ?? null;
 }
 
 export async function getGameWithPlayers(gameId: string): Promise<GameWithPlayers | null> {
@@ -153,12 +153,12 @@ export async function abandonGame(gameId: string, abandoningPlayerId: string): P
 }
 
 export async function getUserActiveGame(userId: string): Promise<typeof games.$inferSelect | null> {
-  return db.query.games.findFirst({
+  return await db.query.games.findFirst({
     where: and(
       or(eq(games.whitePlayerId, userId), eq(games.blackPlayerId, userId)),
       or(eq(games.status, 'pending'), eq(games.status, 'active'))
     ),
-  });
+  }) ?? null;
 }
 
 export async function getUserGameHistory(
@@ -264,10 +264,10 @@ export async function getUserGameHistoryFiltered(
 
   // Stake filters
   if (filters.minStake !== undefined) {
-    conditions.push(gte(games.stakeAmount, filters.minStake));
+    conditions.push(gte(games.stakeAmount, filters.minStake.toString()));
   }
   if (filters.maxStake !== undefined) {
-    conditions.push(lte(games.stakeAmount, filters.maxStake));
+    conditions.push(lte(games.stakeAmount, filters.maxStake.toString()));
   }
 
   // Get all matching games with players
@@ -613,22 +613,24 @@ export async function getUserFinancialSummary(
 
   for (let i = 0; i < txs.length; i++) {
     const tx = txs[i];
-    if (i === 0) startingBalance = tx.balanceAfter - tx.amount;
-    endingBalance = tx.balanceAfter;
+    const txAmount = parseFloat(tx.amount);
+    const txBalanceAfter = parseFloat(tx.balanceAfter);
+    if (i === 0) startingBalance = txBalanceAfter - txAmount;
+    endingBalance = txBalanceAfter;
 
     switch (tx.type) {
       case 'game_win':
-        gameWins += tx.amount;
+        gameWins += txAmount;
         totalGames++;
         break;
       case 'game_stake':
-        gameLosses += Math.abs(tx.amount);
+        gameLosses += Math.abs(txAmount);
         break;
       case 'deposit':
-        deposits += tx.amount;
+        deposits += txAmount;
         break;
       case 'withdrawal':
-        withdrawals += Math.abs(tx.amount);
+        withdrawals += Math.abs(txAmount);
         break;
     }
   }

@@ -121,7 +121,7 @@ export async function createPrediction(
       gameId,
       creatorId,
       predictedWinnerId,
-      amount,
+      amount: amount.toString(),
       status: 'open',
       createdAt: now,
     })

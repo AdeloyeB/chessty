@@ -94,7 +94,7 @@ export async function createChallenge(
       timeControlKey,
       timeControlInitial: timeControl.initial,
       timeControlIncrement: timeControl.increment,
-      stakeAmount,
+      stakeAmount: stakeAmount.toString(),
       minElo: minElo ?? null,
       maxElo: maxElo ?? null,
       status: 'open',
@@ -197,14 +197,14 @@ export async function confirmChallenge(
 
   const [updated] = await db
     .update(challenges)
-    .set({ [updateField]: 1 })
+    .set({ [updateField]: true })
     .where(eq(challenges.id, challengeId))
     .returning();
 
   // Check if both have confirmed
   const bothConfirmed =
-    (isCreator ? 1 : updated.creatorConfirmed) === 1 &&
-    (!isCreator ? 1 : updated.acceptorConfirmed) === 1;
+    (isCreator ? true : updated.creatorConfirmed) === true &&
+    (!isCreator ? true : updated.acceptorConfirmed) === true;
 
   const result = toChallengeWithCreator(
     updated,
@@ -241,8 +241,8 @@ export async function declineChallenge(
     .set({
       status: 'open',
       acceptedById: null,
-      creatorConfirmed: 0,
-      acceptorConfirmed: 0,
+      creatorConfirmed: false,
+      acceptorConfirmed: false,
     })
     .where(eq(challenges.id, challengeId));
 }
@@ -295,8 +295,8 @@ export async function createGameFromChallenge(
       timeControlIncrement: challenge.timeControlIncrement,
       whiteTimeRemaining: challenge.timeControlInitial,
       blackTimeRemaining: challenge.timeControlInitial,
-      stakeAmount,
-      totalPot,
+      stakeAmount: stakeAmount.toString(),
+      totalPot: totalPot.toString(),
       whiteEloAtStart: whitePlayer.eloRating,
       blackEloAtStart: blackPlayer.eloRating,
       createdAt: now,
