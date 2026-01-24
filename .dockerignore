@@ -1,0 +1,73 @@
+# ──────────────────────────────────────────────────────────────
+# .dockerignore
+# Tells Docker what files to SKIP when copying your project
+# into the container. Same concept as .gitignore but for Docker.
+# ──────────────────────────────────────────────────────────────
+
+# Dependencies — we'll install fresh inside the container
+# ** means "at any depth" — catches node_modules in subfolders too
+node_modules
+**/node_modules
+.pnpm-store
+
+# Build outputs — we'll build fresh inside the container
+dist
+.next
+out
+.turbo
+
+# Electron — not needed on the server
+apps/desktop
+release
+
+# Web app — not needed for the server container
+apps/web
+
+# Environment files — secrets should be passed via docker-compose
+# environment variables, not baked into the image
+.env
+.env.local
+.env.*.local
+
+# IDE and OS files
+.idea
+.vscode
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+log/
+
+# Database files — the container will use PostgreSQL, not SQLite files
+*.db
+*.sqlite
+
+# Git
+.git
+.gitignore
+
+# pnpm workspace config — Bun uses "workspaces" in package.json instead.
+# Copying this causes Bun to create broken pnpm-style symlinks.
+pnpm-workspace.yaml
+pnpm-lock.yaml
+
+# Docker files themselves (avoid recursive confusion)
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Documentation and reference (not needed at runtime)
+docs/
+CLAUDE.md
+MOCK_DATA.md
+SECURITY_REVIEW.md
+AGENTS.md
+chesscracked-master/
+
+# Claude config
+.claude/

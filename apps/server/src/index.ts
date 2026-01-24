@@ -108,6 +108,7 @@ function jsonResponse(response: Response): Response {
 
 const server = Bun.serve<WebSocketData>({
   port: PORT,
+  hostname: '0.0.0.0', // Listen on all interfaces (required for Docker)
 
   async fetch(req, server) {
     const url = new URL(req.url);

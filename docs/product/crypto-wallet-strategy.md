@@ -11,10 +11,13 @@ Following the [Polymarket model](https://docs.polymarket.com/polymarket-learn/ge
 | Decision | Recommendation | Rationale |
 |----------|---------------|-----------|
 | **Stablecoin** | USDC | Industry standard, 1:1 USD peg, regulatory clarity |
-| **Primary Network** | Base | Zero fees via Coinbase Onramp, strong Coinbase ecosystem |
-| **Secondary Network** | Polygon | Polymarket standard, established liquidity |
+| **Network** | Polygon (only) | Polymarket-proven for betting, mature ecosystem, deep USDC liquidity |
 | **Wallet Connection** | Wagmi + RainbowKit | Already using Wagmi, RainbowKit adds polished UI |
-| **Fiat Onramp** | Coinbase Onramp + MoonPay | Zero fees on Base (Coinbase), broad coverage (MoonPay) |
+| **Fiat Onramp** | MoonPay (primary) | Broad international coverage, defaults to `usdc_polygon` |
+
+> **Decision (Jan 2026):** Committed to Polygon-only after crypto strategist review.
+> Single-chain approach simplifies UX for non-crypto chess players and follows
+> the Polymarket playbook (the largest prediction market runs exclusively on Polygon).
 
 ---
 
@@ -70,20 +73,14 @@ Source: [Polymarket Sign-Up Guide](https://docs.polymarket.com/polymarket-learn/
 
 Source: [What is USDC](https://www.usdc.com/learn/what-is-usdc)
 
-### USDC Contract Addresses
+### USDC Contract Address (Polygon)
 
 ```typescript
-export const USDC_ADDRESSES = {
-  // Ethereum Mainnet
-  1: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
-  // Base
-  8453: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
-  // Polygon
-  137: '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359',
-  // Arbitrum
-  42161: '0xaf88d065e77c8cC2239327C5EDb3A432268e5831',
-} as const;
+// Official Circle native USDC on Polygon
+export const USDC_ADDRESS = '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359' as const
 ```
+
+Chain ID: `137` (Polygon PoS)
 
 ---
 
@@ -100,22 +97,30 @@ export const USDC_ADDRESSES = {
 
 Source: [Blockchain Fee Comparison](https://www.bleap.finance/blog/which-blockchain-has-the-lowest-fees)
 
-### Recommended Network Strategy
+### Network Decision: Polygon Only
 
 ```
-Primary:   Base      → Zero fees with Coinbase Onramp, best UX for new users
-Secondary: Polygon   → Polymarket compatibility, established infrastructure
-Future:    Arbitrum  → If we need higher liquidity DeFi integrations
+Primary (and only): Polygon → Polymarket-proven, mature, deep USDC liquidity
 ```
 
-### Why Base as Primary?
+### Why Polygon?
 
-1. **Zero Fees**: Coinbase Onramp charges 0% for USDC on Base
-2. **Coinbase Integration**: Seamless for the 100M+ Coinbase users
-3. **Growing Ecosystem**: Backed by Coinbase, rapid adoption
-4. **Circle Paymaster**: Can let users pay gas in USDC (10% markup)
+1. **Polymarket Precedent**: The largest prediction/betting market runs exclusively on Polygon — proven at scale
+2. **Mature Ecosystem**: Live since 2020, battle-tested infrastructure, established liquidity
+3. **Low Fees**: ~$0.002-0.007 per transaction — negligible for betting amounts
+4. **MoonPay Alignment**: MoonPay defaults to `usdc_polygon`, matching our onramp strategy
+5. **Developer Simplicity**: One chain = one RPC, one block explorer, one set of gas estimations
 
-Source: [Coinbase Onramp](https://www.coinbase.com/developer-platform/products/onramp)
+### What We Traded Off
+
+- **Coinbase 0% on-ramp** (Base-only feature) — users pay MoonPay's 1-4.5% instead
+- **Circle Paymaster** (works best on Base) — users need a tiny amount of MATIC for gas (~$1 covers thousands of transactions)
+
+### Gas Token Note
+
+Polygon uses MATIC (POL) for gas fees. Non-crypto users can purchase a small amount ($1) via MoonPay alongside their USDC deposit. At $0.003 per transaction, $1 of MATIC lasts months of betting activity.
+
+Source: [Blockchain Fee Comparison](https://www.bleap.finance/blog/which-blockchain-has-the-lowest-fees)
 
 ---
 
@@ -257,9 +262,9 @@ Source: [Stripe Crypto Docs](https://docs.stripe.com/crypto)
 ### Recommended Onramp Strategy
 
 ```
-US Users:        Coinbase Onramp (0% fees on Base USDC)
-International:   MoonPay (broad coverage)
-Fallback:        Direct wallet transfer (crypto-native users)
+All Users:       MoonPay (broad coverage, defaults to usdc_polygon)
+Fallback:        Direct wallet transfer (crypto-native users send USDC on Polygon)
+Future:          Coinbase Onramp (if we add Base as a secondary chain later)
 ```
 
 ---
@@ -303,10 +308,8 @@ Use feature flags to control crypto features by jurisdiction:
 const CRYPTO_FLAGS = {
   wallet_deposits: false,      // Enable when ready
   wallet_withdrawals: false,   // Enable when ready
-  base_network: true,          // Primary network
-  polygon_network: true,       // Secondary network
-  coinbase_onramp: true,       // US users
-  moonpay_onramp: true,        // International
+  polygon_network: true,       // Only supported network
+  moonpay_onramp: true,        // Primary onramp (all users)
   kyc_required: true,          // Compliance
 };
 ```
@@ -315,22 +318,23 @@ const CRYPTO_FLAGS = {
 
 ## Part 7: Implementation Roadmap
 
-### Phase 1: Wallet Connection (Current)
+### Phase 1: Wallet Connection (Complete)
 - [x] Wagmi configuration
-- [x] Basic connectors (Coinbase, MetaMask)
-- [ ] Add RainbowKit for polished UI
-- [ ] Add Polygon and Arbitrum networks
+- [x] RainbowKit for polished wallet connection UI
+- [x] Polygon network (committed as sole chain)
+- [x] USDC balance reading via ERC-20 balanceOf()
+- [x] Dev mode with mock wallet data
 
-### Phase 2: Read-Only Integration
-- [ ] Display USDC balance
-- [ ] Show transaction history
-- [ ] Network switching UI
+### Phase 2: Read-Only Integration (Complete)
+- [x] Display USDC balance
+- [x] Show transaction history (with balance change tracking)
+- [x] Network detection (wrong network prompts)
 
 ### Phase 3: Deposits (Behind Feature Flag)
-- [ ] Coinbase Onramp integration (US)
-- [ ] MoonPay integration (International)
-- [ ] Direct wallet deposits
+- [ ] MoonPay integration (usdc_polygon + small MATIC purchase)
+- [ ] Direct wallet deposits (USDC on Polygon)
 - [ ] Deposit confirmation flow
+- [ ] Balance sync between on-chain and platform balance
 
 ### Phase 4: Withdrawals (Behind Feature Flag)
 - [ ] Withdrawal request UI
@@ -338,10 +342,10 @@ const CRYPTO_FLAGS = {
 - [ ] Multi-sig treasury (security)
 
 ### Phase 5: Full Integration
-- [ ] Betting with USDC
+- [ ] Betting with USDC on Polygon
 - [ ] Real-time balance updates
 - [ ] Gas estimation and optimization
-- [ ] Circle Paymaster (pay gas in USDC)
+- [ ] Gasless transactions via relayer/paymaster (optional — gas is already ~$0.003)
 
 ---
 
@@ -363,64 +367,47 @@ const CRYPTO_FLAGS = {
 ┌─────────────────────────────────────────────────────────────┐
 │                      ONRAMP LAYER                            │
 ├─────────────────────────────────────────────────────────────┤
-│  Coinbase Onramp  - US users, 0% fees on Base               │
-│  MoonPay          - International, multiple payment methods  │
+│  MoonPay          - Primary onramp, defaults to usdc_polygon │
+│  Direct Transfer  - Crypto-native users send USDC directly   │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                      BLOCKCHAIN LAYER                        │
 ├─────────────────────────────────────────────────────────────┤
-│  Base (Primary)     - Coinbase L2, lowest fees              │
-│  Polygon (Secondary) - Established, Polymarket compatible    │
-│  Arbitrum (Future)   - High liquidity DeFi                  │
+│  Polygon (Only)   - Polymarket-proven, ~$0.003 fees         │
+│                     Chain ID: 137                            │
+│                     Gas token: MATIC/POL                     │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                      SMART CONTRACTS                         │
 ├─────────────────────────────────────────────────────────────┤
-│  USDC (Circle)   - Stablecoin for all transactions          │
+│  USDC (Circle)   - 0x3c499c...3359 (native, not bridged)   │
 │  Treasury        - Multi-sig for platform funds             │
 │  Escrow          - Hold stakes during games (optional)      │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### Updated Wagmi Config
+### Current Wagmi Config (Polygon-Only)
 
 ```typescript
 // apps/web/src/config/wagmi.ts
-import { http, createConfig } from 'wagmi';
-import { mainnet, base, polygon, arbitrum } from 'wagmi/chains';
-import { coinbaseWallet, metaMask, walletConnect, injected } from 'wagmi/connectors';
+import { getDefaultConfig } from '@rainbow-me/rainbowkit'
+import { http } from 'wagmi'
+import { polygon } from 'wagmi/chains'
 
-export const USDC_ADDRESSES = {
-  [mainnet.id]: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
-  [base.id]: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
-  [polygon.id]: '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359',
-  [arbitrum.id]: '0xaf88d065e77c8cC2239327C5EDb3A432268e5831',
-} as const;
+export const USDC_ADDRESS = '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359' as const
 
-export const config = createConfig({
-  chains: [base, polygon, arbitrum, mainnet], // Base first (default)
-  connectors: [
-    coinbaseWallet({
-      appName: 'Chessty',
-      appLogoUrl: '/logo.png',
-    }),
-    metaMask(),
-    walletConnect({
-      projectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID!,
-    }),
-    injected(),
-  ],
+export const config = getDefaultConfig({
+  appName: 'Chessty',
+  projectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || 'demo',
+  chains: [polygon],
   transports: {
-    [mainnet.id]: http(),
-    [base.id]: http(),
     [polygon.id]: http(),
-    [arbitrum.id]: http(),
   },
-});
+})
 ```
 
 ---
