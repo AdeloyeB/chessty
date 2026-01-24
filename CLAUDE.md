@@ -131,6 +131,7 @@ Custom slash commands (skills) are in `.claude/commands/`. These are auto-routab
 **Always use the `/pr` command** for any commit, push, or PR operations. Do NOT use built-in commit-push-pr skills — they don't follow our standards.
 
 The `/pr` command ensures:
+- **Detailed commit messages** — anyone reading the history should understand exactly what happened, why, and what was affected without reading the diff
 - Commit messages follow our type prefix convention (`feat:`, `fix:`, `chore:`)
 - PR titles use the same type prefix format
 - PR body includes Feature, Changes, Bugs/Known Issues, and Testing sections
