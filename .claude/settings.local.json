@@ -4,7 +4,6 @@
       "WebSearch",
       "mcp__plugin_context7_context7__query-docs",
       "mcp__plugin_context7_context7__resolve-library-id",
-
       "Bash(git status:*)",
       "Bash(git diff:*)",
       "Bash(git log:*)",
@@ -22,18 +21,14 @@
       "Bash(git cherry-pick:*)",
       "Bash(git tag:*)",
       "Bash(git remote:*)",
-
       "Bash(gh:*)",
-
       "Bash(pnpm:*)",
       "Bash(npm:*)",
       "Bash(npx:*)",
       "Bash(bun:*)",
       "Bash(turbo:*)",
-
       "Bash(docker:*)",
       "Bash(docker compose:*)",
-
       "Bash(ls:*)",
       "Bash(pwd:*)",
       "Bash(which:*)",
@@ -42,10 +37,14 @@
       "Bash(tail:*)",
       "Bash(wc:*)",
       "Bash(curl:*)",
-
       "Bash(node:*)",
       "Bash(tsc:*)",
-      "Bash(drizzle-kit:*)"
+      "Bash(drizzle-kit:*)",
+      "Bash(grep:*)",
+      "Bash(lsof:*)",
+      "Bash(kill:*)",
+      "Bash(ELECTRON_RUN_AS_NODE= npx electron:*)",
+      "Bash(open https://github.com/AdeloyeB/chessty/pull/7)"
     ]
   }
 }
