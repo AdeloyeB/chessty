@@ -57,7 +57,7 @@ Title must start with a type prefix:
 - `chore:` — Deps, config, cleanup, CI
 
 ```bash
-gh pr create --title "<type>: <concise title>" --body "$(cat <<'EOF'
+PR_URL=$(gh pr create --title "<type>: <concise title>" --body "$(cat <<'EOF'
 ## Feature
 <Feature name derived from branch, 1 sentence description>
 
@@ -76,10 +76,24 @@ gh pr create --title "<type>: <concise title>" --body "$(cat <<'EOF'
 - [ ] Manually tested the affected feature
 
 EOF
-)"
+)" )
+echo "PR created: $PR_URL"
 ```
 
-### 5. Report Back
+### 5. Open in Browser
+
+After creating the PR, immediately open it in the user's browser:
+
+```bash
+# Open PR in browser (cross-platform)
+if [[ "$OSTYPE" == "darwin"* ]]; then
+  open "$PR_URL"
+elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
+  xdg-open "$PR_URL"
+fi
+```
+
+### 6. Report Back
 
 Output the PR URL and a brief summary of what was submitted.
 

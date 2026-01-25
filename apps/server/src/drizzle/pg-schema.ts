@@ -1,8 +1,8 @@
-import { sqliteTable, text, integer, real } from 'drizzle-orm/sqlite-core';
+import { pgTable, text, integer, numeric, boolean, timestamp, jsonb, unique } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 
 // Users table
-export const users = sqliteTable('users', {
+export const users = pgTable('users', {
   id: text('id').primaryKey(),
   email: text('email').notNull().unique(),
   username: text('username').notNull().unique(),
@@ -15,19 +15,19 @@ export const users = sqliteTable('users', {
   gamesWon: integer('games_won').notNull().default(0),
   gamesLost: integer('games_lost').notNull().default(0),
   gamesDraw: integer('games_draw').notNull().default(0),
-  balance: real('balance').notNull().default(1000),
-  totalWagered: real('total_wagered').notNull().default(0),
-  totalWon: real('total_won').notNull().default(0),
+  balance: numeric('balance', { precision: 12, scale: 2 }).notNull().default('1000'),
+  totalWagered: numeric('total_wagered', { precision: 12, scale: 2 }).notNull().default('0'),
+  totalWon: numeric('total_won', { precision: 12, scale: 2 }).notNull().default('0'),
   // Account lockout fields
   failedLoginAttempts: integer('failed_login_attempts').notNull().default(0),
-  lockedUntil: integer('locked_until', { mode: 'timestamp' }),
-  lastFailedLoginAt: integer('last_failed_login_at', { mode: 'timestamp' }),
-  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
-  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
+  lockedUntil: timestamp('locked_until', { withTimezone: true }),
+  lastFailedLoginAt: timestamp('last_failed_login_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().$defaultFn(() => new Date()),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().$defaultFn(() => new Date()),
 });
 
 // Games table
-export const games = sqliteTable('games', {
+export const games = pgTable('games', {
   id: text('id').primaryKey(),
   whitePlayerId: text('white_player_id').notNull().references(() => users.id),
   blackPlayerId: text('black_player_id').notNull().references(() => users.id),
@@ -38,144 +38,157 @@ export const games = sqliteTable('games', {
   startingFen: text('starting_fen').notNull().default('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'),
   currentFen: text('current_fen').notNull().default('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'),
   pgn: text('pgn').notNull().default(''),
-  moves: text('moves', { mode: 'json' }).notNull().$type<any[]>().default([]),
+  moves: jsonb('moves').notNull().$type<any[]>().default([]),
   timeControlInitial: integer('time_control_initial').notNull(),
   timeControlIncrement: integer('time_control_increment').notNull().default(0),
   whiteTimeRemaining: integer('white_time_remaining').notNull(),
   blackTimeRemaining: integer('black_time_remaining').notNull(),
-  stakeAmount: real('stake_amount').notNull(),
-  totalPot: real('total_pot').notNull(),
+  stakeAmount: numeric('stake_amount', { precision: 12, scale: 2 }).notNull(),
+  totalPot: numeric('total_pot', { precision: 12, scale: 2 }).notNull(),
   whiteEloAtStart: integer('white_elo_at_start').notNull(),
   blackEloAtStart: integer('black_elo_at_start').notNull(),
   eloChange: integer('elo_change'),
-  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
-  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
-  startedAt: integer('started_at', { mode: 'timestamp' }),
-  endedAt: integer('ended_at', { mode: 'timestamp' }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().$defaultFn(() => new Date()),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().$defaultFn(() => new Date()),
+  startedAt: timestamp('started_at', { withTimezone: true }),
+  endedAt: timestamp('ended_at', { withTimezone: true }),
 });
 
 // Bets table
-export const bets = sqliteTable('bets', {
+export const bets = pgTable('bets', {
   id: text('id').primaryKey(),
   gameId: text('game_id').notNull().references(() => games.id),
   userId: text('user_id').notNull().references(() => users.id),
   betOnPlayerId: text('bet_on_player_id').notNull().references(() => users.id),
-  amount: real('amount').notNull(),
-  odds: real('odds').notNull(),
-  potentialPayout: real('potential_payout').notNull(),
+  amount: numeric('amount', { precision: 12, scale: 2 }).notNull(),
+  odds: numeric('odds', { precision: 8, scale: 4 }).notNull(),
+  potentialPayout: numeric('potential_payout', { precision: 12, scale: 2 }).notNull(),
   status: text('status').notNull().default('pending'),
   fenAtBet: text('fen_at_bet').notNull(),
   moveNumberAtBet: integer('move_number_at_bet').notNull(),
-  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
-  settledAt: integer('settled_at', { mode: 'timestamp' }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().$defaultFn(() => new Date()),
+  settledAt: timestamp('settled_at', { withTimezone: true }),
 });
 
 // Transactions table
-export const transactions = sqliteTable('transactions', {
+export const transactions = pgTable('transactions', {
   id: text('id').primaryKey(),
   userId: text('user_id').notNull().references(() => users.id),
   type: text('type').notNull(),
-  amount: real('amount').notNull(),
-  balanceAfter: real('balance_after').notNull(),
+  amount: numeric('amount', { precision: 12, scale: 2 }).notNull(),
+  balanceAfter: numeric('balance_after', { precision: 12, scale: 2 }).notNull(),
   referenceId: text('reference_id'),
   description: text('description'),
-  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().$defaultFn(() => new Date()),
 });
 
 // Matchmaking queue table
-export const matchmakingQueue = sqliteTable('matchmaking_queue', {
+export const matchmakingQueue = pgTable('matchmaking_queue', {
   userId: text('user_id').primaryKey().references(() => users.id),
   eloRating: integer('elo_rating').notNull(),
-  stakeAmount: real('stake_amount').notNull(),
+  stakeAmount: numeric('stake_amount', { precision: 12, scale: 2 }).notNull(),
   timeControlInitial: integer('time_control_initial').notNull(),
   timeControlIncrement: integer('time_control_increment').notNull().default(0),
   minElo: integer('min_elo'),
   maxElo: integer('max_elo'),
-  joinedAt: integer('joined_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
+  joinedAt: timestamp('joined_at', { withTimezone: true }).notNull().$defaultFn(() => new Date()),
 });
 
 // Sessions table
-export const sessions = sqliteTable('sessions', {
+export const sessions = pgTable('sessions', {
   id: text('id').primaryKey(),
   userId: text('user_id').notNull().references(() => users.id),
-  expiresAt: integer('expires_at', { mode: 'timestamp' }).notNull(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
   // Security tracking fields
   ipAddress: text('ip_address'),
   userAgent: text('user_agent'),
-  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().$defaultFn(() => new Date()),
 });
 
 // Challenges table for marketplace
-export const challenges = sqliteTable('challenges', {
+export const challenges = pgTable('challenges', {
   id: text('id').primaryKey(),
   creatorId: text('creator_id').notNull().references(() => users.id),
   gameMode: text('game_mode').notNull().default('standard'),
   timeControlKey: text('time_control_key').notNull(),
   timeControlInitial: integer('time_control_initial').notNull(),
   timeControlIncrement: integer('time_control_increment').notNull().default(0),
-  stakeAmount: real('stake_amount').notNull(),
+  stakeAmount: numeric('stake_amount', { precision: 12, scale: 2 }).notNull(),
   minElo: integer('min_elo'),
   maxElo: integer('max_elo'),
   status: text('status').notNull().default('open'),
   acceptedById: text('accepted_by_id').references(() => users.id),
-  creatorConfirmed: integer('creator_confirmed').notNull().default(0),
-  acceptorConfirmed: integer('acceptor_confirmed').notNull().default(0),
-  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
-  expiresAt: integer('expires_at', { mode: 'timestamp' }).notNull(),
+  creatorConfirmed: boolean('creator_confirmed').notNull().default(false),
+  acceptorConfirmed: boolean('acceptor_confirmed').notNull().default(false),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().$defaultFn(() => new Date()),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
 });
 
 // Spectator predictions table (P2P betting between spectators)
-export const spectatorPredictions = sqliteTable('spectator_predictions', {
+export const spectatorPredictions = pgTable('spectator_predictions', {
   id: text('id').primaryKey(),
   gameId: text('game_id').notNull().references(() => games.id),
   creatorId: text('creator_id').notNull().references(() => users.id),
   acceptorId: text('acceptor_id').references(() => users.id),
   predictedWinnerId: text('predicted_winner_id').notNull().references(() => users.id),
-  amount: real('amount').notNull(),
+  amount: numeric('amount', { precision: 12, scale: 2 }).notNull(),
   status: text('status').notNull().default('open'),
-  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
-  settledAt: integer('settled_at', { mode: 'timestamp' }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().$defaultFn(() => new Date()),
+  settledAt: timestamp('settled_at', { withTimezone: true }),
 });
 
 // Spectator chat table
-export const spectatorChat = sqliteTable('spectator_chat', {
+export const spectatorChat = pgTable('spectator_chat', {
   id: text('id').primaryKey(),
   gameId: text('game_id').notNull().references(() => games.id),
   userId: text('user_id').notNull().references(() => users.id),
   message: text('message').notNull(),
-  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().$defaultFn(() => new Date()),
 });
 
 // User achievements table
-export const userAchievements = sqliteTable('user_achievements', {
+export const userAchievements = pgTable('user_achievements', {
   id: text('id').primaryKey(),
   userId: text('user_id').notNull().references(() => users.id),
   achievementId: text('achievement_id').notNull(),
   category: text('category').notNull(), // games, elo, streaks, special_moves, milestones
-  unlockedAt: integer('unlocked_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
-});
+  unlockedAt: timestamp('unlocked_at', { withTimezone: true }).notNull().$defaultFn(() => new Date()),
+}, (table) => [
+  unique('user_achievement_unique').on(table.userId, table.achievementId),
+]);
 
 // User profiles table (extended profile stats)
-export const userProfiles = sqliteTable('user_profiles', {
+export const userProfiles = pgTable('user_profiles', {
   userId: text('user_id').primaryKey().references(() => users.id),
-  isPublic: integer('is_public').notNull().default(1), // 1 = public, 0 = private
+  isPublic: boolean('is_public').notNull().default(true),
   currentStreak: integer('current_streak').notNull().default(0),
   longestStreak: integer('longest_streak').notNull().default(0),
   totalCheckmates: integer('total_checkmates').notNull().default(0),
   quickestWin: integer('quickest_win'), // fewest moves to win
-  biggestStakeWin: real('biggest_stake_win').default(0),
-  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
+  biggestStakeWin: numeric('biggest_stake_win', { precision: 12, scale: 2 }).default('0'),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().$defaultFn(() => new Date()),
 });
 
 // Security audit log table
-export const securityAuditLog = sqliteTable('security_audit_log', {
+export const securityAuditLog = pgTable('security_audit_log', {
   id: text('id').primaryKey(),
-  eventType: text('event_type').notNull(), // login_failed, login_success, account_locked, account_unlocked, etc.
+  eventType: text('event_type').notNull(), // login_failed, login_success, account_locked, etc.
   userId: text('user_id').references(() => users.id),
   ipAddress: text('ip_address'),
   userAgent: text('user_agent'),
-  details: text('details', { mode: 'json' }).$type<Record<string, unknown>>(),
-  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
+  details: jsonb('details').$type<Record<string, unknown>>(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().$defaultFn(() => new Date()),
+});
+
+// Feature flags table
+export const featureFlags = pgTable('feature_flags', {
+  id: text('id').primaryKey(), // e.g., 'betting_enabled', 'matchmaking_v2'
+  name: text('name').notNull(),
+  description: text('description'),
+  enabled: boolean('enabled').notNull().default(false),
+  metadata: jsonb('metadata').$type<Record<string, unknown>>(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().$defaultFn(() => new Date()),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().$defaultFn(() => new Date()),
 });
 
 // Relations
@@ -317,17 +330,6 @@ export const userProfilesRelations = relations(userProfiles, ({ one }) => ({
     references: [users.id],
   }),
 }));
-
-// Feature flags table
-export const featureFlags = sqliteTable('feature_flags', {
-  id: text('id').primaryKey(), // e.g., 'betting_enabled', 'matchmaking_v2'
-  name: text('name').notNull(),
-  description: text('description'),
-  enabled: integer('enabled').notNull().default(0), // 0 = false, 1 = true
-  metadata: text('metadata', { mode: 'json' }).$type<Record<string, unknown>>(), // For future extensibility
-  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
-  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
-});
 
 // Type exports
 export type FeatureFlag = typeof featureFlags.$inferSelect;

@@ -34,7 +34,7 @@ export async function initializeFeatureFlags(): Promise<void> {
         id,
         name: config.name,
         description: config.description,
-        enabled: config.enabled ? 1 : 0,
+        enabled: config.enabled,
         metadata: null,
         createdAt: now,
         updatedAt: now,
@@ -56,7 +56,7 @@ export async function refreshFlagCache(): Promise<void> {
 
   const newCache: FeatureFlagState = {};
   for (const flag of allFlags) {
-    newCache[flag.id] = flag.enabled === 1;
+    newCache[flag.id] = flag.enabled === true;
   }
 
   flagCache = newCache;
@@ -128,7 +128,7 @@ export async function updateFlag(
   await db
     .update(featureFlags)
     .set({
-      ...(updates.enabled !== undefined && { enabled: updates.enabled ? 1 : 0 }),
+      ...(updates.enabled !== undefined && { enabled: updates.enabled }),
       ...(updates.name !== undefined && { name: updates.name }),
       ...(updates.description !== undefined && { description: updates.description }),
       updatedAt: new Date(),
@@ -161,7 +161,7 @@ export async function createFlag(
     id,
     name,
     description,
-    enabled: enabled ? 1 : 0,
+    enabled,
     metadata: null,
     createdAt: now,
     updatedAt: now,
