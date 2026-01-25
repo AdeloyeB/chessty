@@ -7,6 +7,7 @@ import { useGameStore } from '@/store/game';
 import { useSpectatorStore } from '@/store/spectator';
 import { useChallengeStore } from '@/store/challenge';
 import { useSpectatorChatStore } from '@/store/spectatorChat';
+import { useNotificationStore } from '@/store/notification';
 
 const WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:3001/ws';
 const RECONNECT_DELAY = 1000;
@@ -183,6 +184,24 @@ export function useWebSocket() {
           case 'spectator:predictions_list': {
             const data = payload as any;
             spectatorChatStore.setPredictions(data.predictions);
+            break;
+          }
+
+          // Achievement notifications
+          case 'achievement:unlocked': {
+            const data = payload as any;
+            // Show toast for each unlocked achievement
+            if (data.achievements && Array.isArray(data.achievements)) {
+              data.achievements.forEach((achievement: any) => {
+                useNotificationStore.getState().addAchievementNotification({
+                  id: achievement.id,
+                  name: achievement.name,
+                  description: achievement.description,
+                  icon: achievement.icon,
+                  category: achievement.category,
+                });
+              });
+            }
             break;
           }
 

@@ -2,10 +2,12 @@
 
 import { useState, useMemo, useCallback } from 'react';
 import Link from 'next/link';
-import { useAuthStore } from '@/store/auth';
 import { RankBadge } from './RankBadge';
 import { AchievementBadge } from './AchievementBadge';
+import { ProfileSkeleton } from './ProfileSkeleton';
+import { ProfileError } from './ProfileError';
 import { PaginatedGrid } from '../ui/PaginatedGrid';
+import { useProfileData } from '@/hooks/useProfileData';
 import {
   ACHIEVEMENTS,
   getAchievementsByCategory,
@@ -15,63 +17,6 @@ import {
   type AchievementCategory,
   type Achievement,
 } from '@chess-game/shared';
-
-// ============================================================================
-// MOCK DATA - See MOCK_DATA.md for all mock data locations
-// ============================================================================
-const MOCK_PROFILE = {
-  user: {
-    id: 'mock-user-123',
-    username: 'ChessMaster99',
-    eloRating: 1847,
-    peakEloRating: 1923,
-    gamesPlayed: 342,
-    gamesWon: 198,
-    gamesLost: 127,
-    gamesDraw: 17,
-    totalWagered: 15420,
-    totalWon: 18350,
-    createdAt: '2024-03-15T10:30:00Z',
-  },
-  profile: {
-    isPublic: true,
-    currentStreak: 4,
-    longestStreak: 12,
-    totalCheckmates: 89,
-    quickestWin: 14,
-    biggestStakeWin: 500,
-  },
-  achievements: [
-    { id: 'first_game', unlocked: true, unlockedAt: '2024-03-15T10:35:00Z', progress: 100 },
-    { id: 'first_win', unlocked: true, unlockedAt: '2024-03-15T11:20:00Z', progress: 100 },
-    { id: 'games_10', unlocked: true, unlockedAt: '2024-03-18T14:00:00Z', progress: 100 },
-    { id: 'games_50', unlocked: true, unlockedAt: '2024-04-02T09:15:00Z', progress: 100 },
-    { id: 'games_100', unlocked: true, unlockedAt: '2024-05-10T16:30:00Z', progress: 100 },
-    { id: 'wins_10', unlocked: true, unlockedAt: '2024-03-22T11:45:00Z', progress: 100 },
-    { id: 'wins_50', unlocked: true, unlockedAt: '2024-04-28T13:00:00Z', progress: 100 },
-    { id: 'wins_100', unlocked: true, unlockedAt: '2024-06-15T10:00:00Z', progress: 100 },
-    { id: 'elo_1200', unlocked: true, unlockedAt: '2024-03-16T09:00:00Z', progress: 100 },
-    { id: 'elo_1400', unlocked: true, unlockedAt: '2024-03-25T14:30:00Z', progress: 100 },
-    { id: 'elo_1600', unlocked: true, unlockedAt: '2024-04-15T11:00:00Z', progress: 100 },
-    { id: 'elo_1800', unlocked: true, unlockedAt: '2024-05-20T16:45:00Z', progress: 100 },
-    { id: 'streak_3', unlocked: true, unlockedAt: '2024-03-20T12:00:00Z', progress: 100 },
-    { id: 'streak_5', unlocked: true, unlockedAt: '2024-04-08T15:30:00Z', progress: 100 },
-    { id: 'streak_10', unlocked: true, unlockedAt: '2024-05-01T10:15:00Z', progress: 100 },
-    { id: 'checkmate_10', unlocked: true, unlockedAt: '2024-03-28T09:30:00Z', progress: 100 },
-    { id: 'checkmate_50', unlocked: true, unlockedAt: '2024-05-15T14:00:00Z', progress: 100 },
-    { id: 'first_stake', unlocked: true, unlockedAt: '2024-03-15T11:00:00Z', progress: 100 },
-    { id: 'high_roller', unlocked: true, unlockedAt: '2024-06-01T17:30:00Z', progress: 100 },
-    { id: 'speed_demon', unlocked: true, unlockedAt: '2024-04-12T13:45:00Z', progress: 100 },
-    // In progress achievements
-    { id: 'games_500', unlocked: false, progress: 68 },
-    { id: 'games_1000', unlocked: false, progress: 34 },
-    { id: 'wins_500', unlocked: false, progress: 40 },
-    { id: 'elo_2000', unlocked: false, progress: 92 },
-    { id: 'streak_20', unlocked: false, progress: 60 },
-    { id: 'checkmate_100', unlocked: false, progress: 89 },
-  ],
-};
-// ============================================================================
 
 const CATEGORY_LABELS: Record<AchievementCategory, string> = {
   games: 'games_played',
@@ -84,15 +29,80 @@ const CATEGORY_LABELS: Record<AchievementCategory, string> = {
 type TabType = 'overview' | 'achievements';
 
 export function ProfilePage() {
-  const { user: authUser } = useAuthStore();
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [selectedCategory, setSelectedCategory] = useState<AchievementCategory | 'all'>('all');
-  const [isPublic, setIsPublic] = useState(MOCK_PROFILE.profile.isPublic);
 
-  // Use mock data
-  const profileUser = MOCK_PROFILE.user;
-  const profile = MOCK_PROFILE.profile;
-  const achievements = MOCK_PROFILE.achievements;
+  // Fetch profile data from API
+  const {
+    profile: profileData,
+    isLoading,
+    isError,
+    error,
+    refetch,
+    updateProfile,
+    isUpdating,
+  } = useProfileData();
+
+  // Handle loading state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-black">
+        <nav className="border-b border-white/15 bg-black sticky top-0 z-50">
+          <div className="container mx-auto px-6">
+            <div className="flex items-center justify-between h-16">
+              <div className="flex items-center gap-4">
+                <Link href="/" className="text-3xl hover:opacity-80 transition-opacity">♔</Link>
+                <span className="text-white/50 font-mono">/</span>
+                <span className="text-white font-mono lowercase">profile</span>
+              </div>
+            </div>
+          </div>
+        </nav>
+        <main className="container mx-auto px-6 py-8">
+          <ProfileSkeleton />
+        </main>
+      </div>
+    );
+  }
+
+  // Handle error state
+  if (isError || !profileData) {
+    return (
+      <div className="min-h-screen bg-black">
+        <nav className="border-b border-white/15 bg-black sticky top-0 z-50">
+          <div className="container mx-auto px-6">
+            <div className="flex items-center justify-between h-16">
+              <div className="flex items-center gap-4">
+                <Link href="/" className="text-3xl hover:opacity-80 transition-opacity">♔</Link>
+                <span className="text-white/50 font-mono">/</span>
+                <span className="text-white font-mono lowercase">profile</span>
+              </div>
+              <Link
+                href="/"
+                className="text-white/50 hover:text-white transition-colors font-mono text-sm lowercase"
+              >
+                back_to_home
+              </Link>
+            </div>
+          </div>
+        </nav>
+        <main className="container mx-auto px-6 py-8">
+          <ProfileError error={error} onRetry={() => refetch()} />
+        </main>
+      </div>
+    );
+  }
+
+  // Extract data from profile response
+  const profileUser = profileData.user;
+  const profile = profileData.profile;
+  const achievements = profileData.achievements;
+  const isPublic = profile.isPublic;
+
+  // Handle visibility toggle
+  const handleVisibilityToggle = () => {
+    updateProfile({ isPublic: !isPublic });
+  };
 
   // Memoize expensive calculations
   const { rank, nextRank, progress, winRate, netProfit } = useMemo(() => ({
@@ -209,14 +219,17 @@ export function ProfilePage() {
               <p className="text-lg font-mono text-white">{profileUser.username}</p>
             </div>
             <button
-              onClick={() => setIsPublic(!isPublic)}
+              onClick={handleVisibilityToggle}
+              disabled={isUpdating}
               className={`px-4 py-2 border font-mono text-sm transition-all lowercase ${
+                isUpdating ? 'opacity-50 cursor-not-allowed' : ''
+              } ${
                 isPublic
                   ? 'bg-black border-white/15 text-white/50 hover:border-white hover:text-white'
                   : 'bg-white text-black border-white'
               }`}
             >
-              {isPublic ? '🌐 public' : '🔒 private'}
+              {isUpdating ? '...' : isPublic ? '🌐 public' : '🔒 private'}
             </button>
           </div>
 
