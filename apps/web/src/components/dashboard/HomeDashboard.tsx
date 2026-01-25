@@ -19,34 +19,26 @@ import { BalanceDisplay } from '../wallet/BalanceDisplay';
 import { RankBadge, RankBadgeCompact } from '../profile/RankBadge';
 import { AchievementBadge } from '../profile/AchievementBadge';
 import { getRankTier, getProgressToNextRank, getNextRankTier } from '@chess-game/shared';
+import type { LeaderboardEntry, PublicUser } from '@chess-game/shared';
 
 type Tab = 'home' | 'practice' | 'play' | 'watch' | 'history' | 'leaderboard';
 
-// Types for API responses
-interface LeaderboardPlayer {
-  rank: number;
-  value: number;
-  user: {
-    id: string;
-    username: string;
-    eloRating: number;
-    gamesPlayed: number;
-    gamesWon: number;
-    gamesLost: number;
-    gamesDraw: number;
-  };
-}
-
+// ActiveGame interface matching server response from /api/games/active
 interface ActiveGame {
   id: string;
-  whitePlayer: { username: string; eloRating: number };
-  blackPlayer: { username: string; eloRating: number };
+  whitePlayer: PublicUser;
+  blackPlayer: PublicUser;
+  status: string;
+  currentFen: string;
+  moveCount: number;
+  whiteTimeRemaining: number;
+  blackTimeRemaining: number;
   stakeAmount: number;
   totalPot: number;
-  moveCount: number;
+  startedAt: string | null;
 }
 
-function PlayerStatsCard({ player, rank }: { player: LeaderboardPlayer; rank: number }) {
+function PlayerStatsCard({ player, rank }: { player: LeaderboardEntry; rank: number }) {
   const winRate = player.user.gamesPlayed > 0
     ? Math.round((player.user.gamesWon / player.user.gamesPlayed) * 100)
     : 0;
@@ -401,7 +393,7 @@ function HomeContent({ onNavigate }: { onNavigate: (tab: Tab) => void }) {
                 no players yet
               </div>
             ) : (
-              topPlayers.map((player: LeaderboardPlayer) => (
+              topPlayers.map((player: LeaderboardEntry) => (
                 <PlayerStatsCard key={player.user.id} player={player} rank={player.rank} />
               ))
             )}
