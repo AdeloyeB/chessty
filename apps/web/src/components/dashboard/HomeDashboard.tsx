@@ -102,33 +102,42 @@ function HomeContent({ onNavigate }: { onNavigate: (tab: Tab) => void }) {
   const { user } = useAuthStore();
   const { isConnected, initDevMode, isDevMode } = useWallet();
   const { getEloLeaderboard, getActiveGames } = useApi();
+
+  // ============================================================================
+  // MOCK DATA - See MOCK_DATA.md for all mock data locations
+  // ============================================================================
   const [dailyChallenge] = useState({
     description: 'win 3 games today',
     progress: 1,
     total: 3,
   });
+  // ============================================================================
 
   // Fetch top players from API
-  const { data: topPlayers = [], isLoading: loadingPlayers } = useQuery({
+  const { data: topPlayers = [], isLoading: loadingPlayers, isError: playersError } = useQuery({
     queryKey: ['leaderboard', 'elo', 5],
     queryFn: () => getEloLeaderboard(5),
     staleTime: 60 * 1000, // 1 minute
   });
 
   // Fetch active games from API
-  const { data: activeGames = [], isLoading: loadingGames } = useQuery({
+  const { data: activeGames = [], isLoading: loadingGames, isError: gamesError } = useQuery({
     queryKey: ['games', 'active'],
     queryFn: () => getActiveGames(),
     staleTime: 30 * 1000, // 30 seconds
     refetchInterval: 30 * 1000, // Refetch every 30 seconds
   });
 
-  // Calculate profile stats from user data
+  // ============================================================================
+  // MOCK DATA - See MOCK_DATA.md for all mock data locations
+  // ============================================================================
+  // Calculate profile stats from user data (placeholder until profile API exists)
   const profileStats = useMemo(() => ({
     currentStreak: 0, // TODO: Add to user profile API
     unlockedAchievements: 0, // TODO: Add achievements API
     recentAchievements: [] as { id: string }[],
   }), []);
+  // ============================================================================
 
   // Memoize rank calculations
   const { rank, nextRank, progress } = useMemo(() => {
@@ -312,6 +321,10 @@ function HomeContent({ onNavigate }: { onNavigate: (tab: Tab) => void }) {
               <div className="col-span-3 text-center py-8 text-mid-light font-mono text-sm">
                 loading...
               </div>
+            ) : gamesError ? (
+              <div className="col-span-3 text-center py-8 text-red-400 font-mono text-sm">
+                failed to load matches
+              </div>
             ) : activeGames.length === 0 ? (
               <div className="col-span-3 text-center py-8 text-mid-light font-mono text-sm">
                 no live matches
@@ -378,6 +391,10 @@ function HomeContent({ onNavigate }: { onNavigate: (tab: Tab) => void }) {
             {loadingPlayers ? (
               <div className="text-center py-8 text-mid-light font-mono text-sm">
                 loading...
+              </div>
+            ) : playersError ? (
+              <div className="text-center py-8 text-red-400 font-mono text-sm">
+                failed to load players
               </div>
             ) : topPlayers.length === 0 ? (
               <div className="text-center py-8 text-mid-light font-mono text-sm">

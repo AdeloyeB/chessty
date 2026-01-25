@@ -8,37 +8,47 @@ This document tracks all mock/placeholder data used in the codebase. These shoul
 
 ### `apps/web/src/components/dashboard/HomeDashboard.tsx`
 
-| Constant | Line | Description |
-|----------|------|-------------|
-| `RANDOM_PLAYERS` | ~27 | Array of mock player stats for "Top Players" section |
-| `LIVE_MATCHES` | ~36 | Array of mock live match data for "Live Matches" section |
-| `MOCK_PROFILE_DATA` | ~42 | Mock profile data for unified player profile card |
+| Constant | Line | Description | Status |
+|----------|------|-------------|--------|
+| `dailyChallenge` | ~108 | Hardcoded daily challenge data | Pending API |
+| `profileStats` | ~132 | Placeholder profile stats (streak, achievements) | Pending API |
 
 **Data Structure:**
 ```typescript
-// RANDOM_PLAYERS
-const RANDOM_PLAYERS = [
-  { username: 'GrandMaster_X', elo: 2450, wins: 342, winRate: 78 },
-  ...
-];
+// dailyChallenge - static placeholder until daily challenge system exists
+const [dailyChallenge] = useState({
+  description: 'win 3 games today',
+  progress: 1,
+  total: 3,
+});
 
-// LIVE_MATCHES
-const LIVE_MATCHES = [
-  { white: 'GrandMaster_X', black: 'QueenGambit', pool: 500, viewers: 124 },
-  ...
-];
-
-// MOCK_PROFILE_DATA
-const MOCK_PROFILE_DATA = {
-  currentStreak: 4,
-  longestStreak: 12,
-  unlockedAchievements: 20,
-  totalAchievements: 27,
-  recentAchievements: [{ id: 'wins_100' }, ...],
-};
+// profileStats - placeholder until user_profiles API is connected
+const profileStats = useMemo(() => ({
+  currentStreak: 0,       // TODO: Add to user profile API
+  unlockedAchievements: 0, // TODO: Add achievements API
+  recentAchievements: [],
+}), []);
 ```
 
-**Replace with:** WebSocket subscription for live player count and active games.
+**Already migrated to API:**
+- Top players leaderboard (`getEloLeaderboard`)
+- Live matches (`getActiveGames`)
+
+**Replace with:**
+- `GET /api/daily-challenge` for daily challenge data
+- `GET /api/profile/stats` for streak and achievement counts
+
+---
+
+### `apps/web/src/lib/mock/mockData.ts`
+
+Global mock data control flag:
+
+```typescript
+export const USE_MOCK_DATA = false; // Currently disabled
+```
+
+When `true`, components can use mock data fallbacks. Currently set to `false` since most data comes from real API.
 
 ---
 
@@ -75,14 +85,15 @@ const MOCK_PROFILE = {
 
 ## API Endpoints Needed
 
-To replace all mock data, implement these endpoints:
+To replace all remaining mock data, implement these endpoints:
 
-| Endpoint | Method | Returns |
-|----------|--------|---------|
-| `/api/profile` | GET | Full user profile with stats |
-| `/api/profile/achievements` | GET | Achievement progress array |
-| `/api/games/live` | GET/WS | List of active games |
-| `/api/users/online` | GET/WS | Online player count/list |
+| Endpoint | Method | Returns | Status |
+|----------|--------|---------|--------|
+| `/api/leaderboard/elo` | GET | Top players by ELO | Done |
+| `/api/games/active` | GET | Active games list | Done |
+| `/api/profile` | GET | Full user profile with stats | Pending |
+| `/api/profile/achievements` | GET | Achievement progress array | Pending |
+| `/api/daily-challenge` | GET | Daily challenge data | Pending |
 
 ---
 
@@ -93,8 +104,8 @@ Search for mock data patterns:
 # Find MOCK_ constants
 grep -rn "MOCK_" apps/web/src/
 
-# Find placeholder comments
-grep -rn "mock" apps/web/src/ --include="*.tsx"
+# Find mock data comment blocks
+grep -rn "MOCK DATA" apps/web/src/ --include="*.tsx"
 
 # Find TODO comments about data
 grep -rn "TODO.*data\|TODO.*API" apps/
@@ -104,9 +115,10 @@ grep -rn "TODO.*data\|TODO.*API" apps/
 
 ## Migration Checklist
 
-- [ ] Dashboard: Replace RANDOM_PLAYERS with API/WebSocket player stats
-- [ ] Dashboard: Replace LIVE_MATCHES with WebSocket game feed
-- [ ] Dashboard: Replace MOCK_PROFILE_DATA with user profile data
+- [x] Dashboard: Replace RANDOM_PLAYERS with `getEloLeaderboard` API
+- [x] Dashboard: Replace LIVE_MATCHES with `getActiveGames` API
+- [x] Dashboard: Remove MOCK_PROFILE_DATA (partially migrated to profileStats placeholder)
+- [ ] Dashboard: Replace dailyChallenge with daily challenge API
+- [ ] Dashboard: Replace profileStats with user profile API
 - [ ] ProfilePage: Connect to /api/profile endpoint
 - [ ] ProfilePage: Connect to /api/profile/achievements endpoint
-- [ ] Run database migrations for user_profiles and user_achievements tables
