@@ -3,7 +3,7 @@
  * Set USE_MOCK_DATA to true to enable mock data across all components
  */
 
-export const USE_MOCK_DATA = true;
+export const USE_MOCK_DATA = false;
 
 // Simulated network delay (ms)
 export const MOCK_DELAY = 300;

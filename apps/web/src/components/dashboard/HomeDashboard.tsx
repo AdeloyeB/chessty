@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useAuthStore } from '@/store/auth';
 import { useGameStore } from '@/store/game';
@@ -21,39 +22,35 @@ import { getRankTier, getProgressToNextRank, getNextRankTier } from '@chess-game
 
 type Tab = 'home' | 'practice' | 'play' | 'watch' | 'history' | 'leaderboard';
 
-// ============================================================================
-// MOCK DATA - See MOCK_DATA.md for all mock data locations
-// ============================================================================
-const RANDOM_PLAYERS = [
-  { username: 'GrandMaster_X', elo: 2450, wins: 342, winRate: 78 },
-  { username: 'KnightRider99', elo: 2280, wins: 256, winRate: 71 },
-  { username: 'QueenGambit', elo: 2190, wins: 198, winRate: 69 },
-  { username: 'BishopSlayer', elo: 2150, wins: 167, winRate: 65 },
-  { username: 'PawnStorm', elo: 2080, wins: 143, winRate: 62 },
-  { username: 'RookieKing', elo: 1950, wins: 112, winRate: 58 },
-];
+// Types for API responses
+interface LeaderboardPlayer {
+  rank: number;
+  value: number;
+  user: {
+    id: string;
+    username: string;
+    eloRating: number;
+    gamesPlayed: number;
+    gamesWon: number;
+    gamesLost: number;
+    gamesDraw: number;
+  };
+}
 
-const LIVE_MATCHES = [
-  { white: 'GrandMaster_X', black: 'QueenGambit', pool: 500, viewers: 124 },
-  { white: 'KnightRider99', black: 'BishopSlayer', pool: 250, viewers: 67 },
-  { white: 'PawnStorm', black: 'RookieKing', pool: 100, viewers: 23 },
-];
+interface ActiveGame {
+  id: string;
+  whitePlayer: { username: string; eloRating: number };
+  blackPlayer: { username: string; eloRating: number };
+  stakeAmount: number;
+  totalPot: number;
+  moveCount: number;
+}
 
-const MOCK_PROFILE_DATA = {
-  currentStreak: 4,
-  longestStreak: 12,
-  unlockedAchievements: 20,
-  totalAchievements: 27,
-  recentAchievements: [
-    { id: 'wins_100' },
-    { id: 'elo_1800' },
-    { id: 'streak_10' },
-    { id: 'high_roller' },
-  ],
-};
-// ============================================================================
+function PlayerStatsCard({ player, rank }: { player: LeaderboardPlayer; rank: number }) {
+  const winRate = player.user.gamesPlayed > 0
+    ? Math.round((player.user.gamesWon / player.user.gamesPlayed) * 100)
+    : 0;
 
-function PlayerStatsCard({ player, rank }: { player: typeof RANDOM_PLAYERS[0]; rank: number }) {
   return (
     <div className="flex items-center justify-between p-4 bg-pure-black border border-mid/30 hover:border-mid/50 transition-colors">
       <div className="flex items-center gap-4">
@@ -61,19 +58,19 @@ function PlayerStatsCard({ player, rank }: { player: typeof RANDOM_PLAYERS[0]; r
           {rank}
         </div>
         <div>
-          <p className="text-pure-white font-mono">{player.username}</p>
-          <p className="text-xs text-mid-light font-mono">{player.elo} elo</p>
+          <p className="text-pure-white font-mono">{player.user.username}</p>
+          <p className="text-xs text-mid-light font-mono">{player.user.eloRating} elo</p>
         </div>
       </div>
       <div className="text-right">
-        <p className="text-pure-white font-mono">{player.wins} wins</p>
-        <p className="text-xs text-mid-light font-mono">{player.winRate}% wr</p>
+        <p className="text-pure-white font-mono">{player.user.gamesWon} wins</p>
+        <p className="text-xs text-mid-light font-mono">{winRate}% wr</p>
       </div>
     </div>
   );
 }
 
-function LiveMatchCard({ match }: { match: typeof LIVE_MATCHES[0] }) {
+function LiveMatchCard({ game }: { game: ActiveGame }) {
   return (
     <div className="p-4 bg-pure-black border border-mid/30 hover:border-pure-white/30 transition-colors cursor-pointer">
       <div className="flex items-center justify-between mb-3">
@@ -81,21 +78,21 @@ function LiveMatchCard({ match }: { match: typeof LIVE_MATCHES[0] }) {
           <span className="w-2 h-2 bg-pure-white rounded-full animate-pulse" />
           <span className="text-xs font-mono text-mid-light">live</span>
         </div>
-        <span className="text-xs font-mono text-mid-light">{match.viewers} watching</span>
+        <span className="text-xs font-mono text-mid-light">move {game.moveCount}</span>
       </div>
       <div className="space-y-2 mb-3">
         <div className="flex items-center gap-2">
           <span className="w-3 h-3 bg-pure-white border border-mid" />
-          <span className="text-pure-white font-mono text-sm">{match.white}</span>
+          <span className="text-pure-white font-mono text-sm">{game.whitePlayer.username}</span>
         </div>
         <div className="flex items-center gap-2">
           <span className="w-3 h-3 bg-pure-black border border-mid" />
-          <span className="text-pure-white font-mono text-sm">{match.black}</span>
+          <span className="text-pure-white font-mono text-sm">{game.blackPlayer.username}</span>
         </div>
       </div>
       <div className="pt-3 border-t border-mid/30 flex items-center justify-between">
         <span className="text-xs font-mono text-mid-light">pool</span>
-        <USDCAmount amount={match.pool} size="sm" />
+        <USDCAmount amount={game.totalPot} size="sm" />
       </div>
     </div>
   );
@@ -104,11 +101,34 @@ function LiveMatchCard({ match }: { match: typeof LIVE_MATCHES[0] }) {
 function HomeContent({ onNavigate }: { onNavigate: (tab: Tab) => void }) {
   const { user } = useAuthStore();
   const { isConnected, initDevMode, isDevMode } = useWallet();
+  const { getEloLeaderboard, getActiveGames } = useApi();
   const [dailyChallenge] = useState({
     description: 'win 3 games today',
     progress: 1,
     total: 3,
   });
+
+  // Fetch top players from API
+  const { data: topPlayers = [], isLoading: loadingPlayers } = useQuery({
+    queryKey: ['leaderboard', 'elo', 5],
+    queryFn: () => getEloLeaderboard(5),
+    staleTime: 60 * 1000, // 1 minute
+  });
+
+  // Fetch active games from API
+  const { data: activeGames = [], isLoading: loadingGames } = useQuery({
+    queryKey: ['games', 'active'],
+    queryFn: () => getActiveGames(),
+    staleTime: 30 * 1000, // 30 seconds
+    refetchInterval: 30 * 1000, // Refetch every 30 seconds
+  });
+
+  // Calculate profile stats from user data
+  const profileStats = useMemo(() => ({
+    currentStreak: 0, // TODO: Add to user profile API
+    unlockedAchievements: 0, // TODO: Add achievements API
+    recentAchievements: [] as { id: string }[],
+  }), []);
 
   // Memoize rank calculations
   const { rank, nextRank, progress } = useMemo(() => {
@@ -206,21 +226,21 @@ function HomeContent({ onNavigate }: { onNavigate: (tab: Tab) => void }) {
               {/* Quick Stats */}
               <div className="grid grid-cols-2 gap-2 mb-4">
                 <div className="p-3 bg-pure-black border border-mid/30 text-center">
-                  <span className="text-lg font-mono text-pure-white">{MOCK_PROFILE_DATA.currentStreak}</span>
+                  <span className="text-lg font-mono text-pure-white">{profileStats.currentStreak}</span>
                   <span className="text-xs font-mono text-mid-light block">streak</span>
                 </div>
                 <div className="p-3 bg-pure-black border border-mid/30 text-center">
-                  <span className="text-lg font-mono text-pure-white">{MOCK_PROFILE_DATA.unlockedAchievements}</span>
+                  <span className="text-lg font-mono text-pure-white">{profileStats.unlockedAchievements}</span>
                   <span className="text-xs font-mono text-mid-light block">badges</span>
                 </div>
               </div>
 
               {/* Recent Achievements */}
-              {MOCK_PROFILE_DATA.recentAchievements.length > 0 && (
+              {profileStats.recentAchievements.length > 0 && (
                 <div>
                   <p className="text-xs font-mono text-mid-light mb-2">recent_badges</p>
                   <div className="flex gap-2">
-                    {MOCK_PROFILE_DATA.recentAchievements.map((a) => (
+                    {profileStats.recentAchievements.map((a) => (
                       <AchievementBadge
                         key={a.id}
                         achievementId={a.id}
@@ -288,9 +308,19 @@ function HomeContent({ onNavigate }: { onNavigate: (tab: Tab) => void }) {
             </button>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {LIVE_MATCHES.map((match, i) => (
-              <LiveMatchCard key={i} match={match} />
-            ))}
+            {loadingGames ? (
+              <div className="col-span-3 text-center py-8 text-mid-light font-mono text-sm">
+                loading...
+              </div>
+            ) : activeGames.length === 0 ? (
+              <div className="col-span-3 text-center py-8 text-mid-light font-mono text-sm">
+                no live matches
+              </div>
+            ) : (
+              activeGames.slice(0, 3).map((game: ActiveGame) => (
+                <LiveMatchCard key={game.id} game={game} />
+              ))
+            )}
           </div>
         </div>
 
@@ -345,9 +375,19 @@ function HomeContent({ onNavigate }: { onNavigate: (tab: Tab) => void }) {
             </button>
           </div>
           <div className="space-y-2">
-            {RANDOM_PLAYERS.slice(0, 5).map((player, i) => (
-              <PlayerStatsCard key={i} player={player} rank={i + 1} />
-            ))}
+            {loadingPlayers ? (
+              <div className="text-center py-8 text-mid-light font-mono text-sm">
+                loading...
+              </div>
+            ) : topPlayers.length === 0 ? (
+              <div className="text-center py-8 text-mid-light font-mono text-sm">
+                no players yet
+              </div>
+            ) : (
+              topPlayers.map((player: LeaderboardPlayer) => (
+                <PlayerStatsCard key={player.user.id} player={player} rank={player.rank} />
+              ))
+            )}
           </div>
         </div>
 
