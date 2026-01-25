@@ -43,8 +43,9 @@
       "Bash(grep:*)",
       "Bash(lsof:*)",
       "Bash(kill:*)",
-      "Bash(ELECTRON_RUN_AS_NODE= npx electron:*)",
-      "Bash(open https://github.com/AdeloyeB/chessty/pull/7)"
+      "mcp__Neon__describe_project",
+      "mcp__Neon__get_database_tables",
+      "Skill(feature-dev:feature-dev)"
     ]
   }
 }
