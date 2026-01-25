@@ -4,6 +4,7 @@ import type {
   GameMovePayloadServer,
   ClockUpdatePayload,
   GameEndedPayload,
+  AchievementUnlockedPayload,
 } from '@chess-game/shared';
 
 /**
@@ -124,5 +125,21 @@ export function registerBroadcastHandlers(events: GameEventEmitter, broadcast: B
       broadcast.broadcastChallengeList();
     },
     { priority: 50, label: 'broadcast:challenge_expired' }
+  );
+
+  // achievement:unlocked -> send to the user who unlocked them
+  events.on(
+    'achievement:unlocked',
+    (payload) => {
+      const achievementPayload: AchievementUnlockedPayload = {
+        achievements: payload.achievements.map((a) => ({
+          ...a,
+          unlockedAt: a.unlockedAt.toISOString(),
+        })),
+      };
+
+      broadcast.sendToUser(payload.userId, 'achievement:unlocked', achievementPayload);
+    },
+    { priority: 50, label: 'broadcast:achievement_unlocked' }
   );
 }

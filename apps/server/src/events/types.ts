@@ -1,4 +1,4 @@
-import type { Move } from '@chess-game/shared';
+import type { Move, AchievementCategory } from '@chess-game/shared';
 
 /**
  * Typed event map for all game events in the system.
@@ -135,6 +135,19 @@ export interface GameEventMap {
 
   'clock:stopped': {
     gameId: string;
+  };
+
+  // Achievement events
+  'achievement:unlocked': {
+    userId: string;
+    achievements: Array<{
+      id: string;
+      name: string;
+      description: string;
+      icon: string;
+      category: AchievementCategory;
+      unlockedAt: Date;
+    }>;
   };
 }
 

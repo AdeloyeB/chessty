@@ -194,6 +194,8 @@ export const WSMessageTypeSchema = z.enum([
   'spectator:prediction_matched',
   'spectator:prediction_settled',
   'spectator:predictions_list',
+  // Achievement notifications (Server -> Client)
+  'achievement:unlocked',
   'error',
   'ping',
   'pong',
@@ -505,3 +507,6 @@ export * from './history';
 
 // Re-export feature flag types
 export * from './flags';
+
+// Re-export profile types
+export * from './profile';
