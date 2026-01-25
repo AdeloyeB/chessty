@@ -179,45 +179,45 @@ export function ChallengeMarketplace() {
   };
 
   return (
-    <div className="w-full">
-      {/* Desktop Layout: 3-column grid */}
-      <div className="hidden lg:grid lg:grid-cols-12 gap-6">
+    <div className="w-full border border-white/15">
+      {/* Desktop Layout: bento grid with shared borders */}
+      <div className="hidden lg:grid lg:grid-cols-12">
 
         {/* Left Sidebar: Your Profile & Quick Stats */}
-        <div className="lg:col-span-3 space-y-4">
+        <div className="lg:col-span-3 border-r border-white/15">
           {/* Your Stats Card */}
-          <div className="bg-off-black border border-mid/30 p-4">
-            <p className="text-xs font-mono text-mid-light mb-3">your_profile</p>
+          <div className="bg-black p-4 border-b border-white/15">
+            <p className="text-xs font-mono text-white/50 mb-3 lowercase">your_profile</p>
 
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-12 h-12 bg-pure-white flex items-center justify-center text-pure-black text-xl font-mono">
+              <div className="w-12 h-12 bg-white flex items-center justify-center text-black text-xl font-mono">
                 {user?.username?.[0]?.toLowerCase()}
               </div>
               <div>
-                <p className="text-pure-white font-mono">{user?.username}</p>
-                <p className="text-mid-light font-mono text-sm">{userElo} ELO</p>
+                <p className="text-white font-mono">{user?.username}</p>
+                <p className="text-white/50 font-mono text-sm lowercase">{userElo} elo</p>
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-2 mb-4 text-center">
-              <div className="bg-pure-black p-2 border border-mid/20">
-                <p className="text-pure-white font-mono">{user?.gamesWon || 0}</p>
-                <p className="text-xs text-mid-light font-mono">W</p>
+            <div className="grid grid-cols-3 border border-white/15">
+              <div className="p-2 text-center border-r border-white/15">
+                <p className="text-white font-mono">{user?.gamesWon || 0}</p>
+                <p className="text-xs text-white/30 font-mono lowercase">w</p>
               </div>
-              <div className="bg-pure-black p-2 border border-mid/20">
-                <p className="text-pure-white font-mono">{user?.gamesLost || 0}</p>
-                <p className="text-xs text-mid-light font-mono">L</p>
+              <div className="p-2 text-center border-r border-white/15">
+                <p className="text-white font-mono">{user?.gamesLost || 0}</p>
+                <p className="text-xs text-white/30 font-mono lowercase">l</p>
               </div>
-              <div className="bg-pure-black p-2 border border-mid/20">
-                <p className="text-pure-white font-mono">{user?.gamesDraw || 0}</p>
-                <p className="text-xs text-mid-light font-mono">D</p>
+              <div className="p-2 text-center">
+                <p className="text-white font-mono">{user?.gamesDraw || 0}</p>
+                <p className="text-xs text-white/30 font-mono lowercase">d</p>
               </div>
             </div>
 
             {user && user.gamesPlayed > 0 && (
-              <div className="flex items-center justify-between p-2 bg-pure-black border border-mid/20">
-                <span className="text-xs font-mono text-mid-light">win_rate</span>
-                <span className="font-mono text-pure-white">
+              <div className="flex items-center justify-between p-2 border border-white/15 border-t-0">
+                <span className="text-xs font-mono text-white/30 lowercase">win_rate</span>
+                <span className="font-mono text-white">
                   {Math.round((user.gamesWon / user.gamesPlayed) * 100)}%
                 </span>
               </div>
@@ -225,13 +225,13 @@ export function ChallengeMarketplace() {
           </div>
 
           {/* Balance Card */}
-          <div className="bg-off-black border border-mid/30 p-4">
-            <p className="text-xs font-mono text-mid-light mb-2">balance</p>
+          <div className="bg-black p-4 border-b border-white/15">
+            <p className="text-xs font-mono text-white/50 mb-2 lowercase">balance</p>
             <div className="flex items-center justify-between">
               <USDCAmount amount={balance} size="lg" />
               <button
                 onClick={openWalletModal}
-                className="text-xs font-mono text-usdc hover:text-usdc-light"
+                className="text-xs font-mono text-usdc hover:text-usdc-light lowercase"
               >
                 {isConnected ? 'manage' : 'connect'}
               </button>
@@ -239,23 +239,23 @@ export function ChallengeMarketplace() {
           </div>
 
           {/* Quick Actions */}
-          <div className="space-y-2">
+          <div className="border-b border-white/15">
             <button
               onClick={() => setViewMode('create')}
-              className={`w-full p-3 font-mono text-sm border transition-all ${
+              className={`w-full p-3 font-mono text-sm border-b border-white/15 transition-all lowercase ${
                 viewMode === 'create'
-                  ? 'bg-pure-white text-pure-black border-pure-white'
-                  : 'bg-pure-black border-mid/50 text-pure-white hover:border-pure-white'
+                  ? 'bg-white text-black'
+                  : 'bg-black text-white/70 hover:bg-white/5'
               }`}
             >
               + create_game
             </button>
             <button
               onClick={() => setViewMode('browse')}
-              className={`w-full p-3 font-mono text-sm border transition-all ${
+              className={`w-full p-3 font-mono text-sm transition-all lowercase ${
                 viewMode === 'browse'
-                  ? 'bg-pure-white text-pure-black border-pure-white'
-                  : 'bg-pure-black border-mid/50 text-pure-white hover:border-pure-white'
+                  ? 'bg-white text-black'
+                  : 'bg-black text-white/70 hover:bg-white/5'
               }`}
             >
               browse_games
@@ -263,24 +263,24 @@ export function ChallengeMarketplace() {
           </div>
 
           {/* Market Summary */}
-          <div className="bg-off-black border border-mid/30 p-4">
-            <p className="text-xs font-mono text-mid-light mb-3">market_summary</p>
+          <div className="bg-black p-4">
+            <p className="text-xs font-mono text-white/50 mb-3 lowercase">market_summary</p>
             <div className="space-y-2">
               <div className="flex justify-between">
-                <span className="text-xs font-mono text-mid-light">open_games</span>
-                <span className="font-mono text-pure-white">{marketStats.total}</span>
+                <span className="text-xs font-mono text-white/30 lowercase">open_games</span>
+                <span className="font-mono text-white">{marketStats.total}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-xs font-mono text-mid-light">total_stake</span>
+                <span className="text-xs font-mono text-white/30 lowercase">total_stake</span>
                 <USDCAmount amount={marketStats.totalStake} size="sm" />
               </div>
               <div className="flex justify-between">
-                <span className="text-xs font-mono text-mid-light">avg_stake</span>
+                <span className="text-xs font-mono text-white/30 lowercase">avg_stake</span>
                 <USDCAmount amount={marketStats.avgStake} size="sm" />
               </div>
               <div className="flex justify-between">
-                <span className="text-xs font-mono text-mid-light">affordable</span>
-                <span className="font-mono text-pure-white">{marketStats.affordableCount}</span>
+                <span className="text-xs font-mono text-white/30 lowercase">affordable</span>
+                <span className="font-mono text-white">{marketStats.affordableCount}</span>
               </div>
             </div>
           </div>
@@ -289,22 +289,24 @@ export function ChallengeMarketplace() {
         {/* Main Content Area */}
         <div className="lg:col-span-9">
           {viewMode === 'browse' ? (
-            <div className="space-y-4">
+            <div>
               {/* Filters Bar */}
-              <div className="bg-off-black border border-mid/30 p-4">
+              <div className="bg-black p-4 border-b border-white/15">
                 <div className="flex flex-wrap items-center gap-4">
                   {/* Game Mode Filter */}
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-mono text-mid-light">mode:</span>
-                    <div className="flex gap-1">
-                      {(['all', 'standard', 'chess960'] as const).map(mode => (
+                    <span className="text-xs font-mono text-white/30 lowercase">mode:</span>
+                    <div className="flex">
+                      {(['all', 'standard', 'chess960'] as const).map((mode, i) => (
                         <button
                           key={mode}
                           onClick={() => setFilterMode(mode)}
-                          className={`px-3 py-1 text-xs font-mono border transition-all ${
+                          className={`px-3 py-1 text-xs font-mono border-y border-r border-white/15 transition-all lowercase ${
+                            i === 0 ? 'border-l' : ''
+                          } ${
                             filterMode === mode
-                              ? 'bg-pure-white text-pure-black border-pure-white'
-                              : 'bg-pure-black border-mid/50 text-mid-light hover:border-light'
+                              ? 'bg-white text-black'
+                              : 'bg-black text-white/50 hover:text-white'
                           }`}
                         >
                           {mode}
@@ -315,11 +317,11 @@ export function ChallengeMarketplace() {
 
                   {/* Time Control Filter */}
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-mono text-mid-light">time:</span>
+                    <span className="text-xs font-mono text-white/30 lowercase">time:</span>
                     <select
                       value={filterTime}
                       onChange={(e) => setFilterTime(e.target.value)}
-                      className="bg-pure-black border border-mid/50 text-pure-white px-3 py-1 text-xs font-mono"
+                      className="bg-black border border-white/15 text-white px-3 py-1 text-xs font-mono lowercase"
                     >
                       <option value="all">all</option>
                       {Object.entries(CHALLENGE_TIME_CONTROLS).map(([key, value]) => (
@@ -330,7 +332,7 @@ export function ChallengeMarketplace() {
 
                   {/* Results Count */}
                   <div className="ml-auto">
-                    <span className="text-xs font-mono text-mid-light">
+                    <span className="text-xs font-mono text-white/30 lowercase">
                       {filteredChallenges.length} {filteredChallenges.length === 1 ? 'game' : 'games'} available
                     </span>
                   </div>
@@ -368,56 +370,58 @@ export function ChallengeMarketplace() {
       </div>
 
       {/* Mobile Layout: Single column */}
-      <div className="lg:hidden space-y-4">
+      <div className="lg:hidden">
         {/* Mobile Tab Navigation */}
-        <div className="flex gap-2">
+        <div className="flex border-b border-white/15">
           <button
             onClick={() => setViewMode('browse')}
-            className={`flex-1 px-4 py-3 font-mono text-sm border transition-all ${
+            className={`flex-1 px-4 py-3 font-mono text-sm border-r border-white/15 transition-all lowercase ${
               viewMode === 'browse'
-                ? 'bg-pure-white text-pure-black border-pure-white'
-                : 'bg-pure-black border-mid/50 text-mid-light'
+                ? 'bg-white text-black'
+                : 'bg-black text-white/50'
             }`}
           >
-            browse_games ({challenges.length})
+            browse ({challenges.length})
           </button>
           <button
             onClick={() => setViewMode('create')}
-            className={`flex-1 px-4 py-3 font-mono text-sm border transition-all ${
+            className={`flex-1 px-4 py-3 font-mono text-sm transition-all lowercase ${
               viewMode === 'create'
-                ? 'bg-pure-white text-pure-black border-pure-white'
-                : 'bg-pure-black border-mid/50 text-mid-light'
+                ? 'bg-white text-black'
+                : 'bg-black text-white/50'
             }`}
           >
-            create_game
+            create
           </button>
         </div>
 
         {/* Mobile Balance Bar */}
-        <div className="flex items-center justify-between bg-off-black border border-mid/30 p-3">
+        <div className="flex items-center justify-between bg-black border-b border-white/15 p-3">
           <div className="flex items-center gap-2">
-            <span className="text-xs font-mono text-mid-light">balance:</span>
+            <span className="text-xs font-mono text-white/30 lowercase">balance:</span>
             <USDCAmount amount={balance} size="sm" />
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-xs font-mono text-mid-light">elo:</span>
-            <span className="font-mono text-pure-white">{userElo}</span>
+            <span className="text-xs font-mono text-white/30 lowercase">elo:</span>
+            <span className="font-mono text-white">{userElo}</span>
           </div>
         </div>
 
         {/* Mobile Content */}
         {viewMode === 'browse' ? (
-          <div className="space-y-3">
+          <div>
             {/* Mobile Filters */}
-            <div className="flex gap-2 overflow-x-auto pb-2">
-              {(['all', 'standard', 'chess960'] as const).map(mode => (
+            <div className="flex overflow-x-auto border-b border-white/15">
+              {(['all', 'standard', 'chess960'] as const).map((mode, i) => (
                 <button
                   key={mode}
                   onClick={() => setFilterMode(mode)}
-                  className={`px-3 py-1.5 text-xs font-mono border whitespace-nowrap ${
+                  className={`px-4 py-2 text-xs font-mono whitespace-nowrap lowercase ${
+                    i < 2 ? 'border-r border-white/15' : ''
+                  } ${
                     filterMode === mode
-                      ? 'bg-pure-white text-pure-black border-pure-white'
-                      : 'bg-pure-black border-mid/50 text-mid-light'
+                      ? 'bg-white text-black'
+                      : 'bg-black text-white/50'
                   }`}
                 >
                   {mode}
@@ -427,11 +431,11 @@ export function ChallengeMarketplace() {
 
             {/* Mobile Challenge Cards */}
             {filteredChallenges.length === 0 ? (
-              <div className="text-center py-8">
-                <p className="text-mid-light font-mono text-sm">no games available</p>
+              <div className="text-center py-8 bg-black">
+                <p className="text-white/30 font-mono text-sm lowercase">no games available</p>
               </div>
             ) : (
-              <div className="space-y-3">
+              <div>
                 {filteredChallenges.map(challenge => (
                   <MobileChallengeCard
                     key={challenge.id}
@@ -493,16 +497,16 @@ function MobileChallengeCard({ challenge, userBalance, onAccept }: MobileChallen
   const canAfford = userBalance >= challenge.stakeAmount;
 
   return (
-    <div className="bg-off-black border border-mid/30 p-4">
+    <div className="bg-black border-b border-white/15 p-4">
       {/* Header */}
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-pure-white flex items-center justify-center text-pure-black text-sm font-mono">
+          <div className="w-8 h-8 bg-white flex items-center justify-center text-black text-sm font-mono">
             {challenge.creator.username[0].toLowerCase()}
           </div>
           <div>
-            <p className="text-pure-white font-mono text-sm">{challenge.creator.username}</p>
-            <p className="text-xs font-mono text-mid-light">{challenge.creator.eloRating} ELO</p>
+            <p className="text-white font-mono text-sm">{challenge.creator.username}</p>
+            <p className="text-xs font-mono text-white/50 lowercase">{challenge.creator.eloRating} elo</p>
           </div>
         </div>
         {challenge.gameMode === 'chess960' && (
@@ -510,25 +514,25 @@ function MobileChallengeCard({ challenge, userBalance, onAccept }: MobileChallen
         )}
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-4 gap-2 mb-3 text-center">
-        <div className="bg-pure-black p-2 border border-mid/20">
-          <p className="text-pure-white font-mono text-sm">{timeControl?.label}</p>
-          <p className="text-xs text-mid-light font-mono">time</p>
+      {/* Stats Grid - bento style */}
+      <div className="grid grid-cols-4 border border-white/15 mb-3 text-center">
+        <div className="p-2 border-r border-white/15">
+          <p className="text-white font-mono text-sm">{timeControl?.label}</p>
+          <p className="text-xs text-white/30 font-mono lowercase">time</p>
         </div>
-        <div className="bg-pure-black p-2 border border-mid/20">
+        <div className="p-2 border-r border-white/15">
           <USDCAmount amount={challenge.stakeAmount} size="sm" />
-          <p className="text-xs text-mid-light font-mono">stake</p>
+          <p className="text-xs text-white/30 font-mono lowercase">stake</p>
         </div>
-        <div className="bg-pure-black p-2 border border-mid/20">
-          <p className={`font-mono text-sm ${challenge.winProb >= 50 ? 'text-green-400' : 'text-red-400'}`}>
+        <div className="p-2 border-r border-white/15">
+          <p className={`font-mono text-sm ${challenge.winProb >= 50 ? 'text-white' : 'text-white/50'}`}>
             {challenge.winProb}%
           </p>
-          <p className="text-xs text-mid-light font-mono">odds</p>
+          <p className="text-xs text-white/30 font-mono lowercase">odds</p>
         </div>
-        <div className="bg-pure-black p-2 border border-mid/20">
-          <p className="text-pure-white font-mono text-sm">{challenge.creatorWinRate}%</p>
-          <p className="text-xs text-mid-light font-mono">their WR</p>
+        <div className="p-2">
+          <p className="text-white font-mono text-sm">{challenge.creatorWinRate}%</p>
+          <p className="text-xs text-white/30 font-mono lowercase">wr</p>
         </div>
       </div>
 
@@ -536,10 +540,10 @@ function MobileChallengeCard({ challenge, userBalance, onAccept }: MobileChallen
       <button
         onClick={onAccept}
         disabled={!canAfford}
-        className={`w-full py-2 font-mono text-sm transition-all ${
+        className={`w-full py-2 font-mono text-sm transition-all lowercase ${
           canAfford
-            ? 'bg-pure-white text-pure-black hover:bg-off-white'
-            : 'bg-off-black text-mid/30 border border-mid/20 cursor-not-allowed'
+            ? 'bg-white text-black hover:bg-white/90'
+            : 'bg-black text-white/20 border border-white/15 cursor-not-allowed'
         }`}
       >
         {canAfford ? 'accept' : 'insufficient balance'}

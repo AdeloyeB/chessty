@@ -47,13 +47,13 @@ export function GamesTable({ games, isLoading, onGameClick }: GamesTableProps) {
 
   if (isLoading) {
     return (
-      <div className="bg-off-black border border-mid/30 overflow-hidden">
-        <div className="p-4 bg-pure-black border-b border-mid/30">
-          <div className="h-4 bg-mid/30 rounded w-48 animate-pulse" />
+      <div className="bg-black overflow-hidden">
+        <div className="p-4 border-b border-white/15">
+          <div className="h-4 bg-white/10 w-48 animate-pulse" />
         </div>
         {[...Array(5)].map((_, i) => (
-          <div key={i} className="p-4 border-b border-mid/20">
-            <div className="h-4 bg-mid/30 rounded animate-pulse" />
+          <div key={i} className="p-4 border-b border-white/15">
+            <div className="h-4 bg-white/10 animate-pulse" />
           </div>
         ))}
       </div>
@@ -62,18 +62,18 @@ export function GamesTable({ games, isLoading, onGameClick }: GamesTableProps) {
 
   if (games.length === 0) {
     return (
-      <div className="bg-off-black border border-mid/30 p-12 text-center">
+      <div className="bg-black p-12 text-center">
         <p className="text-2xl mb-2">&#9812;</p>
-        <p className="text-mid-light font-mono">no games found</p>
-        <p className="text-xs text-mid font-mono mt-1">try adjusting your filters</p>
+        <p className="text-white/50 font-mono lowercase">no games found</p>
+        <p className="text-xs text-white/30 font-mono mt-1 lowercase">try adjusting your filters</p>
       </div>
     );
   }
 
   return (
-    <div className="bg-off-black border border-mid/30 overflow-hidden">
+    <div className="bg-black overflow-hidden">
       {/* Table Header */}
-      <div className="grid grid-cols-12 gap-4 p-4 bg-pure-black border-b border-mid/30 text-xs font-mono text-mid-light">
+      <div className="grid grid-cols-12 gap-4 p-4 border-b border-white/15 text-xs font-mono text-white/50 lowercase">
         <SortableHeader
           className="col-span-2"
           field="date"
@@ -124,22 +124,22 @@ export function GamesTable({ games, isLoading, onGameClick }: GamesTableProps) {
       </div>
 
       {/* Table Body */}
-      <div className="divide-y divide-mid/20">
+      <div>
         {sortedGames.map((game) => (
           <button
             key={game.id}
             onClick={() => onGameClick(game)}
-            className="w-full grid grid-cols-12 gap-4 p-4 hover:bg-pure-black/50 transition-colors text-left"
+            className="w-full grid grid-cols-12 gap-4 p-4 border-b border-white/15 last:border-b-0 hover:bg-white/5 transition-colors text-left"
           >
             {/* Date */}
             <div className="col-span-2">
-              <p className="text-sm font-mono text-pure-white">
+              <p className="text-sm font-mono text-white lowercase">
                 {new Date(game.endedAt).toLocaleDateString('en-US', {
                   month: 'short',
                   day: 'numeric',
                 })}
               </p>
-              <p className="text-xs font-mono text-mid-light">
+              <p className="text-xs font-mono text-white/50">
                 {new Date(game.endedAt).toLocaleTimeString('en-US', {
                   hour: '2-digit',
                   minute: '2-digit',
@@ -149,14 +149,14 @@ export function GamesTable({ games, isLoading, onGameClick }: GamesTableProps) {
 
             {/* Opponent */}
             <div className="col-span-3 flex items-center gap-3">
-              <div className="w-8 h-8 bg-mid/20 flex items-center justify-center text-mid-light font-mono text-sm shrink-0">
+              <div className="w-8 h-8 bg-white/10 border border-white/15 flex items-center justify-center text-white/50 font-mono text-sm shrink-0">
                 {game.opponent.username[0].toLowerCase()}
               </div>
               <div className="min-w-0">
-                <p className="text-sm font-mono text-pure-white truncate">
+                <p className="text-sm font-mono text-white truncate">
                   {game.opponent.username}
                 </p>
-                <p className="text-xs font-mono text-mid-light">
+                <p className="text-xs font-mono text-white/50">
                   {game.opponentEloAtStart}
                 </p>
               </div>
@@ -169,7 +169,7 @@ export function GamesTable({ games, isLoading, onGameClick }: GamesTableProps) {
 
             {/* Time Control */}
             <div className="col-span-1 flex flex-col justify-center">
-              <p className="text-sm font-mono text-pure-white">
+              <p className="text-sm font-mono text-white lowercase">
                 {game.timeControlLabel}
               </p>
               {game.gameMode === 'chess960' && (
@@ -182,7 +182,7 @@ export function GamesTable({ games, isLoading, onGameClick }: GamesTableProps) {
               <USDCAmount amount={game.stakeAmount} size="sm" />
               <p className={`text-xs font-mono ${
                 game.result === 'win' ? 'text-green-400' :
-                game.result === 'loss' ? 'text-red-400' : 'text-mid-light'
+                game.result === 'loss' ? 'text-red-400' : 'text-white/50'
               }`}>
                 {game.result === 'win' ? '+' : game.result === 'loss' ? '-' : ''}
                 ${game.result === 'draw' ? '0' : game.stakeAmount.toFixed(2)}
@@ -193,7 +193,7 @@ export function GamesTable({ games, isLoading, onGameClick }: GamesTableProps) {
             <div className="col-span-1 flex items-center">
               <span className={`font-mono text-sm ${
                 game.eloChange > 0 ? 'text-green-400' :
-                game.eloChange < 0 ? 'text-red-400' : 'text-mid-light'
+                game.eloChange < 0 ? 'text-red-400' : 'text-white/50'
               }`}>
                 {game.eloChange > 0 ? '+' : ''}{game.eloChange}
               </span>
@@ -201,8 +201,8 @@ export function GamesTable({ games, isLoading, onGameClick }: GamesTableProps) {
 
             {/* Opening */}
             <div className="col-span-2 flex items-center">
-              <p className="text-xs font-mono text-mid-light truncate">
-                {game.opening || 'Unknown'}
+              <p className="text-xs font-mono text-white/50 truncate lowercase">
+                {game.opening || 'unknown'}
               </p>
             </div>
           </button>
@@ -231,11 +231,11 @@ function SortableHeader({
 
   return (
     <button
-      className={`${className} text-left hover:text-pure-white transition-colors flex items-center gap-1`}
+      className={`${className} text-left hover:text-white transition-colors flex items-center gap-1`}
       onClick={() => onSort(field)}
     >
       {children}
-      <span className={isActive ? 'text-pure-white' : 'text-mid/50'}>
+      <span className={isActive ? 'text-white' : 'text-white/20'}>
         {direction === 'asc' ? '↑' : '↓'}
       </span>
     </button>
@@ -244,9 +244,9 @@ function SortableHeader({
 
 function ResultBadge({ result }: { result: 'win' | 'loss' | 'draw' }) {
   const colors = {
-    win: 'bg-green-400/20 text-green-400 border-green-400/50',
-    loss: 'bg-red-400/20 text-red-400 border-red-400/50',
-    draw: 'bg-mid/20 text-mid-light border-mid/50',
+    win: 'bg-green-400/10 text-green-400 border-green-400/30',
+    loss: 'bg-red-400/10 text-red-400 border-red-400/30',
+    draw: 'bg-black text-white/50 border-white/15',
   };
 
   const labels = {

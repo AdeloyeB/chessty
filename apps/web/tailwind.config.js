@@ -8,45 +8,31 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        // Pure black and white palette (legacy)
+        // Pure black and white only - blueprint aesthetic
+        'black': '#000000',
+        'white': '#ffffff',
+
+        // Legacy color aliases (for backwards compatibility during migration)
         'pure-black': '#000000',
-        'off-black': '#0a0a0a',
-        'dark': '#111111',
-        'mid-dark': '#1a1a1a',
-        'mid': '#333333',
-        'mid-light': '#666666',
-        'light': '#999999',
-        'off-white': '#e5e5e5',
+        'off-black': '#000000',  // Now pure black
+        'dark': '#000000',
+        'mid-dark': '#000000',
+        'mid': 'rgba(255, 255, 255, 0.3)',
+        'mid-light': 'rgba(255, 255, 255, 0.5)',
+        'light': 'rgba(255, 255, 255, 0.7)',
+        'off-white': 'rgba(255, 255, 255, 0.9)',
         'pure-white': '#ffffff',
-
-        // Retro blue/white theme
-        'retro-dark': '#0a0f1a',      // Deep navy background
-        'retro-mid': '#111827',       // Slightly lighter navy
-        'retro-blue': '#3b82f6',      // Electric blue accent
-        'retro-cyan': '#06b6d4',      // Cyan highlight
-        'retro-glow': '#60a5fa',      // Lighter blue for glows
-        'retro-muted': '#64748b',     // Muted text
-        'board-light': '#1e3a5f',     // Light squares - muted blue
-        'board-dark': '#0f172a',      // Dark squares - deep navy
-
-        // Accent (subtle)
-        'accent': '#ffffff',
-
-        // Status colors (grayscale)
-        'success': '#ffffff',
-        'warning': '#999999',
-        'danger': '#666666',
 
         // USDC brand colors
         'usdc': {
-          DEFAULT: '#0052FF',
-          light: '#3377FF',
-          dark: '#0041CC',
+          DEFAULT: '#2775CA',
+          light: '#4A90E2',
+          dark: '#1A5FA8',
         },
       },
       fontFamily: {
-        sans: ['system-ui', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
-        mono: ['"SF Mono"', '"Fira Code"', 'Menlo', 'Monaco', 'monospace'],
+        sans: ['"JetBrains Mono"', 'monospace'],
+        mono: ['"JetBrains Mono"', 'monospace'],
       },
       animation: {
         'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',

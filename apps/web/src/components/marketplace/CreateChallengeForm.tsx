@@ -113,11 +113,11 @@ export function CreateChallengeForm({
   };
 
   return (
-    <div className="bg-off-black border border-mid/30">
+    <div className="bg-black border border-white/15">
       {/* Header */}
-      <div className="p-4 border-b border-mid/30">
-        <p className="text-xs font-mono text-mid-light">create_game</p>
-        <p className="text-lg font-mono text-pure-white">post a new game</p>
+      <div className="p-4 border-b border-white/15">
+        <p className="text-xs font-mono text-white/50 lowercase">create_game</p>
+        <p className="text-lg font-mono text-white lowercase">post a new game</p>
       </div>
 
       <div className="p-6">
@@ -129,54 +129,58 @@ export function CreateChallengeForm({
 
             {/* Game Mode Selection */}
             <div>
-              <p className="text-xs font-mono text-mid-light mb-3">game_mode</p>
-              <div className="grid grid-cols-2 gap-3">
+              <p className="text-xs font-mono text-white/50 mb-3 lowercase">game_mode</p>
+              <div className="flex">
                 <button
                   onClick={() => setFormGameMode('standard')}
-                  className={`p-4 border transition-all ${
+                  className={`flex-1 p-4 border-y border-l border-r border-white/15 transition-all ${
                     formGameMode === 'standard'
-                      ? 'bg-pure-white text-pure-black border-pure-white'
-                      : 'bg-pure-black border-mid/50 text-mid-light hover:border-pure-white hover:text-pure-white'
+                      ? 'bg-white text-black'
+                      : 'bg-black text-white/50 hover:text-white'
                   }`}
                 >
                   <div className="text-3xl mb-2">&#9812;</div>
-                  <div className="font-mono text-sm font-medium">standard</div>
-                  <div className="text-xs opacity-60 mt-1">classic chess rules</div>
+                  <div className="font-mono text-sm font-medium lowercase">standard</div>
+                  <div className="text-xs opacity-60 mt-1 lowercase">classic chess rules</div>
                 </button>
                 <button
                   onClick={() => setFormGameMode('chess960')}
-                  className={`p-4 border transition-all ${
+                  className={`flex-1 p-4 border-y border-r border-white/15 transition-all ${
                     formGameMode === 'chess960'
-                      ? 'bg-pure-white text-pure-black border-pure-white'
-                      : 'bg-pure-black border-mid/50 text-mid-light hover:border-pure-white hover:text-pure-white'
+                      ? 'bg-white text-black'
+                      : 'bg-black text-white/50 hover:text-white'
                   }`}
                 >
                   <div className="text-3xl mb-2">&#9812;?</div>
-                  <div className="font-mono text-sm font-medium">chess960</div>
-                  <div className="text-xs opacity-60 mt-1">randomized start</div>
+                  <div className="font-mono text-sm font-medium lowercase">chess960</div>
+                  <div className="text-xs opacity-60 mt-1 lowercase">randomized start</div>
                 </button>
               </div>
             </div>
 
             {/* Time Control Selection */}
             <div>
-              <p className="text-xs font-mono text-mid-light mb-3">time_control</p>
-              <div className="grid grid-cols-3 gap-2">
-                {Object.entries(CHALLENGE_TIME_CONTROLS).map(([key, value]) => {
+              <p className="text-xs font-mono text-white/50 mb-3 lowercase">time_control</p>
+              <div className="grid grid-cols-3 border border-white/15">
+                {Object.entries(CHALLENGE_TIME_CONTROLS).map(([key, value], index) => {
                   const estimate = TIME_ESTIMATES[key];
+                  const isLastInRow = (index + 1) % 3 === 0;
+                  const isLastRow = index >= Object.keys(CHALLENGE_TIME_CONTROLS).length - 3;
                   return (
                     <button
                       key={key}
                       onClick={() => setFormTimeControlKey(key)}
-                      className={`p-3 border transition-all text-left ${
+                      className={`p-3 transition-all text-left ${
+                        !isLastInRow ? 'border-r border-white/15' : ''
+                      } ${!isLastRow ? 'border-b border-white/15' : ''} ${
                         formTimeControlKey === key
-                          ? 'bg-pure-white text-pure-black border-pure-white'
-                          : 'bg-pure-black border-mid/50 text-mid-light hover:border-pure-white hover:text-pure-white'
+                          ? 'bg-white text-black'
+                          : 'bg-black text-white/50 hover:text-white'
                       }`}
                     >
-                      <div className="font-mono text-sm font-medium">{value.label}</div>
+                      <div className="font-mono text-sm font-medium lowercase">{value.label}</div>
                       {estimate && (
-                        <div className="text-xs opacity-60 mt-0.5">
+                        <div className="text-xs opacity-60 mt-0.5 lowercase">
                           ~{estimate.avg} min
                         </div>
                       )}
@@ -189,15 +193,15 @@ export function CreateChallengeForm({
             {/* Stake Selection */}
             <div>
               <div className="flex items-center justify-between mb-3">
-                <p className="text-xs font-mono text-mid-light">stake_amount</p>
+                <p className="text-xs font-mono text-white/50 lowercase">stake_amount</p>
                 {isConnected ? (
-                  <p className="text-xs font-mono text-mid-light">
+                  <p className="text-xs font-mono text-white/50 lowercase">
                     <USDCAmount amount={userBalance} size="sm" className="inline" /> available
                   </p>
                 ) : (
                   <button
                     onClick={onOpenWallet}
-                    className="text-xs font-mono text-usdc hover:text-usdc-light"
+                    className="text-xs font-mono text-usdc hover:text-usdc-light lowercase"
                   >
                     connect wallet
                   </button>
@@ -205,21 +209,24 @@ export function CreateChallengeForm({
               </div>
 
               {/* Stake Presets */}
-              <div className="grid grid-cols-4 gap-2 mb-3">
-                {STAKE_PRESETS.slice(0, 4).map((amount) => {
+              <div className="flex mb-3">
+                {STAKE_PRESETS.slice(0, 4).map((amount, index) => {
                   const isSelected = formStakeAmount === amount && !customStake;
                   const affordable = isConnected && userBalance >= amount;
+                  const isFirst = index === 0;
                   return (
                     <button
                       key={amount}
                       onClick={() => handleStakePreset(amount)}
                       disabled={!affordable}
-                      className={`p-2 border font-mono text-sm transition-all ${
+                      className={`flex-1 p-2 font-mono text-sm transition-all border-y border-r ${
+                        isFirst ? 'border-l' : ''
+                      } border-white/15 ${
                         isSelected
-                          ? 'bg-pure-white text-pure-black border-pure-white'
+                          ? 'bg-white text-black'
                           : !affordable
-                          ? 'bg-pure-black border-mid/20 text-mid/30 cursor-not-allowed'
-                          : 'bg-pure-black border-mid/50 text-mid-light hover:border-pure-white hover:text-pure-white'
+                          ? 'bg-black text-white/20 cursor-not-allowed'
+                          : 'bg-black text-white/50 hover:text-white'
                       }`}
                     >
                       {formatUSDC(amount)}
@@ -235,12 +242,12 @@ export function CreateChallengeForm({
                   value={customStake}
                   onChange={(e) => setCustomStake(e.target.value)}
                   placeholder="custom amount..."
-                  className="w-full bg-pure-black border border-mid/50 text-pure-white px-4 py-3 font-mono text-sm placeholder:text-mid focus:border-pure-white focus:outline-none"
+                  className="w-full bg-black border border-white/15 text-white px-4 py-3 font-mono text-sm placeholder:text-white/30 focus:border-white focus:outline-none lowercase"
                   min={1}
                   max={userBalance}
                   disabled={!isConnected}
                 />
-                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-mono text-mid-light">
+                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-mono text-white/50">
                   USDC
                 </span>
               </div>
@@ -250,19 +257,19 @@ export function CreateChallengeForm({
             <div>
               <button
                 onClick={() => setShowEloRange(!showEloRange)}
-                className="text-xs font-mono text-mid-light hover:text-pure-white transition-colors"
+                className="text-xs font-mono text-white/50 hover:text-white transition-colors lowercase"
               >
                 {showEloRange ? '− hide' : '+'} elo_restrictions (optional)
               </button>
 
               {showEloRange && (
-                <div className="mt-3 p-4 bg-pure-black border border-mid/30">
-                  <p className="text-xs font-mono text-mid mb-3">
+                <div className="mt-3 p-4 bg-black border border-white/15">
+                  <p className="text-xs font-mono text-white/30 mb-3 lowercase">
                     limit who can accept your challenge
                   </p>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <p className="text-xs font-mono text-mid-light mb-1">min_elo</p>
+                  <div className="flex">
+                    <div className="flex-1 border border-white/15 border-r-0 p-3">
+                      <p className="text-xs font-mono text-white/50 mb-1 lowercase">min_elo</p>
                       <input
                         type="number"
                         value={formMinElo || ''}
@@ -270,13 +277,13 @@ export function CreateChallengeForm({
                           setFormMinElo(e.target.value ? parseInt(e.target.value) : null)
                         }
                         placeholder={String(Math.max(0, userElo - 300))}
-                        className="w-full bg-off-black border border-mid/50 text-pure-white px-3 py-2 font-mono text-sm placeholder:text-mid focus:border-pure-white focus:outline-none"
+                        className="w-full bg-black border border-white/15 text-white px-3 py-2 font-mono text-sm placeholder:text-white/30 focus:border-white focus:outline-none"
                         min={0}
                         max={3000}
                       />
                     </div>
-                    <div>
-                      <p className="text-xs font-mono text-mid-light mb-1">max_elo</p>
+                    <div className="flex-1 border border-white/15 p-3">
+                      <p className="text-xs font-mono text-white/50 mb-1 lowercase">max_elo</p>
                       <input
                         type="number"
                         value={formMaxElo || ''}
@@ -284,13 +291,13 @@ export function CreateChallengeForm({
                           setFormMaxElo(e.target.value ? parseInt(e.target.value) : null)
                         }
                         placeholder={String(userElo + 300)}
-                        className="w-full bg-off-black border border-mid/50 text-pure-white px-3 py-2 font-mono text-sm placeholder:text-mid focus:border-pure-white focus:outline-none"
+                        className="w-full bg-black border border-white/15 text-white px-3 py-2 font-mono text-sm placeholder:text-white/30 focus:border-white focus:outline-none"
                         min={0}
                         max={3000}
                       />
                     </div>
                   </div>
-                  <p className="text-xs font-mono text-mid mt-2">
+                  <p className="text-xs font-mono text-white/30 mt-2 lowercase">
                     your elo: {userElo}
                   </p>
                 </div>
@@ -302,109 +309,112 @@ export function CreateChallengeForm({
           <div className="space-y-4">
 
             {/* Your Stats Summary */}
-            <div className="p-4 bg-pure-black border border-mid/30">
-              <p className="text-xs font-mono text-mid-light mb-3">your_stats</p>
-              <div className="grid grid-cols-4 gap-3 text-center">
-                <div>
-                  <p className="text-xl font-mono text-pure-white">{userElo}</p>
-                  <p className="text-xs font-mono text-mid-light">elo</p>
+            <div className="bg-black border border-white/15">
+              <div className="p-3 border-b border-white/15">
+                <p className="text-xs font-mono text-white/50 lowercase">your_stats</p>
+              </div>
+              <div className="grid grid-cols-4">
+                <div className="p-3 text-center border-r border-white/15">
+                  <p className="text-xl font-mono text-white">{userElo}</p>
+                  <p className="text-xs font-mono text-white/50 lowercase">elo</p>
                 </div>
-                <div>
-                  <p className="text-xl font-mono text-pure-white">{userStats.peakElo}</p>
-                  <p className="text-xs font-mono text-mid-light">peak</p>
+                <div className="p-3 text-center border-r border-white/15">
+                  <p className="text-xl font-mono text-white">{userStats.peakElo}</p>
+                  <p className="text-xs font-mono text-white/50 lowercase">peak</p>
                 </div>
-                <div>
-                  <p className="text-xl font-mono text-pure-white">{winRate}%</p>
-                  <p className="text-xs font-mono text-mid-light">win_rate</p>
+                <div className="p-3 text-center border-r border-white/15">
+                  <p className={`text-xl font-mono ${winRate >= 50 ? 'text-green-400' : 'text-red-400'}`}>{winRate}%</p>
+                  <p className="text-xs font-mono text-white/50 lowercase">win_rate</p>
                 </div>
-                <div>
-                  <p className="text-xl font-mono text-pure-white">{userStats.gamesPlayed}</p>
-                  <p className="text-xs font-mono text-mid-light">games</p>
+                <div className="p-3 text-center">
+                  <p className="text-xl font-mono text-white">{userStats.gamesPlayed}</p>
+                  <p className="text-xs font-mono text-white/50 lowercase">games</p>
                 </div>
               </div>
             </div>
 
             {/* Game Summary */}
-            <div className="p-4 bg-pure-black border border-mid/30">
-              <p className="text-xs font-mono text-mid-light mb-3">game_summary</p>
+            <div className="bg-black border border-white/15">
+              <div className="p-3 border-b border-white/15">
+                <p className="text-xs font-mono text-white/50 lowercase">game_summary</p>
+              </div>
 
-              <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-mono text-mid-light">mode</span>
-                  <span className="text-sm font-mono text-pure-white">
-                    {formGameMode === 'chess960' ? 'Chess960' : 'Standard'}
+              <div className="divide-y divide-white/15">
+                <div className="flex justify-between items-center p-3">
+                  <span className="text-sm font-mono text-white/50 lowercase">mode</span>
+                  <span className="text-sm font-mono text-white lowercase">
+                    {formGameMode === 'chess960' ? 'chess960' : 'standard'}
                   </span>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-mono text-mid-light">time</span>
-                  <span className="text-sm font-mono text-pure-white">
+                <div className="flex justify-between items-center p-3">
+                  <span className="text-sm font-mono text-white/50 lowercase">time</span>
+                  <span className="text-sm font-mono text-white lowercase">
                     {CHALLENGE_TIME_CONTROLS[formTimeControlKey as keyof typeof CHALLENGE_TIME_CONTROLS]?.label}
                   </span>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-mono text-mid-light">est_duration</span>
-                  <span className="text-sm font-mono text-pure-white">
+                <div className="flex justify-between items-center p-3">
+                  <span className="text-sm font-mono text-white/50 lowercase">est_duration</span>
+                  <span className="text-sm font-mono text-white lowercase">
                     {riskMetrics.timeEstimate.min}-{riskMetrics.timeEstimate.max} min
                   </span>
                 </div>
-
-                <div className="border-t border-mid/30 pt-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm font-mono text-mid-light">your_stake</span>
-                    <USDCAmount amount={stakeAmount} size="sm" />
-                  </div>
+                <div className="flex justify-between items-center p-3">
+                  <span className="text-sm font-mono text-white/50 lowercase">your_stake</span>
+                  <USDCAmount amount={stakeAmount} size="sm" />
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-mono text-mid-light">total_pot</span>
+                <div className="flex justify-between items-center p-3">
+                  <span className="text-sm font-mono text-white/50 lowercase">total_pot</span>
                   <USDCAmount amount={riskMetrics.potentialWin} size="sm" />
                 </div>
               </div>
             </div>
 
             {/* Risk Assessment */}
-            <div className="p-4 bg-pure-black border border-mid/30">
-              <p className="text-xs font-mono text-mid-light mb-3">risk_assessment</p>
+            <div className="bg-black border border-white/15">
+              <div className="p-3 border-b border-white/15">
+                <p className="text-xs font-mono text-white/50 lowercase">risk_assessment</p>
+              </div>
 
-              <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-mono text-mid-light">risk_level</span>
-                  <span className={`text-sm font-mono font-medium ${riskMetrics.riskColor}`}>
-                    {riskMetrics.riskLevel.toUpperCase()}
+              <div className="divide-y divide-white/15">
+                <div className="flex justify-between items-center p-3">
+                  <span className="text-sm font-mono text-white/50 lowercase">risk_level</span>
+                  <span className={`text-sm font-mono font-medium lowercase ${riskMetrics.riskColor}`}>
+                    {riskMetrics.riskLevel}
                   </span>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-mono text-mid-light">% of balance</span>
+                <div className="flex justify-between items-center p-3">
+                  <span className="text-sm font-mono text-white/50 lowercase">% of balance</span>
                   <span className={`text-sm font-mono ${riskMetrics.riskColor}`}>
                     {riskMetrics.riskPercent.toFixed(1)}%
                   </span>
                 </div>
 
                 {/* Risk Bar */}
-                <div className="h-2 bg-off-black border border-mid/30 overflow-hidden">
-                  <div
-                    className={`h-full transition-all ${
-                      riskMetrics.riskLevel === 'extreme' ? 'bg-red-500' :
-                      riskMetrics.riskLevel === 'high' ? 'bg-red-400' :
-                      riskMetrics.riskLevel === 'medium' ? 'bg-yellow-400' :
-                      'bg-green-400'
-                    }`}
-                    style={{ width: `${Math.min(100, riskMetrics.riskPercent)}%` }}
-                  />
+                <div className="p-3">
+                  <div className="h-2 bg-black border border-white/15 overflow-hidden">
+                    <div
+                      className={`h-full transition-all ${
+                        riskMetrics.riskLevel === 'extreme' ? 'bg-red-500' :
+                        riskMetrics.riskLevel === 'high' ? 'bg-red-400' :
+                        riskMetrics.riskLevel === 'medium' ? 'bg-yellow-400' :
+                        'bg-green-400'
+                      }`}
+                      style={{ width: `${Math.min(100, riskMetrics.riskPercent)}%` }}
+                    />
+                  </div>
                 </div>
 
-                <div className="border-t border-mid/30 pt-3 space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm font-mono text-mid-light">if_win</span>
-                    <span className="text-sm font-mono text-green-400">
-                      <USDCAmount amount={riskMetrics.balanceAfterWin} size="sm" className="inline" />
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm font-mono text-mid-light">if_lose</span>
-                    <span className="text-sm font-mono text-red-400">
-                      <USDCAmount amount={Math.max(0, riskMetrics.balanceAfterLoss)} size="sm" className="inline" />
-                    </span>
-                  </div>
+                <div className="flex justify-between items-center p-3">
+                  <span className="text-sm font-mono text-white/50 lowercase">if_win</span>
+                  <span className="text-sm font-mono text-green-400">
+                    <USDCAmount amount={riskMetrics.balanceAfterWin} size="sm" className="inline" />
+                  </span>
+                </div>
+                <div className="flex justify-between items-center p-3">
+                  <span className="text-sm font-mono text-white/50 lowercase">if_lose</span>
+                  <span className="text-sm font-mono text-red-400">
+                    <USDCAmount amount={Math.max(0, riskMetrics.balanceAfterLoss)} size="sm" className="inline" />
+                  </span>
                 </div>
               </div>
             </div>
@@ -414,7 +424,7 @@ export function CreateChallengeForm({
               {!isConnected ? (
                 <button
                   onClick={onOpenWallet}
-                  className="w-full p-4 bg-usdc text-white font-mono hover:bg-usdc-light transition-colors"
+                  className="w-full p-4 bg-usdc text-white font-mono hover:bg-usdc-light transition-colors lowercase"
                 >
                   connect wallet to play
                 </button>
@@ -422,10 +432,10 @@ export function CreateChallengeForm({
                 <button
                   onClick={handleSubmit}
                   disabled={!canAfford}
-                  className={`w-full p-4 font-mono transition-all ${
+                  className={`w-full p-4 font-mono transition-all lowercase ${
                     canAfford
-                      ? 'bg-pure-white text-pure-black hover:bg-off-white'
-                      : 'bg-off-black text-mid/30 border border-mid/20 cursor-not-allowed'
+                      ? 'bg-white text-black hover:bg-white/90'
+                      : 'bg-black text-white/20 border border-white/15 cursor-not-allowed'
                   }`}
                 >
                   {!canAfford
@@ -439,8 +449,8 @@ export function CreateChallengeForm({
 
             {/* Warning for high risk */}
             {canAfford && riskMetrics.riskLevel === 'extreme' && (
-              <div className="p-3 border border-red-500/50 bg-red-500/10">
-                <p className="text-xs font-mono text-red-400">
+              <div className="p-3 border border-red-500/30 bg-red-500/10">
+                <p className="text-xs font-mono text-red-400 lowercase">
                   ⚠ high risk: staking {riskMetrics.riskPercent.toFixed(0)}% of your balance
                 </p>
               </div>

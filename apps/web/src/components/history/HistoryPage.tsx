@@ -40,12 +40,12 @@ export function HistoryPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="border border-white/15">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between p-4 border-b border-white/15">
         <div>
-          <p className="text-xs font-mono text-mid-light">your_history</p>
-          <h1 className="text-2xl font-mono text-pure-white">Game History</h1>
+          <p className="text-xs font-mono text-white/50 lowercase">your_history</p>
+          <h1 className="text-2xl font-mono text-white lowercase">game history</h1>
         </div>
         <ExportDropdown
           onExportGames={handleExportGames}
@@ -56,7 +56,7 @@ export function HistoryPage() {
       </div>
 
       {/* Date Range Picker */}
-      <div className="bg-off-black border border-mid/30 p-4">
+      <div className="bg-black p-4 border-b border-white/15">
         <DateRangePicker
           preset={historyData.dateRange.preset}
           onPresetChange={historyData.dateRange.setPreset}
@@ -72,7 +72,7 @@ export function HistoryPage() {
       />
 
       {/* Tabs */}
-      <div className="flex gap-4 border-b border-mid/30">
+      <div className="flex border-b border-white/15">
         <TabButton
           active={activeTab === 'analytics'}
           onClick={() => setActiveTab('analytics')}
@@ -95,20 +95,24 @@ export function HistoryPage() {
 
       {/* Analytics Tab */}
       {activeTab === 'analytics' && (
-        <HistoryCharts />
+        <div className="p-4">
+          <HistoryCharts />
+        </div>
       )}
 
       {/* Games Tab */}
       {activeTab === 'games' && (
-        <div className="space-y-4">
+        <div>
           {/* Filters */}
-          <HistoryFilters
-            filters={historyData.filters}
-            onResultChange={historyData.setResultFilter}
-            onTimeControlChange={historyData.setTimeControlFilter}
-            onGameModeChange={historyData.setGameModeFilter}
-            onReset={historyData.resetFilters}
-          />
+          <div className="border-b border-white/15">
+            <HistoryFilters
+              filters={historyData.filters}
+              onResultChange={historyData.setResultFilter}
+              onTimeControlChange={historyData.setTimeControlFilter}
+              onGameModeChange={historyData.setGameModeFilter}
+              onReset={historyData.resetFilters}
+            />
+          </div>
 
           {/* Games Table */}
           <GamesTable
@@ -119,41 +123,43 @@ export function HistoryPage() {
 
           {/* Pagination */}
           {!historyData.isLoadingGames && historyData.totalGames > 0 && (
-            <TablePagination
-              page={historyData.page}
-              totalPages={historyData.totalPages}
-              totalItems={historyData.totalGames}
-              onPageChange={historyData.setPage}
-              onPrevPage={historyData.prevPage}
-              onNextPage={historyData.nextPage}
-            />
+            <div className="border-t border-white/15">
+              <TablePagination
+                page={historyData.page}
+                totalPages={historyData.totalPages}
+                totalItems={historyData.totalGames}
+                onPageChange={historyData.setPage}
+                onPrevPage={historyData.prevPage}
+                onNextPage={historyData.nextPage}
+              />
+            </div>
           )}
         </div>
       )}
 
       {/* Financial Tab */}
       {activeTab === 'financial' && (
-        <div className="space-y-4">
+        <div>
           <FinancialSummary
             summary={historyData.financialSummary}
             isLoading={historyData.isLoadingFinancial}
           />
 
           {/* Recent Transactions */}
-          <div className="bg-off-black border border-mid/30">
-            <div className="p-4 border-b border-mid/30">
-              <p className="text-xs font-mono text-mid-light">recent_transactions</p>
+          <div className="bg-black border-t border-white/15">
+            <div className="p-4 border-b border-white/15">
+              <p className="text-xs font-mono text-white/50 lowercase">recent_transactions</p>
             </div>
-            <div className="divide-y divide-mid/20">
+            <div>
               {historyData.isLoadingTransactions ? (
                 [...Array(5)].map((_, i) => (
-                  <div key={i} className="p-4">
-                    <div className="h-4 bg-mid/30 rounded animate-pulse" />
+                  <div key={i} className="p-4 border-b border-white/15">
+                    <div className="h-4 bg-white/10 animate-pulse" />
                   </div>
                 ))
               ) : historyData.transactions.length === 0 ? (
                 <div className="p-8 text-center">
-                  <p className="text-mid-light font-mono">no transactions found</p>
+                  <p className="text-white/30 font-mono lowercase">no transactions found</p>
                 </div>
               ) : (
                 historyData.transactions.slice(0, 20).map((tx) => (
@@ -186,13 +192,16 @@ function TabButton({
   return (
     <button
       onClick={onClick}
-      className={`pb-3 font-mono text-sm transition-colors border-b-2 -mb-[1px] ${
+      className={`px-4 py-3 font-mono text-sm transition-all relative lowercase ${
         active
-          ? 'text-pure-white border-pure-white'
-          : 'text-mid-light border-transparent hover:text-pure-white'
+          ? 'text-white'
+          : 'text-white/40 hover:text-white/70'
       }`}
     >
       {children}
+      {active && (
+        <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-3/4 h-px bg-white shadow-[0_0_8px_rgba(255,255,255,0.8)]" />
+      )}
     </button>
   );
 }
@@ -209,39 +218,39 @@ function TransactionRow({ transaction }: { transaction: any }) {
   };
 
   const typeColors: Record<string, string> = {
-    game_win: 'text-green-400',
-    game_stake: 'text-red-400',
-    deposit: 'text-green-400',
-    withdrawal: 'text-red-400',
-    bet_won: 'text-green-400',
-    bet_lost: 'text-red-400',
+    game_win: 'text-white',
+    game_stake: 'text-white/50',
+    deposit: 'text-white',
+    withdrawal: 'text-white/50',
+    bet_won: 'text-white',
+    bet_lost: 'text-white/50',
     bonus: 'text-usdc',
   };
 
   const typeLabels: Record<string, string> = {
-    game_win: 'Game Win',
-    game_stake: 'Game Stake',
-    deposit: 'Deposit',
-    withdrawal: 'Withdrawal',
-    bet_won: 'Bet Won',
-    bet_lost: 'Bet Lost',
-    bet_placed: 'Bet Placed',
-    bet_refunded: 'Bet Refunded',
-    bonus: 'Bonus',
+    game_win: 'game win',
+    game_stake: 'game stake',
+    deposit: 'deposit',
+    withdrawal: 'withdrawal',
+    bet_won: 'bet won',
+    bet_lost: 'bet lost',
+    bet_placed: 'bet placed',
+    bet_refunded: 'bet refunded',
+    bonus: 'bonus',
   };
 
   return (
-    <div className="grid grid-cols-4 gap-4 p-4 font-mono text-sm">
-      <div className="text-mid-light">
+    <div className="grid grid-cols-4 gap-4 p-4 font-mono text-sm border-b border-white/15 last:border-b-0 hover:bg-white/5 transition-colors">
+      <div className="text-white/30 lowercase">
         {formatDate(transaction.createdAt)}
       </div>
-      <div className={typeColors[transaction.type] || 'text-pure-white'}>
+      <div className={typeColors[transaction.type] || 'text-white'}>
         {typeLabels[transaction.type] || transaction.type}
       </div>
-      <div className={transaction.amount >= 0 ? 'text-green-400' : 'text-red-400'}>
+      <div className={transaction.amount >= 0 ? 'text-white' : 'text-white/50'}>
         {transaction.amount >= 0 ? '+' : ''}${Math.abs(transaction.amount).toFixed(2)}
       </div>
-      <div className="text-mid-light text-right">
+      <div className="text-white/30 text-right lowercase">
         bal: ${transaction.balanceAfter.toFixed(2)}
       </div>
     </div>

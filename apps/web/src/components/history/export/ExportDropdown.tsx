@@ -35,10 +35,10 @@ export function ExportDropdown({
       <button
         onClick={() => setIsOpen(!isOpen)}
         disabled={isExporting}
-        className={`px-4 py-2 font-mono text-sm border transition-colors flex items-center gap-2 ${
+        className={`px-4 py-2 font-mono text-sm border transition-colors flex items-center gap-2 lowercase ${
           isExporting
-            ? 'text-mid/50 border-mid/20 cursor-not-allowed'
-            : 'text-mid-light border-mid/30 hover:text-pure-white hover:border-pure-white'
+            ? 'text-white/20 border-white/10 cursor-not-allowed'
+            : 'text-white/50 border-white/15 hover:text-white hover:border-white'
         }`}
       >
         {isExporting ? (
@@ -55,34 +55,33 @@ export function ExportDropdown({
       </button>
 
       {isOpen && !isExporting && (
-        <div className="absolute right-0 mt-1 w-48 bg-off-black border border-mid/30 shadow-lg z-10">
+        <div className="absolute right-0 mt-1 w-48 bg-black border border-white/15 shadow-lg z-10">
           <button
             onClick={() => {
               onExportGames();
               setIsOpen(false);
             }}
-            className="w-full px-4 py-2 text-left font-mono text-sm text-mid-light hover:bg-pure-black hover:text-pure-white transition-colors"
+            className="w-full px-4 py-2 text-left font-mono text-sm text-white/50 hover:bg-white/5 hover:text-white transition-colors lowercase"
           >
-            Games (CSV)
+            games (csv)
           </button>
           <button
             onClick={() => {
               onExportTransactions();
               setIsOpen(false);
             }}
-            className="w-full px-4 py-2 text-left font-mono text-sm text-mid-light hover:bg-pure-black hover:text-pure-white transition-colors"
+            className="w-full px-4 py-2 text-left font-mono text-sm text-white/50 hover:bg-white/5 hover:text-white transition-colors lowercase border-t border-white/15"
           >
-            Transactions (CSV)
+            transactions (csv)
           </button>
-          <div className="border-t border-mid/30" />
           <button
             onClick={() => {
               onExportBoth();
               setIsOpen(false);
             }}
-            className="w-full px-4 py-2 text-left font-mono text-sm text-mid-light hover:bg-pure-black hover:text-pure-white transition-colors"
+            className="w-full px-4 py-2 text-left font-mono text-sm text-white/50 hover:bg-white/5 hover:text-white transition-colors lowercase border-t border-white/15"
           >
-            Both (2 CSVs)
+            both (2 csvs)
           </button>
         </div>
       )}

@@ -8,6 +8,7 @@ interface StatCardProps {
   trendValue?: string;
   highlight?: 'positive' | 'negative' | 'neutral';
   size?: 'sm' | 'md' | 'lg';
+  className?: string;
 }
 
 export function StatCard({
@@ -18,17 +19,20 @@ export function StatCard({
   trendValue,
   highlight = 'neutral',
   size = 'md',
+  className = '',
 }: StatCardProps) {
+  // Main value colors - green/red for positive/negative, white for neutral
   const highlightColors = {
     positive: 'text-green-400',
     negative: 'text-red-400',
-    neutral: 'text-pure-white',
+    neutral: 'text-white',
   };
 
+  // Trend indicator colors - green for up, red for down
   const trendColors = {
     up: 'text-green-400',
     down: 'text-red-400',
-    neutral: 'text-mid-light',
+    neutral: 'text-white/30',
   };
 
   const trendIcons = {
@@ -44,8 +48,8 @@ export function StatCard({
   };
 
   return (
-    <div className="p-4 bg-pure-black border border-mid/30">
-      <p className={`font-mono ${sizes[size].label} text-mid-light mb-1`}>
+    <div className={`p-4 bg-black ${className}`}>
+      <p className={`font-mono ${sizes[size].label} text-white/50 mb-1 lowercase`}>
         {label}
       </p>
       <div className="flex items-end gap-2">
@@ -60,7 +64,7 @@ export function StatCard({
         )}
       </div>
       {subValue && (
-        <p className={`font-mono ${sizes[size].sub} text-mid-light mt-1`}>
+        <p className={`font-mono ${sizes[size].sub} text-white/30 mt-1 lowercase`}>
           {subValue}
         </p>
       )}

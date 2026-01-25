@@ -48,7 +48,7 @@ export function PaginatedGrid<T>({
   if (items.length === 0) {
     return (
       <div className="text-center py-8">
-        <p className="text-mid-light font-mono text-sm">{emptyMessage}</p>
+        <p className="text-white/50 font-mono text-sm lowercase">{emptyMessage}</p>
       </div>
     );
   }
@@ -59,38 +59,38 @@ export function PaginatedGrid<T>({
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-4">
           {showCount && (
-            <p className="text-xs font-mono text-mid-light">
+            <p className="text-xs font-mono text-white/50 lowercase">
               {items.length} {countLabel}
             </p>
           )}
         </div>
 
         {totalPages > 1 && (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center">
             <button
               onClick={goToPrevious}
               disabled={currentPage === 0}
-              className={`w-8 h-8 flex items-center justify-center border font-mono transition-all ${
+              className={`w-8 h-8 flex items-center justify-center border-y border-l border-r border-white/15 font-mono transition-all ${
                 currentPage === 0
-                  ? 'border-mid/20 text-mid/40 cursor-not-allowed'
-                  : 'border-mid/50 text-mid-light hover:border-pure-white hover:text-pure-white'
+                  ? 'text-white/20 cursor-not-allowed'
+                  : 'text-white/50 hover:text-white'
               }`}
               aria-label="Previous page"
             >
               ←
             </button>
 
-            <span className="text-xs font-mono text-mid-light min-w-[60px] text-center">
+            <span className="text-xs font-mono text-white/50 min-w-[60px] text-center px-2 border-y border-white/15">
               {currentPage + 1} / {totalPages}
             </span>
 
             <button
               onClick={goToNext}
               disabled={currentPage >= totalPages - 1}
-              className={`w-8 h-8 flex items-center justify-center border font-mono transition-all ${
+              className={`w-8 h-8 flex items-center justify-center border border-white/15 font-mono transition-all ${
                 currentPage >= totalPages - 1
-                  ? 'border-mid/20 text-mid/40 cursor-not-allowed'
-                  : 'border-mid/50 text-mid-light hover:border-pure-white hover:text-pure-white'
+                  ? 'text-white/20 cursor-not-allowed'
+                  : 'text-white/50 hover:text-white'
               }`}
               aria-label="Next page"
             >
@@ -146,7 +146,7 @@ export function PaginatedList<T>({
   if (items.length === 0) {
     return (
       <div className="text-center py-8">
-        <p className="text-mid-light font-mono text-sm">{emptyMessage}</p>
+        <p className="text-white/50 font-mono text-sm lowercase">{emptyMessage}</p>
       </div>
     );
   }
@@ -160,31 +160,31 @@ export function PaginatedList<T>({
 
       {/* Navigation Footer */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-2 mt-4 pt-4 border-t border-mid/30">
+        <div className="flex items-center justify-center mt-4 pt-4 border-t border-white/15">
           <button
             onClick={goToPrevious}
             disabled={currentPage === 0}
-            className={`w-8 h-8 flex items-center justify-center border font-mono transition-all ${
+            className={`w-8 h-8 flex items-center justify-center border-y border-l border-r border-white/15 font-mono transition-all ${
               currentPage === 0
-                ? 'border-mid/20 text-mid/40 cursor-not-allowed'
-                : 'border-mid/50 text-mid-light hover:border-pure-white hover:text-pure-white'
+                ? 'text-white/20 cursor-not-allowed'
+                : 'text-white/50 hover:text-white'
             }`}
             aria-label="Previous page"
           >
             ←
           </button>
 
-          <span className="text-xs font-mono text-mid-light min-w-[60px] text-center">
+          <span className="text-xs font-mono text-white/50 min-w-[60px] text-center px-2 border-y border-white/15">
             {currentPage + 1} / {totalPages}
           </span>
 
           <button
             onClick={goToNext}
             disabled={currentPage >= totalPages - 1}
-            className={`w-8 h-8 flex items-center justify-center border font-mono transition-all ${
+            className={`w-8 h-8 flex items-center justify-center border border-white/15 font-mono transition-all ${
               currentPage >= totalPages - 1
-                ? 'border-mid/20 text-mid/40 cursor-not-allowed'
-                : 'border-mid/50 text-mid-light hover:border-pure-white hover:text-pure-white'
+                ? 'text-white/20 cursor-not-allowed'
+                : 'text-white/50 hover:text-white'
             }`}
             aria-label="Next page"
           >

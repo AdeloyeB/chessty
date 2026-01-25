@@ -137,38 +137,38 @@ export function ProfilePage() {
         key={achievement.id}
         className={`p-4 border transition-all ${
           isUnlocked
-            ? 'bg-pure-black border-mid/50'
-            : 'bg-pure-black border-mid/20 opacity-60'
+            ? 'bg-black border-white/30'
+            : 'bg-black border-white/10 opacity-60'
         }`}
       >
         <div className="flex items-start gap-4">
           <div
             className={`flex items-center justify-center w-12 h-12 border text-2xl flex-shrink-0 ${
-              isUnlocked ? 'border-pure-white/50' : 'border-mid/30 grayscale'
+              isUnlocked ? 'border-white/50' : 'border-white/15 grayscale'
             }`}
           >
             {achievement.icon}
           </div>
           <div className="flex-1 min-w-0">
-            <p className={`font-mono text-sm ${isUnlocked ? 'text-pure-white' : 'text-mid'}`}>
+            <p className={`font-mono text-sm lowercase ${isUnlocked ? 'text-white' : 'text-white/30'}`}>
               {achievement.name}
             </p>
-            <p className="text-xs font-mono text-mid-light mt-1 line-clamp-2">
+            <p className="text-xs font-mono text-white/50 mt-1 line-clamp-2 lowercase">
               {achievement.description}
             </p>
             {!isUnlocked && progressData?.progress !== undefined && progressData.progress > 0 && (
               <div className="mt-2">
-                <div className="h-1 bg-off-black border border-mid/30 overflow-hidden">
+                <div className="h-1 bg-black border border-white/15 overflow-hidden">
                   <div
-                    className="h-full bg-mid-light transition-all"
+                    className="h-full bg-white/50 transition-all"
                     style={{ width: `${progressData.progress}%` }}
                   />
                 </div>
-                <p className="text-xs font-mono text-mid mt-1">{progressData.progress}%</p>
+                <p className="text-xs font-mono text-white/30 mt-1">{progressData.progress}%</p>
               </div>
             )}
             {isUnlocked && progressData?.unlockedAt && (
-              <p className="text-xs font-mono text-mid mt-2">
+              <p className="text-xs font-mono text-white/30 mt-2">
                 ✓ {new Date(progressData.unlockedAt).toLocaleDateString()}
               </p>
             )}
@@ -179,19 +179,19 @@ export function ProfilePage() {
   }, [achievementMap]);
 
   return (
-    <div className="min-h-screen bg-pure-black">
+    <div className="min-h-screen bg-black">
       {/* Navigation */}
-      <nav className="border-b border-mid/30 bg-off-black sticky top-0 z-50">
+      <nav className="border-b border-white/15 bg-black sticky top-0 z-50">
         <div className="container mx-auto px-6">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-4">
               <Link href="/" className="text-3xl hover:opacity-80 transition-opacity">♔</Link>
-              <span className="text-mid-light font-mono">/</span>
-              <span className="text-pure-white font-mono">profile</span>
+              <span className="text-white/50 font-mono">/</span>
+              <span className="text-white font-mono lowercase">profile</span>
             </div>
             <Link
               href="/"
-              className="text-mid-light hover:text-pure-white transition-colors font-mono text-sm"
+              className="text-white/50 hover:text-white transition-colors font-mono text-sm lowercase"
             >
               back_to_home
             </Link>
@@ -201,73 +201,73 @@ export function ProfilePage() {
 
       <main className="container mx-auto px-6 py-8">
         {/* Profile Header Card */}
-        <div className="bg-off-black border border-mid/30 mb-6">
+        <div className="border border-white/15 mb-6">
           {/* Header */}
-          <div className="p-4 border-b border-mid/30 flex items-center justify-between">
+          <div className="p-4 border-b border-white/15 flex items-center justify-between bg-black">
             <div>
-              <p className="text-xs font-mono text-mid-light">player_profile</p>
-              <p className="text-lg font-mono text-pure-white">{profileUser.username}</p>
+              <p className="text-xs font-mono text-white/50 lowercase">player_profile</p>
+              <p className="text-lg font-mono text-white">{profileUser.username}</p>
             </div>
             <button
               onClick={() => setIsPublic(!isPublic)}
-              className={`px-4 py-2 border font-mono text-sm transition-all ${
+              className={`px-4 py-2 border font-mono text-sm transition-all lowercase ${
                 isPublic
-                  ? 'bg-pure-black border-mid/50 text-mid-light hover:border-pure-white hover:text-pure-white'
-                  : 'bg-pure-white text-pure-black border-pure-white'
+                  ? 'bg-black border-white/15 text-white/50 hover:border-white hover:text-white'
+                  : 'bg-white text-black border-white'
               }`}
             >
               {isPublic ? '🌐 public' : '🔒 private'}
             </button>
           </div>
 
-          <div className="p-6">
+          <div className="p-6 bg-black">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               {/* Left: Avatar & Rank */}
               <div className="flex flex-col items-center lg:items-start gap-4">
-                <div className="w-24 h-24 bg-pure-white flex items-center justify-center text-pure-black text-4xl font-mono">
+                <div className="w-24 h-24 bg-white flex items-center justify-center text-black text-4xl font-mono">
                   {profileUser.username?.[0]?.toLowerCase()}
                 </div>
                 <RankBadge elo={profileUser.eloRating} size="lg" showElo />
-                <p className="text-sm font-mono text-mid-light text-center lg:text-left">
+                <p className="text-sm font-mono text-white/50 text-center lg:text-left lowercase">
                   {rank.description}
                 </p>
               </div>
 
-              {/* Center: Stats Grid */}
+              {/* Center: Stats Grid - bento style */}
               <div className="lg:col-span-2">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                  <div className="p-4 bg-pure-black border border-mid/30 text-center">
-                    <p className="text-2xl font-mono text-pure-white">{profileUser.eloRating}</p>
-                    <p className="text-xs font-mono text-mid-light">current_elo</p>
+                <div className="grid grid-cols-2 md:grid-cols-4 border border-white/15 mb-6">
+                  <div className="p-4 bg-black text-center border-r border-b md:border-b-0 border-white/15">
+                    <p className="text-2xl font-mono text-white">{profileUser.eloRating}</p>
+                    <p className="text-xs font-mono text-white/50 lowercase">current_elo</p>
                   </div>
-                  <div className="p-4 bg-pure-black border border-mid/30 text-center">
-                    <p className="text-2xl font-mono text-pure-white">{profileUser.peakEloRating}</p>
-                    <p className="text-xs font-mono text-mid-light">peak_elo</p>
+                  <div className="p-4 bg-black text-center md:border-r border-b md:border-b-0 border-white/15">
+                    <p className="text-2xl font-mono text-white">{profileUser.peakEloRating}</p>
+                    <p className="text-xs font-mono text-white/50 lowercase">peak_elo</p>
                   </div>
-                  <div className="p-4 bg-pure-black border border-mid/30 text-center">
-                    <p className="text-2xl font-mono text-pure-white">{winRate}%</p>
-                    <p className="text-xs font-mono text-mid-light">win_rate</p>
+                  <div className="p-4 bg-black text-center border-r border-white/15">
+                    <p className="text-2xl font-mono text-white">{winRate}%</p>
+                    <p className="text-xs font-mono text-white/50 lowercase">win_rate</p>
                   </div>
-                  <div className="p-4 bg-pure-black border border-mid/30 text-center">
-                    <p className="text-2xl font-mono text-pure-white">{unlockedCount}/{totalCount}</p>
-                    <p className="text-xs font-mono text-mid-light">achievements</p>
+                  <div className="p-4 bg-black text-center">
+                    <p className="text-2xl font-mono text-white">{unlockedCount}/{totalCount}</p>
+                    <p className="text-xs font-mono text-white/50 lowercase">achievements</p>
                   </div>
                 </div>
 
                 {/* Rank Progress */}
                 {nextRank && (
-                  <div className="p-4 bg-pure-black border border-mid/30">
-                    <div className="flex items-center justify-between text-xs font-mono text-mid-light mb-2">
+                  <div className="p-4 bg-black border border-white/15">
+                    <div className="flex items-center justify-between text-xs font-mono text-white/50 mb-2 lowercase">
                       <span>{rank.name}</span>
                       <span>{nextRank.name}</span>
                     </div>
-                    <div className="h-2 bg-off-black border border-mid/30 overflow-hidden">
+                    <div className="h-2 bg-black border border-white/15 overflow-hidden">
                       <div
                         className="h-full transition-all"
                         style={{ width: `${progress}%`, backgroundColor: rank.color }}
                       />
                     </div>
-                    <p className="text-xs font-mono text-mid mt-2 text-center">
+                    <p className="text-xs font-mono text-white/30 mt-2 text-center lowercase">
                       {nextRank.minElo - profileUser.eloRating} ELO to {nextRank.name}
                     </p>
                   </div>
@@ -278,15 +278,17 @@ export function ProfilePage() {
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-2 mb-6">
-          {(['overview', 'achievements'] as TabType[]).map((tab) => (
+        <div className="flex mb-6">
+          {(['overview', 'achievements'] as TabType[]).map((tab, index) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`px-6 py-3 border font-mono text-sm transition-all ${
+              className={`px-6 py-3 font-mono text-sm transition-all lowercase ${
+                index === 0 ? 'border-l' : ''
+              } border-y border-r border-white/15 ${
                 activeTab === tab
-                  ? 'bg-pure-white text-pure-black border-pure-white'
-                  : 'bg-pure-black border-mid/50 text-mid-light hover:border-pure-white hover:text-pure-white'
+                  ? 'bg-white text-black'
+                  : 'bg-black text-white/50 hover:text-white'
               }`}
             >
               {tab}
@@ -296,83 +298,83 @@ export function ProfilePage() {
 
         {/* Tab Content */}
         {activeTab === 'overview' && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2">
             {/* Game Statistics */}
-            <div className="bg-off-black border border-mid/30">
-              <div className="p-4 border-b border-mid/30">
-                <p className="text-xs font-mono text-mid-light">game_statistics</p>
+            <div className="border border-white/15 lg:border-r-0">
+              <div className="p-4 border-b border-white/15 bg-black">
+                <p className="text-xs font-mono text-white/50 lowercase">game_statistics</p>
               </div>
-              <div className="p-6 space-y-4">
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="p-4 bg-pure-black border border-mid/30 text-center">
-                    <p className="text-2xl font-mono text-pure-white">{profileUser.gamesWon}</p>
-                    <p className="text-xs font-mono text-mid-light">wins</p>
+              <div className="p-6 space-y-4 bg-black">
+                <div className="grid grid-cols-3 border border-white/15">
+                  <div className="p-4 bg-black text-center border-r border-white/15">
+                    <p className="text-2xl font-mono text-white">{profileUser.gamesWon}</p>
+                    <p className="text-xs font-mono text-white/50 lowercase">wins</p>
                   </div>
-                  <div className="p-4 bg-pure-black border border-mid/30 text-center">
-                    <p className="text-2xl font-mono text-pure-white">{profileUser.gamesLost}</p>
-                    <p className="text-xs font-mono text-mid-light">losses</p>
+                  <div className="p-4 bg-black text-center border-r border-white/15">
+                    <p className="text-2xl font-mono text-white">{profileUser.gamesLost}</p>
+                    <p className="text-xs font-mono text-white/50 lowercase">losses</p>
                   </div>
-                  <div className="p-4 bg-pure-black border border-mid/30 text-center">
-                    <p className="text-2xl font-mono text-pure-white">{profileUser.gamesDraw}</p>
-                    <p className="text-xs font-mono text-mid-light">draws</p>
+                  <div className="p-4 bg-black text-center">
+                    <p className="text-2xl font-mono text-white">{profileUser.gamesDraw}</p>
+                    <p className="text-xs font-mono text-white/50 lowercase">draws</p>
                   </div>
                 </div>
 
-                <div className="space-y-3 pt-4 border-t border-mid/30">
+                <div className="space-y-3 pt-4 border-t border-white/15">
                   <div className="flex justify-between items-center">
-                    <span className="text-sm font-mono text-mid-light">total_games</span>
-                    <span className="text-sm font-mono text-pure-white">{profileUser.gamesPlayed}</span>
+                    <span className="text-sm font-mono text-white/50 lowercase">total_games</span>
+                    <span className="text-sm font-mono text-white">{profileUser.gamesPlayed}</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-sm font-mono text-mid-light">current_streak</span>
-                    <span className="text-sm font-mono text-pure-white">{profile.currentStreak} 🔥</span>
+                    <span className="text-sm font-mono text-white/50 lowercase">current_streak</span>
+                    <span className="text-sm font-mono text-white">{profile.currentStreak} 🔥</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-sm font-mono text-mid-light">longest_streak</span>
-                    <span className="text-sm font-mono text-pure-white">{profile.longestStreak}</span>
+                    <span className="text-sm font-mono text-white/50 lowercase">longest_streak</span>
+                    <span className="text-sm font-mono text-white">{profile.longestStreak}</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-sm font-mono text-mid-light">total_checkmates</span>
-                    <span className="text-sm font-mono text-pure-white">{profile.totalCheckmates}</span>
+                    <span className="text-sm font-mono text-white/50 lowercase">total_checkmates</span>
+                    <span className="text-sm font-mono text-white">{profile.totalCheckmates}</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-sm font-mono text-mid-light">quickest_win</span>
-                    <span className="text-sm font-mono text-pure-white">{profile.quickestWin} moves</span>
+                    <span className="text-sm font-mono text-white/50 lowercase">quickest_win</span>
+                    <span className="text-sm font-mono text-white">{profile.quickestWin} moves</span>
                   </div>
                 </div>
               </div>
             </div>
 
             {/* Financial Statistics */}
-            <div className="bg-off-black border border-mid/30">
-              <div className="p-4 border-b border-mid/30">
-                <p className="text-xs font-mono text-mid-light">financial_statistics</p>
+            <div className="border border-white/15 border-t-0 lg:border-t">
+              <div className="p-4 border-b border-white/15 bg-black">
+                <p className="text-xs font-mono text-white/50 lowercase">financial_statistics</p>
               </div>
-              <div className="p-6 space-y-4">
+              <div className="p-6 space-y-4 bg-black">
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
-                    <span className="text-sm font-mono text-mid-light">total_wagered</span>
-                    <span className="text-sm font-mono text-pure-white">${profileUser.totalWagered.toLocaleString()}</span>
+                    <span className="text-sm font-mono text-white/50 lowercase">total_wagered</span>
+                    <span className="text-sm font-mono text-white">${profileUser.totalWagered.toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-sm font-mono text-mid-light">total_won</span>
-                    <span className="text-sm font-mono text-pure-white">${profileUser.totalWon.toLocaleString()}</span>
+                    <span className="text-sm font-mono text-white/50 lowercase">total_won</span>
+                    <span className="text-sm font-mono text-white">${profileUser.totalWon.toLocaleString()}</span>
                   </div>
-                  <div className="flex justify-between items-center pt-3 border-t border-mid/30">
-                    <span className="text-sm font-mono text-mid-light">net_profit</span>
+                  <div className="flex justify-between items-center pt-3 border-t border-white/15">
+                    <span className="text-sm font-mono text-white/50 lowercase">net_profit</span>
                     <span className={`text-sm font-mono font-medium ${netProfit >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                       {netProfit >= 0 ? '+' : ''}${netProfit.toLocaleString()}
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-sm font-mono text-mid-light">biggest_win</span>
-                    <span className="text-sm font-mono text-pure-white">${profile.biggestStakeWin}</span>
+                    <span className="text-sm font-mono text-white/50 lowercase">biggest_win</span>
+                    <span className="text-sm font-mono text-white">${profile.biggestStakeWin}</span>
                   </div>
                 </div>
 
-                <div className="pt-4 border-t border-mid/30">
-                  <p className="text-xs font-mono text-mid-light mb-2">member_since</p>
-                  <p className="text-sm font-mono text-pure-white">
+                <div className="pt-4 border-t border-white/15">
+                  <p className="text-xs font-mono text-white/50 mb-2 lowercase">member_since</p>
+                  <p className="text-sm font-mono text-white lowercase">
                     {new Date(profileUser.createdAt).toLocaleDateString('en-US', {
                       year: 'numeric',
                       month: 'long',
@@ -384,17 +386,17 @@ export function ProfilePage() {
             </div>
 
             {/* Recent Achievements */}
-            <div className="bg-off-black border border-mid/30 lg:col-span-2">
-              <div className="p-4 border-b border-mid/30 flex items-center justify-between">
-                <p className="text-xs font-mono text-mid-light">recent_achievements</p>
+            <div className="border border-white/15 border-t-0 lg:col-span-2">
+              <div className="p-4 border-b border-white/15 flex items-center justify-between bg-black">
+                <p className="text-xs font-mono text-white/50 lowercase">recent_achievements</p>
                 <button
                   onClick={() => setActiveTab('achievements')}
-                  className="text-xs font-mono text-mid-light hover:text-pure-white transition-colors"
+                  className="text-xs font-mono text-white/50 hover:text-white transition-colors lowercase"
                 >
                   view_all →
                 </button>
               </div>
-              <div className="p-6">
+              <div className="p-6 bg-black">
                 <div className="flex flex-wrap gap-3">
                   {recentUnlocked.map((achievement) => (
                     <AchievementBadge
@@ -412,20 +414,20 @@ export function ProfilePage() {
         )}
 
         {activeTab === 'achievements' && (
-          <div className="bg-off-black border border-mid/30">
-            <div className="p-4 border-b border-mid/30 flex items-center justify-between">
+          <div className="border border-white/15">
+            <div className="p-4 border-b border-white/15 flex items-center justify-between bg-black">
               <div>
-                <p className="text-xs font-mono text-mid-light">all_achievements</p>
-                <p className="text-lg font-mono text-pure-white">{unlockedCount} / {totalCount} unlocked</p>
+                <p className="text-xs font-mono text-white/50 lowercase">all_achievements</p>
+                <p className="text-lg font-mono text-white lowercase">{unlockedCount} / {totalCount} unlocked</p>
               </div>
               {/* Category Filter */}
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap">
                 <button
                   onClick={() => setSelectedCategory('all')}
-                  className={`px-3 py-1.5 border font-mono text-xs transition-all ${
+                  className={`px-3 py-1.5 font-mono text-xs transition-all lowercase border-y border-l border-r border-white/15 ${
                     selectedCategory === 'all'
-                      ? 'bg-pure-white text-pure-black border-pure-white'
-                      : 'bg-pure-black border-mid/50 text-mid-light hover:border-pure-white hover:text-pure-white'
+                      ? 'bg-white text-black'
+                      : 'bg-black text-white/50 hover:text-white'
                   }`}
                 >
                   all
@@ -434,10 +436,10 @@ export function ProfilePage() {
                   <button
                     key={cat}
                     onClick={() => setSelectedCategory(cat)}
-                    className={`px-3 py-1.5 border font-mono text-xs transition-all ${
+                    className={`px-3 py-1.5 font-mono text-xs transition-all lowercase border-y border-r border-white/15 ${
                       selectedCategory === cat
-                        ? 'bg-pure-white text-pure-black border-pure-white'
-                        : 'bg-pure-black border-mid/50 text-mid-light hover:border-pure-white hover:text-pure-white'
+                        ? 'bg-white text-black'
+                        : 'bg-black text-white/50 hover:text-white'
                     }`}
                   >
                     {CATEGORY_LABELS[cat]}
@@ -445,7 +447,7 @@ export function ProfilePage() {
                 ))}
               </div>
             </div>
-            <div className="p-6">
+            <div className="p-6 bg-black">
               <PaginatedGrid
                 items={visibleAchievements}
                 itemsPerPage={6}

@@ -12,11 +12,16 @@ interface HistoryStatsProps {
 export function HistoryStats({ stats, isLoading }: HistoryStatsProps) {
   if (isLoading) {
     return (
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 border-b border-white/15">
         {[...Array(6)].map((_, i) => (
-          <div key={i} className="p-4 bg-pure-black border border-mid/30 animate-pulse">
-            <div className="h-3 bg-mid/30 rounded w-20 mb-2" />
-            <div className="h-6 bg-mid/30 rounded w-16" />
+          <div
+            key={i}
+            className={`p-4 bg-black animate-pulse ${
+              i < 5 ? 'border-r border-white/15' : ''
+            } ${i < 3 ? 'lg:border-b-0 border-b border-white/15' : ''}`}
+          >
+            <div className="h-3 bg-white/10 w-20 mb-2" />
+            <div className="h-6 bg-white/10 w-16" />
           </div>
         ))}
       </div>
@@ -25,8 +30,8 @@ export function HistoryStats({ stats, isLoading }: HistoryStatsProps) {
 
   if (!stats) {
     return (
-      <div className="p-8 bg-pure-black border border-mid/30 text-center">
-        <p className="text-mid-light font-mono">No data available</p>
+      <div className="p-8 bg-black border-b border-white/15 text-center">
+        <p className="text-white/50 font-mono lowercase">no data available</p>
       </div>
     );
   }
@@ -45,18 +50,20 @@ export function HistoryStats({ stats, isLoading }: HistoryStatsProps) {
   };
 
   return (
-    <div className="space-y-4">
-      {/* Primary Stats Row */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+    <div>
+      {/* Primary Stats Row - bento grid */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 border-b border-white/15">
         <StatCard
           label="total_games"
           value={stats.totalGames}
           subValue={`${stats.wins}W ${stats.losses}L ${stats.draws}D`}
+          className="border-r border-white/15 md:border-b lg:border-b-0 border-b border-white/15"
         />
         <StatCard
           label="win_rate"
           value={`${stats.winRate}%`}
           highlight={stats.winRate >= 50 ? 'positive' : 'negative'}
+          className="md:border-r border-white/15 md:border-b lg:border-b-0 border-b border-white/15"
         />
         <StatCard
           label="net_profit"
@@ -64,6 +71,7 @@ export function HistoryStats({ stats, isLoading }: HistoryStatsProps) {
           highlight={stats.netProfit >= 0 ? 'positive' : 'negative'}
           trend={stats.netProfit >= 0 ? 'up' : 'down'}
           trendValue={`${stats.roi}% ROI`}
+          className="border-r border-white/15 border-b lg:border-b-0 border-white/15"
         />
         <StatCard
           label="current_elo"
@@ -71,11 +79,13 @@ export function HistoryStats({ stats, isLoading }: HistoryStatsProps) {
           subValue={`Peak: ${stats.peakElo}`}
           trend={stats.eloChange >= 0 ? 'up' : 'down'}
           trendValue={`${stats.eloChange >= 0 ? '+' : ''}${stats.eloChange}`}
+          className="md:border-r border-white/15 border-b lg:border-b-0 border-white/15"
         />
         <StatCard
           label="biggest_win"
           value={`$${formatMoney(stats.biggestWin)}`}
           highlight="positive"
+          className="border-r border-white/15"
         />
         <StatCard
           label="biggest_loss"
@@ -84,34 +94,39 @@ export function HistoryStats({ stats, isLoading }: HistoryStatsProps) {
         />
       </div>
 
-      {/* Secondary Stats Row */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+      {/* Secondary Stats Row - bento grid */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 border-b border-white/15">
         <StatCard
           label="total_wagered"
           value={`$${formatMoney(stats.totalWagered)}`}
           size="sm"
+          className="border-r border-white/15 border-b lg:border-b-0 border-white/15"
         />
         <StatCard
           label="avg_opponent"
           value={stats.averageOpponentElo}
           size="sm"
+          className="md:border-r border-white/15 border-b lg:border-b-0 border-white/15"
         />
         <StatCard
           label="current_streak"
           value={stats.currentStreak}
           highlight={stats.currentStreak > 0 ? 'positive' : stats.currentStreak < 0 ? 'negative' : 'neutral'}
           size="sm"
+          className="border-r border-white/15 border-b lg:border-b-0 border-white/15"
         />
         <StatCard
           label="longest_win"
           value={stats.longestWinStreak}
           highlight="positive"
           size="sm"
+          className="md:border-r border-white/15 border-b lg:border-b-0 border-white/15"
         />
         <StatCard
           label="avg_duration"
           value={formatDuration(stats.averageGameDuration)}
           size="sm"
+          className="border-r border-white/15"
         />
         <StatCard
           label="most_active"
@@ -121,24 +136,29 @@ export function HistoryStats({ stats, isLoading }: HistoryStatsProps) {
         />
       </div>
 
-      {/* Time Control Breakdown */}
-      <div className="p-4 bg-pure-black border border-mid/30">
-        <p className="text-xs font-mono text-mid-light mb-3">performance_by_time_control</p>
-        <div className="grid grid-cols-4 gap-4">
+      {/* Time Control Breakdown - bento grid */}
+      <div className="border-b border-white/15">
+        <div className="p-4 border-b border-white/15">
+          <p className="text-xs font-mono text-white/50 lowercase">performance_by_time_control</p>
+        </div>
+        <div className="grid grid-cols-4">
           <TimeControlStat
             label="bullet"
             games={stats.bulletStats.games}
             winRate={stats.bulletStats.winRate}
+            className="border-r border-white/15"
           />
           <TimeControlStat
             label="blitz"
             games={stats.blitzStats.games}
             winRate={stats.blitzStats.winRate}
+            className="border-r border-white/15"
           />
           <TimeControlStat
             label="rapid"
             games={stats.rapidStats.games}
             winRate={stats.rapidStats.winRate}
+            className="border-r border-white/15"
           />
           <TimeControlStat
             label="classical"
@@ -155,17 +175,19 @@ function TimeControlStat({
   label,
   games,
   winRate,
+  className = '',
 }: {
   label: string;
   games: number;
   winRate: number;
+  className?: string;
 }) {
   return (
-    <div className="text-center">
-      <p className="text-xs font-mono text-mid-light mb-1">{label}</p>
-      <p className="text-lg font-mono text-pure-white">{games}</p>
+    <div className={`p-4 text-center bg-black ${className}`}>
+      <p className="text-xs font-mono text-white/50 mb-1 lowercase">{label}</p>
+      <p className="text-lg font-mono text-white">{games}</p>
       <div className="flex items-center justify-center gap-2 mt-1">
-        <div className="w-12 h-1 bg-mid/30 overflow-hidden">
+        <div className="w-12 h-1 bg-white/10 overflow-hidden">
           <div
             className={`h-full ${winRate >= 50 ? 'bg-green-400' : 'bg-red-400'}`}
             style={{ width: `${winRate}%` }}
