@@ -21,29 +21,25 @@ export function Leaderboard() {
   const renderLeaderboardEntry = useCallback((entry: LeaderboardEntry, index: number) => (
     <div
       key={entry.user.id}
-      className={`flex items-center justify-between p-3 border ${
-        index < 3
-          ? 'bg-pure-black border-pure-white/30'
-          : 'bg-pure-black border-mid/20'
-      }`}
+      className="flex items-center justify-between p-3 border-b border-white/15 last:border-b-0 hover:bg-white/5 transition-colors"
     >
       <div className="flex items-center gap-3">
         <span
           className={`w-7 h-7 flex items-center justify-center font-mono text-sm border ${
             index === 0
-              ? 'bg-pure-white text-pure-black border-pure-white'
+              ? 'bg-white text-black border-white'
               : index === 1
-              ? 'bg-light/20 text-pure-white border-light/50'
+              ? 'bg-white/20 text-white border-white/50'
               : index === 2
-              ? 'bg-mid/20 text-light border-mid/50'
-              : 'bg-off-black text-mid-light border-mid/30'
+              ? 'bg-white/10 text-white/70 border-white/30'
+              : 'bg-black text-white/50 border-white/15'
           }`}
         >
           {entry.rank}
         </span>
         <div>
-          <div className="text-pure-white font-mono text-sm">{entry.user.username}</div>
-          <div className="text-xs text-mid-light font-mono">
+          <div className="text-white font-mono text-sm">{entry.user.username}</div>
+          <div className="text-xs text-white/30 font-mono lowercase">
             {entry.user.gamesPlayed} games • {entry.user.gamesWon} wins
           </div>
         </div>
@@ -51,8 +47,8 @@ export function Leaderboard() {
       <div className="text-right">
         {type === 'elo' ? (
           <>
-            <div className="font-mono text-pure-white">{entry.value}</div>
-            <div className="text-xs font-mono text-mid-light">elo</div>
+            <div className="font-mono text-white">{entry.value}</div>
+            <div className="text-xs font-mono text-white/30 lowercase">elo</div>
           </>
         ) : (
           <USDCAmount amount={entry.value} size="sm" />
@@ -62,29 +58,29 @@ export function Leaderboard() {
   ), [type]);
 
   return (
-    <div className="card">
-      <div className="flex items-center justify-between mb-6">
+    <div className="border border-white/15">
+      <div className="flex items-center justify-between p-4 border-b border-white/15">
         <div>
-          <p className="text-xs font-mono text-mid-light">rankings</p>
-          <p className="text-xl font-mono text-pure-white">leaderboard</p>
+          <p className="text-xs font-mono text-white/50 lowercase">rankings</p>
+          <p className="text-xl font-mono text-white lowercase">leaderboard</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex">
           <button
             onClick={() => setType('elo')}
-            className={`px-3 py-1.5 font-mono text-xs border ${
+            className={`px-3 py-1.5 font-mono text-xs border-y border-l border-white/15 transition-all lowercase ${
               type === 'elo'
-                ? 'bg-pure-white text-pure-black border-pure-white'
-                : 'bg-transparent border-mid/50 text-mid-light hover:text-pure-white'
+                ? 'bg-white text-black'
+                : 'bg-black text-white/50 hover:text-white'
             }`}
           >
             elo
           </button>
           <button
             onClick={() => setType('winnings')}
-            className={`px-3 py-1.5 font-mono text-xs border ${
+            className={`px-3 py-1.5 font-mono text-xs border border-white/15 transition-all lowercase ${
               type === 'winnings'
-                ? 'bg-pure-white text-pure-black border-pure-white'
-                : 'bg-transparent border-mid/50 text-mid-light hover:text-pure-white'
+                ? 'bg-white text-black'
+                : 'bg-black text-white/50 hover:text-white'
             }`}
           >
             returns
@@ -93,12 +89,12 @@ export function Leaderboard() {
       </div>
 
       {isLoading ? (
-        <div className="flex justify-center py-8">
-          <span className="animate-blink text-pure-white font-mono">_</span>
+        <div className="flex justify-center py-8 bg-black">
+          <span className="animate-blink text-white font-mono">_</span>
         </div>
       ) : !leaderboard?.length ? (
-        <div className="text-center py-8">
-          <p className="text-mid-light font-mono text-sm">no data available</p>
+        <div className="text-center py-8 bg-black">
+          <p className="text-white/30 font-mono text-sm lowercase">no data available</p>
         </div>
       ) : (
         <PaginatedList

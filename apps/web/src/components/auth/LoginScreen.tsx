@@ -265,30 +265,34 @@ export function LoginScreen() {
   };
 
   return (
-    <div className="min-h-screen flex">
+    <div className="min-h-screen flex bg-black">
       {/* Left Sidebar - Login Form */}
-      <div className="w-full lg:w-[420px] bg-off-black border-r border-mid/30 flex flex-col justify-center p-8 lg:p-12 relative z-10">
+      <div className="w-full lg:w-[420px] bg-black border-r border-white/15 flex flex-col justify-center p-8 lg:p-12 relative z-10">
         <div className="max-w-sm mx-auto w-full">
           {/* Logo */}
           <div className="mb-12">
             <div className="flex items-center gap-3 mb-2">
-              <span className="text-5xl">♔</span>
+              <span className="text-5xl text-white/80">♔</span>
             </div>
-            <p className="text-mid-light font-mono text-sm mt-4">
+            <p className="text-white/50 font-mono text-sm mt-4 lowercase">
               play • stake • win
             </p>
           </div>
 
           {/* Tab Navigation */}
-          <div className="flex mb-8 border-b border-mid/30">
+          <div className="flex mb-8 border-b border-white/15">
             <button
-              className={isLogin ? 'tab-active flex-1' : 'tab-inactive flex-1'}
+              className={`flex-1 pb-2 text-sm transition-all duration-150 lowercase tracking-wide ${
+                isLogin ? 'text-white border-b border-white' : 'text-white/30 hover:text-white/60 border-b border-transparent'
+              }`}
               onClick={() => setIsLogin(true)}
             >
               login
             </button>
             <button
-              className={!isLogin ? 'tab-active flex-1' : 'tab-inactive flex-1'}
+              className={`flex-1 pb-2 text-sm transition-all duration-150 lowercase tracking-wide ${
+                !isLogin ? 'text-white border-b border-white' : 'text-white/30 hover:text-white/60 border-b border-transparent'
+              }`}
               onClick={() => setIsLogin(false)}
             >
               register
@@ -298,14 +302,14 @@ export function LoginScreen() {
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
-              <label className="block text-xs font-mono text-mid-light mb-2">
+              <label className="block text-xs font-mono text-white/50 mb-2 lowercase">
                 email
               </label>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="input"
+                className="w-full px-3 py-2.5 bg-black border border-white/15 text-white placeholder-white/30 lowercase tracking-wide focus:outline-none focus:border-white transition-colors duration-150 font-mono"
                 placeholder="you@example.com"
                 required
               />
@@ -313,14 +317,14 @@ export function LoginScreen() {
 
             {!isLogin && (
               <div>
-                <label className="block text-xs font-mono text-mid-light mb-2">
+                <label className="block text-xs font-mono text-white/50 mb-2 lowercase">
                   username
                 </label>
                 <input
                   type="text"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  className="input"
+                  className="w-full px-3 py-2.5 bg-black border border-white/15 text-white placeholder-white/30 lowercase tracking-wide focus:outline-none focus:border-white transition-colors duration-150 font-mono"
                   placeholder="your_name"
                   required
                   minLength={3}
@@ -330,14 +334,14 @@ export function LoginScreen() {
             )}
 
             <div>
-              <label className="block text-xs font-mono text-mid-light mb-2">
+              <label className="block text-xs font-mono text-white/50 mb-2 lowercase">
                 password
               </label>
               <input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="input"
+                className="w-full px-3 py-2.5 bg-black border border-white/15 text-white placeholder-white/30 lowercase tracking-wide focus:outline-none focus:border-white transition-colors duration-150 font-mono"
                 placeholder="••••••••"
                 required
                 minLength={8}
@@ -345,7 +349,7 @@ export function LoginScreen() {
             </div>
 
             {error && (
-              <div className="p-3 bg-pure-black border border-mid text-light text-sm font-mono">
+              <div className="p-3 bg-black border border-white/30 text-white/70 text-sm font-mono lowercase">
                 error: {error}
               </div>
             )}
@@ -353,10 +357,10 @@ export function LoginScreen() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full btn btn-primary"
+              className="w-full px-5 py-2.5 text-sm font-mono bg-white text-black border border-white hover:bg-white/90 transition-all duration-150 lowercase tracking-wide disabled:opacity-50"
             >
               {loading ? (
-                <span className="flex items-center justify-center gap-2 font-mono">
+                <span className="flex items-center justify-center gap-2">
                   <span className="animate-blink">_</span>
                   {isLogin ? 'logging_in...' : 'creating...'}
                 </span>
@@ -370,11 +374,11 @@ export function LoginScreen() {
 
           {/* Dev Login */}
           {process.env.NODE_ENV === 'development' && (
-            <div className="mt-6 pt-6 border-t border-mid/30">
+            <div className="mt-6 pt-6 border-t border-white/15">
               <button
                 type="button"
                 onClick={handleDevLogin}
-                className="w-full btn btn-secondary text-xs"
+                className="w-full px-5 py-2.5 text-xs font-mono bg-black border border-white/15 text-white/50 hover:border-white hover:text-white transition-all duration-150 lowercase"
               >
                 dev_login (skip auth)
               </button>
@@ -382,32 +386,34 @@ export function LoginScreen() {
           )}
 
           {/* Footer */}
-          <div className="mt-6 pt-6 border-t border-mid/30">
-            <p className="text-mid-light text-xs font-mono text-center">
+          <div className="mt-6 pt-6 border-t border-white/15">
+            <p className="text-white/30 text-xs font-mono text-center lowercase">
               connect your wallet to start playing
             </p>
           </div>
 
-          {/* Stats Preview */}
-          <div className="mt-8 grid grid-cols-3 gap-4">
-            <div className="text-center">
-              <p className="text-2xl font-mono text-pure-white">2.4k</p>
-              <p className="text-xs font-mono text-mid-light">players</p>
-            </div>
-            <div className="text-center">
-              <p className="text-2xl font-mono text-pure-white">847</p>
-              <p className="text-xs font-mono text-mid-light">live</p>
-            </div>
-            <div className="text-center">
-              <p className="text-2xl font-mono text-pure-white">12.5k</p>
-              <p className="text-xs font-mono text-mid-light">games</p>
+          {/* Stats Preview - Bento grid style */}
+          <div className="mt-8 border border-white/15">
+            <div className="grid grid-cols-3">
+              <div className="text-center p-4 border-r border-white/15">
+                <p className="text-2xl font-mono text-white">2.4k</p>
+                <p className="text-xs font-mono text-white/30 lowercase">players</p>
+              </div>
+              <div className="text-center p-4 border-r border-white/15">
+                <p className="text-2xl font-mono text-white">847</p>
+                <p className="text-xs font-mono text-white/30 lowercase">live</p>
+              </div>
+              <div className="text-center p-4">
+                <p className="text-2xl font-mono text-white">12.5k</p>
+                <p className="text-xs font-mono text-white/30 lowercase">games</p>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
       {/* Right Side - Animated Background */}
-      <div className="hidden lg:block flex-1 relative overflow-hidden">
+      <div className="hidden lg:block flex-1 relative overflow-hidden border-l border-white/15">
         <AnimatedBackground />
 
         {/* Floating chess pieces */}
@@ -424,8 +430,8 @@ export function LoginScreen() {
 
         {/* Decorative text */}
         <div className="absolute bottom-8 right-8 text-right">
-          <p className="text-xs font-mono text-mid/50 mb-1">v1.0.0</p>
-          <p className="text-xs font-mono text-mid/30">play_chess_stake_usdc</p>
+          <p className="text-xs font-mono text-white/20 mb-1">v1.0.0</p>
+          <p className="text-xs font-mono text-white/10 lowercase">play_chess_stake_usdc</p>
         </div>
       </div>
     </div>

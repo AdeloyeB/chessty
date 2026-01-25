@@ -23,34 +23,32 @@ export function HistoryFilters({
     filters.gameMode !== 'all';
 
   return (
-    <div className="flex flex-wrap items-center gap-4">
+    <div className="flex flex-wrap items-center gap-4 p-4 bg-black">
       {/* Result Filter */}
       <FilterGroup label="result">
         <FilterButton
           active={filters.result === 'all'}
           onClick={() => onResultChange('all')}
         >
-          All
+          all
         </FilterButton>
         <FilterButton
           active={filters.result === 'win'}
           onClick={() => onResultChange('win')}
-          color="green"
         >
-          Wins
+          wins
         </FilterButton>
         <FilterButton
           active={filters.result === 'loss'}
           onClick={() => onResultChange('loss')}
-          color="red"
         >
-          Losses
+          losses
         </FilterButton>
         <FilterButton
           active={filters.result === 'draw'}
           onClick={() => onResultChange('draw')}
         >
-          Draws
+          draws
         </FilterButton>
       </FilterGroup>
 
@@ -60,31 +58,31 @@ export function HistoryFilters({
           active={filters.timeControl === 'all'}
           onClick={() => onTimeControlChange('all')}
         >
-          All
+          all
         </FilterButton>
         <FilterButton
           active={filters.timeControl === 'bullet'}
           onClick={() => onTimeControlChange('bullet')}
         >
-          Bullet
+          bullet
         </FilterButton>
         <FilterButton
           active={filters.timeControl === 'blitz'}
           onClick={() => onTimeControlChange('blitz')}
         >
-          Blitz
+          blitz
         </FilterButton>
         <FilterButton
           active={filters.timeControl === 'rapid'}
           onClick={() => onTimeControlChange('rapid')}
         >
-          Rapid
+          rapid
         </FilterButton>
         <FilterButton
           active={filters.timeControl === 'classical'}
           onClick={() => onTimeControlChange('classical')}
         >
-          Classical
+          classical
         </FilterButton>
       </FilterGroup>
 
@@ -94,13 +92,13 @@ export function HistoryFilters({
           active={filters.gameMode === 'all'}
           onClick={() => onGameModeChange('all')}
         >
-          All
+          all
         </FilterButton>
         <FilterButton
           active={filters.gameMode === 'standard'}
           onClick={() => onGameModeChange('standard')}
         >
-          Standard
+          standard
         </FilterButton>
         <FilterButton
           active={filters.gameMode === 'chess960'}
@@ -114,7 +112,7 @@ export function HistoryFilters({
       {hasActiveFilters && (
         <button
           onClick={onReset}
-          className="px-3 py-1.5 font-mono text-xs text-mid-light hover:text-pure-white transition-colors"
+          className="px-3 py-1.5 font-mono text-xs text-white/50 hover:text-white transition-colors lowercase"
         >
           reset filters
         </button>
@@ -126,8 +124,8 @@ export function HistoryFilters({
 function FilterGroup({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex items-center gap-2">
-      <span className="text-xs font-mono text-mid-light">{label}:</span>
-      <div className="flex gap-1">
+      <span className="text-xs font-mono text-white/50 lowercase">{label}:</span>
+      <div className="flex">
         {children}
       </div>
     </div>
@@ -137,26 +135,20 @@ function FilterGroup({ label, children }: { label: string; children: React.React
 function FilterButton({
   active,
   onClick,
-  color,
   children,
 }: {
   active: boolean;
   onClick: () => void;
-  color?: 'green' | 'red';
   children: React.ReactNode;
 }) {
-  const baseClasses = 'px-2 py-1 font-mono text-xs border transition-colors';
-  const activeClasses = color === 'green'
-    ? 'bg-green-400/20 text-green-400 border-green-400/50'
-    : color === 'red'
-      ? 'bg-red-400/20 text-red-400 border-red-400/50'
-      : 'bg-pure-white text-pure-black border-pure-white';
-  const inactiveClasses = 'bg-pure-black text-mid-light border-mid/30 hover:border-mid hover:text-pure-white';
-
   return (
     <button
       onClick={onClick}
-      className={`${baseClasses} ${active ? activeClasses : inactiveClasses}`}
+      className={`px-2 py-1 font-mono text-xs border-y border-r first:border-l border-white/15 transition-colors lowercase ${
+        active
+          ? 'bg-white text-black'
+          : 'bg-black text-white/50 hover:text-white'
+      }`}
     >
       {children}
     </button>

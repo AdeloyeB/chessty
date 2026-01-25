@@ -19,7 +19,7 @@ export function TablePagination({
 }: TablePaginationProps) {
   if (totalPages <= 1) {
     return (
-      <div className="flex justify-between items-center p-4 bg-pure-black border-t border-mid/30 text-xs font-mono text-mid-light">
+      <div className="flex justify-between items-center p-4 bg-black text-xs font-mono text-white/50 lowercase">
         <span>{totalItems} {totalItems === 1 ? 'game' : 'games'}</span>
       </div>
     );
@@ -63,63 +63,61 @@ export function TablePagination({
   };
 
   return (
-    <div className="flex justify-between items-center p-4 bg-pure-black border-t border-mid/30">
-      <span className="text-xs font-mono text-mid-light">
+    <div className="flex justify-between items-center p-4 bg-black">
+      <span className="text-xs font-mono text-white/50 lowercase">
         {totalItems} {totalItems === 1 ? 'game' : 'games'}
       </span>
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-center">
         {/* Previous Button */}
         <button
           onClick={onPrevPage}
           disabled={page === 1}
-          className={`px-2 py-1 font-mono text-xs border transition-colors ${
+          className={`px-3 py-1.5 font-mono text-xs border-y border-l border-white/15 transition-colors lowercase ${
             page === 1
-              ? 'text-mid/30 border-mid/20 cursor-not-allowed'
-              : 'text-mid-light border-mid/30 hover:text-pure-white hover:border-pure-white'
+              ? 'text-white/20 cursor-not-allowed'
+              : 'text-white/50 hover:text-white'
           }`}
         >
           prev
         </button>
 
         {/* Page Numbers */}
-        <div className="flex gap-1">
-          {getPageNumbers().map((pageNum, i) =>
-            pageNum === 'ellipsis' ? (
-              <span key={`ellipsis-${i}`} className="px-2 py-1 font-mono text-xs text-mid-light">
-                ...
-              </span>
-            ) : (
-              <button
-                key={pageNum}
-                onClick={() => onPageChange(pageNum)}
-                className={`w-8 h-8 font-mono text-xs border transition-colors ${
-                  page === pageNum
-                    ? 'bg-pure-white text-pure-black border-pure-white'
-                    : 'text-mid-light border-mid/30 hover:text-pure-white hover:border-pure-white'
-                }`}
-              >
-                {pageNum}
-              </button>
-            )
-          )}
-        </div>
+        {getPageNumbers().map((pageNum, i) =>
+          pageNum === 'ellipsis' ? (
+            <span key={`ellipsis-${i}`} className="px-2 py-1.5 font-mono text-xs text-white/50 border-y border-l border-white/15">
+              ...
+            </span>
+          ) : (
+            <button
+              key={pageNum}
+              onClick={() => onPageChange(pageNum)}
+              className={`w-8 h-8 font-mono text-xs border-y border-l border-white/15 transition-colors ${
+                page === pageNum
+                  ? 'bg-white text-black'
+                  : 'text-white/50 hover:text-white'
+              }`}
+            >
+              {pageNum}
+            </button>
+          )
+        )}
 
         {/* Next Button */}
         <button
           onClick={onNextPage}
           disabled={page === totalPages}
-          className={`px-2 py-1 font-mono text-xs border transition-colors ${
+          className={`px-3 py-1.5 font-mono text-xs border border-white/15 transition-colors lowercase ${
             page === totalPages
-              ? 'text-mid/30 border-mid/20 cursor-not-allowed'
-              : 'text-mid-light border-mid/30 hover:text-pure-white hover:border-pure-white'
+              ? 'text-white/20 cursor-not-allowed'
+              : 'text-white/50 hover:text-white'
           }`}
         >
           next
         </button>
       </div>
 
-      <span className="text-xs font-mono text-mid-light">
+      <span className="text-xs font-mono text-white/50 lowercase">
         page {page} of {totalPages}
       </span>
     </div>

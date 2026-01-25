@@ -25,18 +25,21 @@ export function ActiveGamesLobby() {
 
   if (isLoading) {
     return (
-      <div className="card flex justify-center py-12">
-        <span className="text-pure-white font-mono animate-blink">_</span>
+      <div className="border border-white/15 bg-black flex justify-center py-12">
+        <span className="text-white font-mono animate-blink">_</span>
       </div>
     );
   }
 
   if (!games?.length) {
     return (
-      <div className="card text-center py-12">
-        <p className="text-mid-light font-mono mb-2">no active games</p>
-        <p className="text-xs text-mid font-mono mb-6">check back later to watch some chess</p>
-        <button onClick={() => refetch()} className="btn btn-secondary">
+      <div className="border border-white/15 bg-black text-center py-12">
+        <p className="text-white/50 font-mono mb-2 lowercase">no active games</p>
+        <p className="text-xs text-white/30 font-mono mb-6 lowercase">check back later to watch some chess</p>
+        <button
+          onClick={() => refetch()}
+          className="px-4 py-2 font-mono text-sm border border-white/15 text-white/50 hover:text-white hover:border-white transition-colors lowercase"
+        >
           refresh
         </button>
       </div>
@@ -44,72 +47,83 @@ export function ActiveGamesLobby() {
   }
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-8">
+    <div className="border border-white/15">
+      {/* Header */}
+      <div className="flex items-center justify-between p-4 border-b border-white/15">
         <div>
-          <p className="text-xs font-mono text-mid-light mb-1">live</p>
-          <h2 className="text-xl font-mono text-pure-white">active_games</h2>
+          <p className="text-xs font-mono text-white/50 lowercase">live</p>
+          <h2 className="text-xl font-mono text-white lowercase">active_games</h2>
         </div>
-        <button onClick={() => refetch()} className="btn btn-secondary text-sm">
+        <button
+          onClick={() => refetch()}
+          className="px-3 py-1.5 font-mono text-xs border border-white/15 text-white/50 hover:text-white hover:border-white transition-colors lowercase"
+        >
           refresh
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {games.map((game: any) => (
-          <div
-            key={game.id}
-            className="card-hover cursor-pointer"
-            onClick={() => spectateGame(game.id)}
-          >
-            <div className="flex justify-between items-start mb-4">
-              <div className="space-y-2">
-                <div className="flex items-center gap-3">
-                  <span className="w-3 h-3 bg-pure-white border border-mid" />
-                  <span className="text-pure-white font-mono">
-                    {game.whitePlayer.username}
-                  </span>
-                  <span className="text-xs text-light font-mono">
-                    {game.whitePlayer.eloRating}
-                  </span>
+      {/* Games Grid - bento style */}
+      <div className="grid grid-cols-1 md:grid-cols-2">
+        {games.map((game: any, index: number) => {
+          const isRightColumn = index % 2 === 1;
+          const isNotLastRow = index < games.length - 2 || (games.length % 2 === 1 && index < games.length - 1);
+          return (
+            <div
+              key={game.id}
+              className={`p-4 bg-black cursor-pointer hover:bg-white/5 transition-colors ${
+                !isRightColumn ? 'md:border-r md:border-white/15' : ''
+              } ${isNotLastRow ? 'border-b border-white/15' : ''}`}
+              onClick={() => spectateGame(game.id)}
+            >
+              <div className="flex justify-between items-start mb-4">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-3">
+                    <span className="w-3 h-3 bg-white border border-white/50" />
+                    <span className="text-white font-mono">
+                      {game.whitePlayer.username}
+                    </span>
+                    <span className="text-xs text-white/30 font-mono">
+                      {game.whitePlayer.eloRating}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="w-3 h-3 bg-black border border-white/50" />
+                    <span className="text-white font-mono">
+                      {game.blackPlayer.username}
+                    </span>
+                    <span className="text-xs text-white/30 font-mono">
+                      {game.blackPlayer.eloRating}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <span className="w-3 h-3 bg-pure-black border border-mid" />
-                  <span className="text-pure-white font-mono">
-                    {game.blackPlayer.username}
-                  </span>
-                  <span className="text-xs text-light font-mono">
-                    {game.blackPlayer.eloRating}
-                  </span>
+                <div className="text-right">
+                  <USDCAmount amount={game.totalPot} size="sm" />
+                  <div className="text-xs text-white/30 font-mono lowercase">pool</div>
                 </div>
               </div>
-              <div className="text-right">
-                <USDCAmount amount={game.totalPot} size="sm" />
-                <div className="text-xs text-mid-light font-mono">pool</div>
-              </div>
-            </div>
 
-            <div className="flex justify-between text-sm pt-4 border-t border-mid/30">
-              <div className="flex gap-4 font-mono text-xs">
-                <div>
-                  <span className="text-mid">w </span>
-                  <span className="text-pure-white">{formatTime(game.whiteTimeRemaining)}</span>
+              <div className="flex justify-between text-sm pt-4 border-t border-white/15">
+                <div className="flex gap-4 font-mono text-xs">
+                  <div>
+                    <span className="text-white/30">w </span>
+                    <span className="text-white">{formatTime(game.whiteTimeRemaining)}</span>
+                  </div>
+                  <div>
+                    <span className="text-white/30">b </span>
+                    <span className="text-white">{formatTime(game.blackTimeRemaining)}</span>
+                  </div>
                 </div>
-                <div>
-                  <span className="text-mid">b </span>
-                  <span className="text-pure-white">{formatTime(game.blackTimeRemaining)}</span>
+                <div className="text-white/50 font-mono text-xs lowercase">
+                  move {game.moveCount}
                 </div>
               </div>
-              <div className="text-mid-light font-mono text-xs">
-                move {game.moveCount}
-              </div>
-            </div>
 
-            <div className="mt-4 text-center">
-              <span className="text-pure-white text-xs font-mono border-b border-pure-white/50">watch</span>
+              <div className="mt-4 text-center">
+                <span className="text-white text-xs font-mono border-b border-white/50 lowercase">watch</span>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

@@ -24,29 +24,35 @@ export function MoveHistory() {
   }
 
   return (
-    <div className="bg-retro-mid border border-retro-blue/20 p-4 h-full">
-      <p className="text-xs font-mono text-retro-muted mb-4">move_history</p>
+    <div className="bg-black h-full flex flex-col">
+      <div className="px-3 py-2 border-b border-white/15">
+        <p className="text-xs font-mono text-white/50 lowercase">move_history</p>
+      </div>
 
       {moves.length === 0 ? (
-        <div className="text-center py-12">
-          <p className="text-retro-muted font-mono">no moves yet</p>
-          <p className="text-xs text-retro-blue font-mono mt-2">game will start when both players are ready</p>
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <p className="text-white/30 font-mono lowercase">no moves yet</p>
+            <p className="text-xs text-white/20 font-mono mt-2 lowercase">game will start when both players are ready</p>
+          </div>
         </div>
       ) : (
         <div
           ref={scrollRef}
-          className="max-h-80 overflow-y-auto space-y-1 font-mono text-sm"
+          className="flex-1 overflow-y-auto px-3 py-2"
         >
-          {movePairs.map((pair) => (
-            <div
-              key={pair.number}
-              className="flex items-center gap-3 hover:bg-retro-blue/10"
-            >
-              <span className="w-6 text-retro-blue">{pair.number}.</span>
-              <span className="w-14 text-pure-white">{pair.white || '...'}</span>
-              <span className="w-14 text-retro-glow">{pair.black || ''}</span>
-            </div>
-          ))}
+          <div className="space-y-0.5 font-mono text-sm">
+            {movePairs.map((pair) => (
+              <div
+                key={pair.number}
+                className="flex items-center hover:bg-white/5 px-1"
+              >
+                <span className="w-6 text-white/30">{pair.number}.</span>
+                <span className="w-14 text-white/70">{pair.white || '...'}</span>
+                <span className="w-14 text-white/50">{pair.black || ''}</span>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>

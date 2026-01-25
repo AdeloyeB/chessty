@@ -40,7 +40,7 @@ export function BalanceDisplay({ className, size = 'lg' }: BalanceDisplayProps) 
       <button
         onClick={openWalletModal}
         className={cn(
-          'text-mid-light font-mono hover:text-usdc transition-colors cursor-pointer',
+          'text-white/50 font-mono hover:text-white transition-colors cursor-pointer lowercase',
           size === 'lg' ? 'text-lg' : size === 'md' ? 'text-base' : 'text-sm'
         )}
       >
@@ -64,7 +64,7 @@ export function BalanceDisplay({ className, size = 'lg' }: BalanceDisplayProps) 
       >
         {isLoadingBalance ? (
           <span className={cn(
-            'text-mid-light font-mono',
+            'text-white/50 font-mono',
             size === 'lg' ? 'text-2xl' : size === 'md' ? 'text-lg' : 'text-sm'
           )}>
             ...

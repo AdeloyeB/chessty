@@ -40,35 +40,35 @@ export function ChallengeFilters({ onFilterChange }: ChallengeFiltersProps) {
   };
 
   return (
-    <div className="flex flex-wrap gap-2 mb-4">
+    <div className="flex flex-wrap gap-4 mb-4">
       {/* Game Mode Filter */}
-      <div className="flex gap-1">
+      <div className="flex">
         <button
           onClick={() => handleGameModeChange('all')}
-          className={`px-3 py-1 text-xs font-mono border transition-all ${
+          className={`px-3 py-1 text-xs font-mono border-y border-l border-r border-white/15 transition-all lowercase ${
             gameMode === 'all'
-              ? 'bg-pure-white text-pure-black border-pure-white'
-              : 'bg-pure-black border-mid/50 text-mid-light hover:border-light'
+              ? 'bg-white text-black'
+              : 'bg-black text-white/50 hover:text-white'
           }`}
         >
           all
         </button>
         <button
           onClick={() => handleGameModeChange('standard')}
-          className={`px-3 py-1 text-xs font-mono border transition-all ${
+          className={`px-3 py-1 text-xs font-mono border-y border-r border-white/15 transition-all lowercase ${
             gameMode === 'standard'
-              ? 'bg-pure-white text-pure-black border-pure-white'
-              : 'bg-pure-black border-mid/50 text-mid-light hover:border-light'
+              ? 'bg-white text-black'
+              : 'bg-black text-white/50 hover:text-white'
           }`}
         >
           standard
         </button>
         <button
           onClick={() => handleGameModeChange('chess960')}
-          className={`px-3 py-1 text-xs font-mono border transition-all ${
+          className={`px-3 py-1 text-xs font-mono border-y border-r border-white/15 transition-all lowercase ${
             gameMode === 'chess960'
-              ? 'bg-pure-white text-pure-black border-pure-white'
-              : 'bg-pure-black border-mid/50 text-mid-light hover:border-light'
+              ? 'bg-white text-black'
+              : 'bg-black text-white/50 hover:text-white'
           }`}
         >
           960
@@ -76,13 +76,13 @@ export function ChallengeFilters({ onFilterChange }: ChallengeFiltersProps) {
       </div>
 
       {/* Time Control Filter */}
-      <div className="flex gap-1">
+      <div className="flex">
         <button
           onClick={() => handleTimeControlChange('all')}
-          className={`px-3 py-1 text-xs font-mono border transition-all ${
+          className={`px-3 py-1 text-xs font-mono border-y border-l border-r border-white/15 transition-all lowercase ${
             timeControlKey === 'all'
-              ? 'bg-pure-white text-pure-black border-pure-white'
-              : 'bg-pure-black border-mid/50 text-mid-light hover:border-light'
+              ? 'bg-white text-black'
+              : 'bg-black text-white/50 hover:text-white'
           }`}
         >
           any time
@@ -91,10 +91,10 @@ export function ChallengeFilters({ onFilterChange }: ChallengeFiltersProps) {
           <button
             key={key}
             onClick={() => handleTimeControlChange(key)}
-            className={`px-3 py-1 text-xs font-mono border transition-all ${
+            className={`px-3 py-1 text-xs font-mono border-y border-r border-white/15 transition-all lowercase ${
               timeControlKey === key
-                ? 'bg-pure-white text-pure-black border-pure-white'
-                : 'bg-pure-black border-mid/50 text-mid-light hover:border-light'
+                ? 'bg-white text-black'
+                : 'bg-black text-white/50 hover:text-white'
             }`}
           >
             {value.label}

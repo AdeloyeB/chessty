@@ -11,12 +11,12 @@ interface DateRangePickerProps {
 }
 
 const PRESETS: { value: DateRangePreset; label: string }[] = [
-  { value: 'today', label: 'Today' },
+  { value: 'today', label: 'today' },
   { value: 'week', label: '7 days' },
   { value: 'month', label: '30 days' },
   { value: '3months', label: '3 months' },
-  { value: 'year', label: 'Year' },
-  { value: 'all', label: 'All time' },
+  { value: 'year', label: 'year' },
+  { value: 'all', label: 'all time' },
 ];
 
 export function DateRangePicker({
@@ -43,15 +43,17 @@ export function DateRangePicker({
   return (
     <div className="space-y-3">
       {/* Preset Buttons */}
-      <div className="flex flex-wrap gap-2">
-        {PRESETS.map(({ value, label }) => (
+      <div className="flex flex-wrap">
+        {PRESETS.map(({ value, label }, index) => (
           <button
             key={value}
             onClick={() => handlePresetClick(value)}
-            className={`px-3 py-1.5 font-mono text-sm border transition-colors ${
+            className={`px-3 py-1.5 font-mono text-xs transition-colors lowercase ${
+              index === 0 ? 'border-l' : ''
+            } border-y border-r border-white/15 ${
               preset === value && !showCustom
-                ? 'bg-pure-white text-pure-black border-pure-white'
-                : 'bg-pure-black text-mid-light border-mid/30 hover:border-pure-white hover:text-pure-white'
+                ? 'bg-white text-black'
+                : 'bg-black text-white/50 hover:text-white'
             }`}
           >
             {label}
@@ -59,49 +61,49 @@ export function DateRangePicker({
         ))}
         <button
           onClick={() => setShowCustom(!showCustom)}
-          className={`px-3 py-1.5 font-mono text-sm border transition-colors ${
+          className={`px-3 py-1.5 font-mono text-xs border-y border-r border-white/15 transition-colors lowercase ${
             preset === 'custom'
-              ? 'bg-pure-white text-pure-black border-pure-white'
-              : 'bg-pure-black text-mid-light border-mid/30 hover:border-pure-white hover:text-pure-white'
+              ? 'bg-white text-black'
+              : 'bg-black text-white/50 hover:text-white'
           }`}
         >
-          Custom
+          custom
         </button>
       </div>
 
       {/* Custom Date Range Inputs */}
       {showCustom && (
-        <div className="flex items-center gap-3 p-3 bg-pure-black border border-mid/30">
+        <div className="flex items-center gap-3 p-3 bg-black border border-white/15">
           <div className="flex items-center gap-2">
-            <label className="text-xs font-mono text-mid-light">From:</label>
+            <label className="text-xs font-mono text-white/50 lowercase">from:</label>
             <input
               type="date"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
-              className="px-2 py-1 bg-off-black border border-mid/30 text-pure-white font-mono text-sm focus:border-pure-white focus:outline-none"
+              className="px-2 py-1 bg-black border border-white/15 text-white font-mono text-sm focus:border-white focus:outline-none"
             />
           </div>
           <div className="flex items-center gap-2">
-            <label className="text-xs font-mono text-mid-light">To:</label>
+            <label className="text-xs font-mono text-white/50 lowercase">to:</label>
             <input
               type="date"
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
-              className="px-2 py-1 bg-off-black border border-mid/30 text-pure-white font-mono text-sm focus:border-pure-white focus:outline-none"
+              className="px-2 py-1 bg-black border border-white/15 text-white font-mono text-sm focus:border-white focus:outline-none"
             />
           </div>
           <button
             onClick={handleCustomApply}
-            className="px-3 py-1 bg-pure-white text-pure-black font-mono text-sm hover:bg-off-white transition-colors"
+            className="px-3 py-1 bg-white text-black font-mono text-sm hover:bg-white/90 transition-colors lowercase"
           >
-            Apply
+            apply
           </button>
         </div>
       )}
 
       {/* Current Range Display */}
-      <p className="text-xs font-mono text-mid-light">
-        Showing: <span className="text-pure-white">{formattedRange}</span>
+      <p className="text-xs font-mono text-white/50 lowercase">
+        showing: <span className="text-white">{formattedRange}</span>
       </p>
     </div>
   );

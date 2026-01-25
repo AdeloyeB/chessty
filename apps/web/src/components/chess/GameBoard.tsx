@@ -44,34 +44,39 @@ export function GameBoard() {
 
   const boardOrientation = playerColor === 'black' ? 'black' : 'white';
 
+  // Get initial time from game time control (default to 3 minutes)
+  const initialTime = game?.timeControl?.initial || 180;
+
   return (
     <div className="max-w-6xl mx-auto">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-0 border border-white/15">
         {/* Left: Move History */}
-        <div className="lg:col-span-1 order-3 lg:order-1">
+        <div className="lg:col-span-1 order-3 lg:order-1 border-r border-white/15">
           <MoveHistory />
         </div>
 
         {/* Center: Chess Board */}
-        <div className="lg:col-span-1 order-1 lg:order-2">
+        <div className="lg:col-span-1 order-1 lg:order-2 bg-black">
           {/* Opponent Info */}
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between p-3 border-b border-white/15">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-board-dark border border-retro-blue/50 flex items-center justify-center text-pure-white font-mono">
+              <div className="w-8 h-8 bg-white/10 border border-white/15 flex items-center justify-center text-white font-mono text-sm lowercase">
                 {(playerColor === 'white' ? blackPlayer : whitePlayer)?.username?.[0]?.toLowerCase()}
               </div>
               <div>
-                <div className="text-pure-white font-mono">
+                <div className="text-white font-mono text-sm lowercase">
                   {(playerColor === 'white' ? blackPlayer : whitePlayer)?.username}
                 </div>
-                <div className="text-xs text-retro-muted font-mono">
-                  {(playerColor === 'white' ? blackPlayer : whitePlayer)?.eloRating}
+                <div className="text-xs text-white/50 font-mono lowercase">
+                  {(playerColor === 'white' ? blackPlayer : whitePlayer)?.eloRating} elo
                 </div>
               </div>
             </div>
             <GameClock
               time={playerColor === 'white' ? blackTimeRemaining : whiteTimeRemaining}
               isActive={!isMyTurn && status === 'playing'}
+              initialTime={initialTime}
+              size="md"
             />
           </div>
 
@@ -86,54 +91,56 @@ export function GameBoard() {
 
             {/* Check indicator */}
             {isCheck && (
-              <div className="absolute top-2 left-1/2 -translate-x-1/2 px-4 py-1 bg-red-500 text-pure-white text-sm font-mono border border-red-400 shadow-[0_0_15px_rgba(239,68,68,0.7)] z-10">
-                CHECK
+              <div className="absolute top-2 left-1/2 -translate-x-1/2 px-4 py-1 bg-red-500 text-white text-sm font-mono border border-red-400 shadow-[0_0_15px_rgba(239,68,68,0.7)] z-10 lowercase">
+                check
               </div>
             )}
 
             {/* Turn indicator */}
-            <div className={`absolute bottom-2 left-1/2 -translate-x-1/2 px-4 py-1 text-sm font-mono border z-10 ${
+            <div className={`absolute bottom-2 left-1/2 -translate-x-1/2 px-4 py-1 text-sm font-mono border z-10 lowercase ${
               isMyTurn
-                ? 'bg-retro-blue text-pure-white border-retro-blue shadow-[0_0_15px_rgba(59,130,246,0.5)]'
-                : 'bg-retro-dark text-retro-muted border-retro-blue/30'
+                ? 'bg-white text-black border-white shadow-[0_0_8px_rgba(255,255,255,0.5)]'
+                : 'bg-black text-white/50 border-white/15'
             }`}>
               {isMyTurn ? 'your_turn' : 'opponent_turn'}
             </div>
           </div>
 
           {/* Player Info */}
-          <div className="flex items-center justify-between mt-4">
+          <div className="flex items-center justify-between p-3 border-t border-white/15">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-pure-white border border-retro-blue/50 flex items-center justify-center text-pure-black font-mono">
+              <div className="w-8 h-8 bg-white border border-white/15 flex items-center justify-center text-black font-mono text-sm lowercase">
                 {(playerColor === 'white' ? whitePlayer : blackPlayer)?.username?.[0]?.toLowerCase()}
               </div>
               <div>
-                <div className="text-pure-white font-mono">
+                <div className="text-white font-mono text-sm lowercase">
                   {(playerColor === 'white' ? whitePlayer : blackPlayer)?.username}
-                  <span className="ml-2 text-xs text-retro-cyan">(you)</span>
+                  <span className="ml-2 text-xs text-green-400">(you)</span>
                 </div>
-                <div className="text-xs text-retro-muted font-mono">
-                  {(playerColor === 'white' ? whitePlayer : blackPlayer)?.eloRating}
+                <div className="text-xs text-white/50 font-mono lowercase">
+                  {(playerColor === 'white' ? whitePlayer : blackPlayer)?.eloRating} elo
                 </div>
               </div>
             </div>
             <GameClock
               time={playerColor === 'white' ? whiteTimeRemaining : blackTimeRemaining}
               isActive={isMyTurn && status === 'playing'}
+              initialTime={initialTime}
+              size="md"
             />
           </div>
 
           {/* Pool Info */}
           {game && (
-            <div className="mt-6 p-4 bg-retro-mid border border-retro-blue/30 text-center">
-              <p className="text-xs font-mono text-retro-muted mb-1">total_pool</p>
+            <div className="p-3 border-t border-white/15 text-center">
+              <p className="text-xs font-mono text-white/50 mb-1 lowercase">total_pool</p>
               <USDCAmount amount={game.totalPot} size="lg" className="justify-center" />
             </div>
           )}
         </div>
 
         {/* Right: Game Controls */}
-        <div className="lg:col-span-1 order-2 lg:order-3">
+        <div className="lg:col-span-1 order-2 lg:order-3 border-l border-white/15">
           <GameControls />
         </div>
       </div>
