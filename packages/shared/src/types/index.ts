@@ -168,6 +168,7 @@ export const WSMessageTypeSchema = z.enum([
   'game:started',
   'game:move_made',
   'game:ended',
+  'game:cancelled',
   'game:clock_update',
   'game:draw_offered',
   'game:draw_declined',

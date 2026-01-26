@@ -23,12 +23,20 @@ import * as bettingService from '../services/betting';
 import * as authService from '../services/auth';
 import * as spectatorChatService from '../services/spectatorChat';
 import * as spectatorPredictionService from '../services/spectatorPrediction';
+import * as walletService from '../services/wallet';
+
+// FIX #2: Timeout for pending games (2 minutes)
+const PENDING_GAME_TIMEOUT = 2 * 60 * 1000;
 
 /**
  * Thin orchestrator that coordinates game flow.
  * Delegates to focused managers and emits events.
  */
 export class GameCoordinator {
+  // FIX #2: Track pending game timeouts
+  // When a game is created but players don't join within 2 minutes, cancel and refund
+  private pendingGameTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
+
   constructor(
     private gameState: GameStateManager,
     private clock: ClockManager,
@@ -43,6 +51,97 @@ export class GameCoordinator {
       if (!game || game.status !== 'active') return;
       await this.endGame(payload.gameId, 'timeout', payload.winnerId);
     }, { priority: 1, label: 'coordinator:timeout' });
+
+    // Listen for challenge:confirmed to start pending game timeout
+    this.events.on('challenge:confirmed', async (payload) => {
+      this.startPendingGameTimeout(payload.gameId);
+    }, { priority: 50, label: 'coordinator:pending_game_timeout' });
+  }
+
+  /**
+   * FIX #2: Start a timeout for a pending game.
+   * If both players don't join within 2 minutes, the game is cancelled and wagers refunded.
+   */
+  private startPendingGameTimeout(gameId: string): void {
+    console.log(`[GameCoordinator] Starting pending game timeout for game ${gameId}`);
+
+    const timeout = setTimeout(async () => {
+      try {
+        const game = await gameService.getGame(gameId);
+        if (!game) {
+          console.log(`[GameCoordinator] Game ${gameId} not found during timeout check`);
+          return;
+        }
+
+        // Only cancel if game is still pending (hasn't started yet)
+        if (game.status !== 'pending') {
+          console.log(`[GameCoordinator] Game ${gameId} is no longer pending (status: ${game.status}), skipping timeout`);
+          return;
+        }
+
+        console.log(`[GameCoordinator] Game ${gameId} timed out - players didn't join in time. Cancelling and refunding.`);
+
+        // Cancel the game
+        await this.cancelPendingGame(gameId);
+      } catch (error) {
+        console.error(`[GameCoordinator] Error during pending game timeout for ${gameId}:`, error);
+      } finally {
+        this.pendingGameTimeouts.delete(gameId);
+      }
+    }, PENDING_GAME_TIMEOUT);
+
+    this.pendingGameTimeouts.set(gameId, timeout);
+  }
+
+  /**
+   * FIX #2: Clear the pending game timeout when both players have joined.
+   */
+  private clearPendingGameTimeout(gameId: string): void {
+    const timeout = this.pendingGameTimeouts.get(gameId);
+    if (timeout) {
+      console.log(`[GameCoordinator] Clearing pending game timeout for game ${gameId} - both players joined`);
+      clearTimeout(timeout);
+      this.pendingGameTimeouts.delete(gameId);
+    }
+  }
+
+  /**
+   * FIX #2: Cancel a pending game and refund wagers.
+   */
+  private async cancelPendingGame(gameId: string): Promise<void> {
+    const game = await gameService.getGame(gameId);
+    if (!game) return;
+
+    const wagerAmount = parseFloat(game.wagerAmount);
+
+    // Refund both players
+    console.log(`[GameCoordinator] Refunding wagers for cancelled game ${gameId}`);
+    await Promise.all([
+      walletService.refundWager(game.whitePlayerId, wagerAmount, `game-cancelled-${gameId}`),
+      walletService.refundWager(game.blackPlayerId, wagerAmount, `game-cancelled-${gameId}`),
+    ]);
+
+    // Update game status to cancelled
+    await gameService.cancelGame(gameId);
+
+    // Notify players if they're connected
+    const whiteWs = this.connections.get(game.whitePlayerId);
+    const blackWs = this.connections.get(game.blackPlayerId);
+
+    const cancelPayload = {
+      gameId,
+      reason: 'Game cancelled - players did not join in time',
+    };
+
+    if (whiteWs) {
+      this.broadcast.sendToUser(game.whitePlayerId, 'game:cancelled', cancelPayload);
+    }
+    if (blackWs) {
+      this.broadcast.sendToUser(game.blackPlayerId, 'game:cancelled', cancelPayload);
+    }
+
+    // Cleanup any room state
+    this.cleanupGame(gameId);
   }
 
   // --- Game Lifecycle ---
@@ -88,6 +187,9 @@ export class GameCoordinator {
     });
 
     if (bothPresent && game.status === 'pending') {
+      // FIX #2: Clear the pending game timeout since both players have joined
+      this.clearPendingGameTimeout(gameId);
+
       await this.startGame(gameId);
     }
 

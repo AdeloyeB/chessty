@@ -152,6 +152,32 @@ export async function abandonGame(gameId: string, abandoningPlayerId: string): P
   return updated;
 }
 
+/**
+ * Cancel a pending game (before it starts).
+ * Used when players don't join within the timeout period.
+ * Wagers should be refunded separately before calling this.
+ */
+export async function cancelGame(gameId: string): Promise<typeof games.$inferSelect> {
+  const game = await getGame(gameId);
+  if (!game) throw new Error('Game not found');
+
+  if (game.status !== 'pending') {
+    throw new Error('Can only cancel pending games');
+  }
+
+  const [updated] = await db
+    .update(games)
+    .set({
+      status: 'cancelled',
+      endedAt: new Date(),
+      updatedAt: new Date(),
+    })
+    .where(eq(games.id, gameId))
+    .returning();
+
+  return updated;
+}
+
 export async function getUserActiveGame(userId: string): Promise<typeof games.$inferSelect | null> {
   return await db.query.games.findFirst({
     where: and(

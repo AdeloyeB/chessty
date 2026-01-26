@@ -7,6 +7,8 @@ import type {
 } from '@chess-game/shared';
 import type { GameEventEmitter } from '../events/GameEventEmitter';
 import type { BroadcastService } from './BroadcastService';
+import type { ConnectionManager } from './ConnectionManager';
+import type { GameCoordinator } from './GameCoordinator';
 import * as challengeService from '../services/challenge';
 import * as gameService from '../services/game';
 import * as authService from '../services/auth';
@@ -17,11 +19,22 @@ import * as authService from '../services/auth';
  */
 export class ChallengeCoordinator {
   private confirmTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
+  private gameCoordinator: GameCoordinator | null = null;
 
   constructor(
     private events: GameEventEmitter,
-    private broadcast: BroadcastService
+    private broadcast: BroadcastService,
+    private connections: ConnectionManager
   ) {}
+
+  /**
+   * Sets the game coordinator reference.
+   * This is called after both coordinators are instantiated to avoid circular dependency.
+   */
+  setGameCoordinator(coordinator: GameCoordinator): void {
+    this.gameCoordinator = coordinator;
+    console.log('[ChallengeCoordinator] GameCoordinator reference set');
+  }
 
   async handleCreate(userId: string, payload: ChallengeCreatePayload): Promise<void> {
     try {
@@ -123,6 +136,30 @@ export class ChallengeCoordinator {
           this.confirmTimeouts.delete(challengeId);
         }
 
+        // FIX #3: Check if both players are still connected before creating the game
+        const creatorConnected = this.connections.get(challenge.creatorId) !== undefined;
+        const acceptorConnected = challenge.acceptedById
+          ? this.connections.get(challenge.acceptedById) !== undefined
+          : false;
+
+        if (!creatorConnected || !acceptorConnected) {
+          console.log(`[ChallengeCoordinator] Player disconnected before game creation. Creator: ${creatorConnected}, Acceptor: ${acceptorConnected}`);
+
+          // Refund both players and cancel the challenge
+          await challengeService.expireChallenge(challengeId);
+
+          // Notify connected players about the cancellation
+          if (creatorConnected) {
+            this.broadcast.sendError(challenge.creatorId, 'CHALLENGE_ERROR', 'Opponent disconnected before game could start');
+          }
+          if (acceptorConnected && challenge.acceptedById) {
+            this.broadcast.sendError(challenge.acceptedById, 'CHALLENGE_ERROR', 'Opponent disconnected before game could start');
+          }
+
+          await this.events.emit('challenge:cancelled', { challengeId });
+          return;
+        }
+
         // Create the game
         const game = await challengeService.createGameFromChallenge(challengeId);
         const gameData = await gameService.getGameWithPlayers(game.id);
@@ -164,6 +201,21 @@ export class ChallengeCoordinator {
           this.broadcast.sendToUser(challenge.creatorId, 'challenge:confirmed', confirmedPayload);
           if (challenge.acceptedById) {
             this.broadcast.sendToUser(challenge.acceptedById, 'challenge:confirmed', confirmedPayload);
+          }
+
+          // FIX #1: Auto-join both players to the game after creation
+          if (this.gameCoordinator) {
+            console.log(`[ChallengeCoordinator] Auto-joining players to game ${game.id}`);
+
+            // Join white player
+            const whiteJoined = await this.gameCoordinator.joinGame(game.whitePlayerId, game.id);
+            console.log(`[ChallengeCoordinator] White player ${game.whitePlayerId} joined: ${whiteJoined}`);
+
+            // Join black player
+            const blackJoined = await this.gameCoordinator.joinGame(game.blackPlayerId, game.id);
+            console.log(`[ChallengeCoordinator] Black player ${game.blackPlayerId} joined: ${blackJoined}`);
+          } else {
+            console.warn('[ChallengeCoordinator] GameCoordinator not set - players must join manually');
           }
         }
 
