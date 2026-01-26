@@ -1,6 +1,6 @@
 # Fetch Code Rabbit AI Review
 
-You are fetching and presenting Code Rabbit's automated code review for a pull request. Your job is to parse the review comments, explain each issue in plain language, and offer to fix them.
+You are fetching Code Rabbit's automated code review for a pull request and **automatically fixing all issues**. No prompting — just fetch, explain, fix, and commit.
 
 ## Steps
 
@@ -45,16 +45,17 @@ For each Code Rabbit inline comment, extract:
 - **File path**: from the `.path` field
 - **Line number**: from the `.line` or `.original_line` field
 - **Severity**: Parse from the comment body:
-  - `⚠️` or "Potential issue" → MAJOR
+  - `⚠️` or "Potential issue" → CRITICAL
+  - `🔒` or "Security" → CRITICAL
   - `🛠️` or "suggestion" or "nitpick" → SUGGESTION
   - Anything else → MINOR
 - **Description**: The main text explaining the issue
 - **Suggested fix**: Look for code blocks (especially ```diff blocks or ```suggestion blocks)
 - **AI Agent prompt**: Look for content inside `<details><summary>🤖 Prompt for AI Agents</summary>` blocks
 
-### 6. Present the Review
+### 6. Present Summary and Begin Fixing
 
-Format your output like this:
+Output a brief summary:
 
 ```
 ## Code Rabbit Review — PR #<number> (<title>)
@@ -63,74 +64,88 @@ Format your output like this:
 ### Walkthrough
 <Summarize the walkthrough comment in 2-3 sentences — what does this PR do?>
 
-### Issues (<count>)
+### Issues Found: <count>
+- ⚠️ Critical: <count>
+- 🟡 Minor: <count>
+- 💡 Suggestions: <count>
 
-1. <severity_icon> <SEVERITY> — <file_path>:<line_number>
-   <description of the issue>
-
-   **What this means:** <2-3 sentence plain-language explanation of WHY this matters,
-   written for someone learning software engineering. Explain the consequence of NOT
-   fixing it — what could go wrong?>
-
-   **Fix:**
-   ```diff
-   <the suggested fix if available>
-   ```
-   🤖 "<AI agent prompt if available>"
-
-2. ...
-
----
-Which issues would you like me to fix? (e.g., "fix 1 and 3", "fix all", "skip")
+**Automatically fixing all issues...**
 ```
 
-### Severity Icons
-- MAJOR: ⚠️
-- MINOR: 🟡
-- SUGGESTION: 💡
+### 7. Automatically Fix All Issues
 
-### 7. Wait for User Response
-
-After presenting the issues, wait for the user to tell you which to fix.
-
-- **"fix all"** → Fix every issue that has a suggested fix
-- **"fix 1 and 3"** or **"fix 1, 3"** → Fix only those numbered issues
-- **"skip"** → Do nothing, just end
-
-### 8. Apply Fixes
-
-For each issue the user wants fixed:
+For each issue (prioritize CRITICAL first, then MINOR, then SUGGESTIONS):
 
 1. Read the file at the specified path
 2. Find the code at/near the specified line number
 3. Apply the suggested fix (use the diff or AI agent prompt as guidance)
-4. Show the user what you changed
+4. Briefly explain what was fixed:
+   ```
+   ✓ Fixed: <file_path>:<line_number>
+     Issue: <brief description>
+     Fix: <what was changed>
+   ```
 
 If a suggested fix isn't in a clean diff format, use the AI agent prompt or description to understand what change is needed and implement it yourself.
 
-### 9. Offer to Commit
+**Skip conditions:**
+- If the code no longer matches (already fixed), note: `⏭️ Skipped: <file> — already resolved`
+- If a fix would break other code, note: `⚠️ Skipped: <file> — fix would cause side effects, manual review needed`
 
-After applying all fixes, ask:
+### 8. Run Build Verification
 
-"All fixes applied. Would you like me to commit and push these changes?"
+After all fixes are applied:
 
-If yes, create a commit with message format:
+```bash
+pnpm build
 ```
-fix: address Code Rabbit review feedback
 
-- <brief description of fix 1>
-- <brief description of fix 2>
+If the build fails, attempt to fix the build errors. If you can't fix them, revert the problematic change and note it.
+
+### 9. Commit and Push
+
+After all fixes are applied and build passes, automatically commit:
+
+```bash
+git add -A
+git commit -m "fix: address Code Rabbit review feedback
+
+<list each fix as a bullet point>
+
+Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
+
+git push
+```
+
+### 10. Final Summary
+
+Output a completion summary:
+
+```
+## ✅ Code Rabbit Review Complete
+
+**PR:** #<number> — <title>
+**Issues Fixed:** <count>/<total>
+**Build:** ✓ Passing
+
+### Changes Made:
+- <file1>: <brief description>
+- <file2>: <brief description>
 ...
 
-Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>
+### Skipped (if any):
+- <file>: <reason>
+
+Changes have been committed and pushed.
 ```
 
 ## Edge Cases
 
 - **No Code Rabbit comments found**: Say "Code Rabbit hasn't reviewed this PR yet. It may still be processing, or the PR may not have Code Rabbit enabled."
 - **Comments exist but no actionable issues**: Say "Code Rabbit reviewed this PR but found no actionable issues. The review was clean!"
-- **Suggested fix doesn't match current code**: The file may have changed since the review. Read the current file, understand the intent of the fix, and adapt it to the current code. Tell the user if the fix needed adaptation.
+- **Suggested fix doesn't match current code**: The file may have changed since the review. Read the current file, understand the intent of the fix, and adapt it to the current code.
 - **Multiple review rounds**: Code Rabbit may have left comments across multiple pushes. Fetch all of them — they accumulate. If an issue was already fixed (the code no longer matches), note it as "Already resolved" and skip it.
+- **Build fails after fixes**: Attempt to fix build errors. If unfixable, revert the problematic change and document it.
 
 ## Rules
 
@@ -138,7 +153,8 @@ Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>
 - Don't silently skip issues. If you can't parse a comment, show its raw body.
 - Reference specific file paths and line numbers.
 - When applying fixes, always read the file first to understand context.
-- Don't fix issues the user didn't ask for.
-- If a fix could introduce new issues, warn the user before applying.
+- If a fix could introduce new issues, skip it and document why.
+- Prioritize security and critical issues first.
+- Always verify the build passes before committing.
 
 $ARGUMENTS

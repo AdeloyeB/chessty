@@ -52,6 +52,7 @@ export function ChallengeMarketplace() {
   } = useChallengeStore();
 
   const {
+    isConnected: isWebSocketConnected,
     createChallenge,
     cancelChallenge,
     acceptChallenge,
@@ -362,6 +363,8 @@ export function ChallengeMarketplace() {
                 peakElo: user?.peakEloRating || userElo,
               }}
               isConnected={isConnected}
+              isWebSocketConnected={isWebSocketConnected}
+              isCreating={uiState === 'creating'}
               onSubmit={handleCreateChallenge}
               onOpenWallet={openWalletModal}
             />
@@ -459,6 +462,8 @@ export function ChallengeMarketplace() {
               peakElo: user?.peakEloRating || userElo,
             }}
             isConnected={isConnected}
+            isWebSocketConnected={isWebSocketConnected}
+            isCreating={uiState === 'creating'}
             onSubmit={handleCreateChallenge}
             onOpenWallet={openWalletModal}
           />

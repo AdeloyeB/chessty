@@ -10,6 +10,7 @@ import { GameCoordinator } from './GameCoordinator';
 import { gameEvents } from '../events/GameEventEmitter';
 import { registerAllHandlers } from '../events/handlers';
 import * as authService from '../services/auth';
+import * as challengeService from '../services/challenge';
 
 // --- Module Instances ---
 const connectionManager = new ConnectionManager();
@@ -55,10 +56,25 @@ export async function handleWebSocketUpgrade(req: Request, server: any): Promise
   return success ? undefined : new Response('WebSocket upgrade failed', { status: 500 });
 }
 
-export function handleWebSocketOpen(ws: ServerWebSocket<WebSocketData>) {
+export async function handleWebSocketOpen(ws: ServerWebSocket<WebSocketData>) {
   const { userId } = ws.data;
   console.log(`WebSocket connected: ${userId}`);
   connectionManager.add(userId, ws as ChessGameWS);
+
+  // Send initial data to the newly connected user
+  try {
+    // Send current challenge list
+    const challenges = await challengeService.getOpenChallenges();
+    broadcastService.sendToUser(userId, 'challenge:list_update', { challenges });
+
+    // If user has an active challenge, send it
+    const myChallenge = await challengeService.getUserActiveChallenge(userId);
+    if (myChallenge) {
+      broadcastService.sendToUser(userId, 'challenge:created', { challenge: myChallenge });
+    }
+  } catch (error) {
+    console.error('Failed to send initial data to user:', error);
+  }
 
   gameEvents.emit('player:connected', { userId });
 }
