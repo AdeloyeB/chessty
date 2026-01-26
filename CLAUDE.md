@@ -555,3 +555,331 @@ nb bookmark "https://docs.polygon.technology" --tags crypto,polygon
 
 **User says:** "Delete note 5"
 → First confirm: "Delete note 5?" → Then: `nb delete 5 --force`
+
+---
+
+## Product Context
+
+### What This Is
+
+A **real-money chess prediction/betting platform** for crypto-native users. Players wager USDC on chess games, and spectators can bet on outcomes. Think Polymarket meets Chess.com.
+
+### Target Audience
+
+**Primary:** Crypto-native chess enthusiasts
+- Active on Polymarket, familiar with USDC and wallet connections
+- Play chess casually between trading sessions
+- Value transparency and trustless verification
+- Comfortable with Web3 UX (wallet signing, gas concepts)
+- Typical stakes: $5 - $500 per game
+
+### Platform Strategy
+
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| Desktop-first | ✅ Yes | Target users are on computers trading/working. Mobile app is future roadmap. |
+| Crypto-only | ✅ Required | Prediction markets cannot use Stripe/PayPal (see Payment section) |
+| Electron app | ✅ Yes | Desktop app for serious players, like Discord or Slack |
+
+### Future Features (Roadmap)
+
+| Feature | Purpose | Priority |
+|---------|---------|----------|
+| Discord Bot | Analytics notifications (game results, leaderboard changes, platform stats) — NOT for gameplay | Medium |
+| Mobile App | React Native port for on-the-go play | Low (future) |
+| Tournament System | Organized competition with prize pools | Medium |
+| Streaming Integration | Twitch/YouTube for spectated games | Low |
+
+---
+
+## Payment & Regulatory Context
+
+### CRITICAL: Traditional Payment Processors Are NOT An Option
+
+This is a **prediction market / betting platform**. Traditional payment processors explicitly prohibit this category:
+
+| Provider | Status | Reason |
+|----------|--------|--------|
+| Stripe | ❌ Prohibited | "Games of skill with entry fees" banned in ToS |
+| PayPal | ❌ Prohibited | Gambling/betting explicitly banned |
+| Square | ❌ Prohibited | No gaming/gambling merchants |
+| Venmo | ❌ Prohibited | Same as PayPal |
+| Adyen | ⚠️ Restricted | Requires gambling license, high fees, case-by-case |
+
+**When building ANY payment feature, NEVER consider traditional processors. They will terminate your account and freeze funds.**
+
+### Why Crypto/USDC is Required (Not Optional)
+
+This isn't a "Web3 feature" — it's the **only viable payment infrastructure**:
+
+| Requirement | Why Traditional Fails | USDC/Polygon Solution |
+|-------------|----------------------|------------------------|
+| Accept payments | Stripe/PayPal ban betting | USDC is permissionless |
+| Global users | Banks block gambling transactions | Crypto works worldwide |
+| Instant settlement | Card processors hold funds 30+ days | Settles in seconds |
+| No chargebacks | Losing bettors dispute credit card charges | Blockchain is final |
+| Transparency | "Trust us" doesn't work for betting | On-chain verification |
+
+### Approved Payment Solutions ONLY
+
+| Solution | Use Case | Notes |
+|----------|----------|-------|
+| **USDC (Polygon)** | Primary deposits/withdrawals | Circle's stablecoin, 1:1 USD backed |
+| **Coinbase Commerce** | Fiat on-ramp | Users buy USDC with card → deposit |
+| **MoonPay** | Alternative fiat on-ramp | Supports prediction markets |
+| **Transak** | Alternative fiat on-ramp | Good international coverage |
+
+### Legal Model (Reference: Polymarket)
+
+Polymarket structure: Offshore entity (Cayman Islands) + geo-restrictions where required
+- Smart contracts are permissionless (no KYC at contract level)
+- Frontend can implement geo-blocking if legally required
+- **This is NOT legal advice** — consult a crypto/gambling attorney before launch
+
+---
+
+## Security Requirements (MANDATORY)
+
+This is a **real-money platform**. Security failures can result in:
+- Users losing funds
+- Platform insolvency
+- Legal liability
+- Criminal prosecution
+
+**Every feature touching user funds MUST follow these requirements. No shortcuts.**
+
+### Core Security Principles
+
+1. **Defense in Depth** — Never rely on a single security layer
+2. **Fail Secure** — When in doubt, block the transaction and alert
+3. **Assume Breach** — Design systems assuming attackers will get partial access
+4. **Audit Trail** — Every money movement must be logged and verifiable
+5. **Least Privilege** — Components only get the minimum access they need
+
+### Database Operations (Money)
+
+**NEVER do read-then-write (vulnerable to race conditions):**
+```typescript
+// ❌ VULNERABLE: Race condition allows double-spend
+const balance = await getBalance(userId);
+if (balance >= amount) {
+  await updateBalance(userId, balance - amount);
+}
+```
+
+**ALWAYS use atomic updates with conditions in WHERE clause:**
+```typescript
+// ✅ SAFE: Atomic update — check and deduct happen together
+const result = await db.update(users)
+  .set({ balance: sql`balance - ${amount}` })
+  .where(and(
+    eq(users.id, userId),
+    sql`balance >= ${amount}`  // Condition in WHERE = atomic check
+  ))
+  .returning();
+
+if (result.length === 0) throw new Error('Insufficient balance');
+```
+
+### Smart Contract Security Requirements
+
+| Requirement | Implementation | Why |
+|-------------|----------------|-----|
+| Multi-signature | Gnosis Safe (2-of-3 minimum) | No single key can drain funds |
+| Time-locks | 48hr delay on admin functions | Time to detect and respond to compromise |
+| Withdrawal delays | 24hr for amounts > $500 | Limits damage from hot wallet compromise |
+| Rate limits | Daily settlement caps in contract | Caps losses even if fully compromised |
+| Emergency pause | Guardian wallet can freeze all operations | Kill switch for attacks |
+| Third-party audit | Required before mainnet | Professional review catches bugs |
+
+### Secrets Management
+
+| Environment | Solution | Cost |
+|-------------|----------|------|
+| Development | `.env.local` (gitignored) | Free |
+| Staging | Doppler (free tier) | Free |
+| Production | Doppler or AWS Secrets Manager | $0-18/mo |
+
+**Recommended:** Start with **Doppler** — free tier supports 5 users with unlimited secrets, excellent CLI integration.
+
+```bash
+# Doppler usage
+doppler run -- bun run start  # Injects secrets as environment variables
+```
+
+**NEVER:**
+- Hardcode private keys in source code
+- Commit `.env` files to git
+- Log private keys or secrets
+- Use the same wallet for multiple purposes
+- Store production secrets in plain text files
+
+### Server Wallet Security
+
+The server wallet (hot wallet) signs blockchain transactions. If compromised, attackers can steal funds.
+
+**Required Controls:**
+- Hot wallet holds maximum 24 hours of expected settlements
+- Auto-refill from cold multi-sig storage when low
+- Alerts when balance exceeds threshold
+- Separate wallets for development/staging/production
+
+### Required Monitoring & Alerts
+
+Set up alerts (PagerDuty, Opsgenie, or similar) for:
+- Single settlement > $1,000
+- Daily settlements > $10,000
+- Failed settlement attempts (any)
+- Contract pause triggered
+- Withdrawal patterns > 3 standard deviations from mean
+- Hot wallet balance anomalies
+
+---
+
+## Blockchain Architecture (Polygon)
+
+### Why Polygon
+
+| Requirement | Polygon Advantage |
+|-------------|-------------------|
+| Low fees | ~$0.01-0.05 per transaction |
+| Fast finality | ~2 seconds confirmation |
+| USDC native | Circle's official USDC deployment |
+| EVM compatible | Standard Solidity, familiar tooling |
+| Battle-tested | Polymarket, Aavegotchi, major DeFi protocols |
+
+### Contract Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    GNOSIS SAFE (2-of-3)                      │
+│            Multi-sig owner of all platform contracts         │
+│                                                              │
+│   Signer 1: Founder hardware wallet (Ledger)                 │
+│   Signer 2: Co-founder / advisor hardware wallet             │
+│   Signer 3: Server operational wallet (for routine ops)      │
+└─────────────────────────────────────────────────────────────┘
+                            │ owns
+                            ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    ChessEscrow.sol                           │
+│                                                              │
+│  - Holds all user USDC deposits                              │
+│  - Locks stakes when games start                             │
+│  - Settles games (pays winners, takes platform fee)          │
+│  - Enforces rate limits (daily max settlements)              │
+│  - Time-locked withdrawals for large amounts                 │
+│  - Emergency pause functionality                             │
+└─────────────────────────────────────────────────────────────┘
+                            │ records
+                            ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    GameRegistry.sol                          │
+│                                                              │
+│  - Immutable record of game results                          │
+│  - Stores hash of final position + move history              │
+│  - Enables dispute verification (anyone can replay & check)  │
+│  - Audit trail for regulatory compliance                     │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Settlement Flow
+
+```
+1. Game ends (checkmate, resign, timeout, draw)
+   └── Server determines winner (off-chain, instant)
+
+2. Server calls ChessEscrow.settleGame()
+   ├── Contract verifies: game exists, not already settled, within daily limits
+   ├── Contract calculates: winner payout = (stake × 2) - platform fee
+   ├── Contract updates: winner's on-chain balance
+   └── Contract emits: GameSettled event (for indexing/analytics)
+
+3. GameRegistry.recordResult()
+   └── Stores: gameId, winner, loser, finalFenHash, moveHistoryHash, timestamp
+
+4. User withdraws (anytime)
+   ├── Small amounts (<$500): Instant
+   └── Large amounts (≥$500): 24-hour time-lock
+```
+
+---
+
+## Scaling Architecture
+
+### Current State (Development)
+- Single Bun.js server process
+- PostgreSQL (Neon serverless)
+- In-memory game state (lost on restart)
+- WebSocket connections on single instance
+
+### Phase 1: Production Ready (10,000 concurrent users)
+
+| Component | Current | Production Solution |
+|-----------|---------|---------------------|
+| Database | Neon PostgreSQL | Same + connection pooling tuned |
+| Cache | None | Redis (Upstash serverless) |
+| Game state | In-memory | Redis with Lua scripts for atomicity |
+| WebSocket | Single server | Single server with sticky sessions |
+| Blockchain | None | Polygon mainnet + Alchemy RPC |
+| Monitoring | Console logs | Datadog or Grafana Cloud |
+| Secrets | .env files | Doppler |
+| Rate limiting | In-memory | Redis-backed (distributed) |
+
+### Phase 2: Scale (100,000 concurrent users)
+
+| Component | Solution |
+|-----------|----------|
+| WebSocket | Multiple server instances + Redis Pub/Sub for cross-instance messaging |
+| Load balancer | AWS ALB with WebSocket sticky sessions |
+| Database | Read replicas for query-heavy operations |
+| Game state | Redis Cluster (sharded) |
+| CDN | CloudFlare for static assets |
+| Background jobs | BullMQ (Redis-backed job queue) |
+
+### Phase 3: Global Scale (1,000,000+ users)
+
+| Component | Solution |
+|-----------|----------|
+| Multi-region | Deploy to US-East, EU-West, Asia-Pacific |
+| Database | CockroachDB or Neon multi-region |
+| WebSocket | Regional clusters with global Redis Pub/Sub |
+| Blockchain | Multiple RPC providers (Alchemy + Infura + QuickNode) with failover |
+| Settlement | Queue-based with retry logic and dead-letter handling |
+
+---
+
+## Feature Roadmap
+
+### Completed ✅
+- [x] Core chess engine with full move validation
+- [x] WebSocket real-time gameplay (moves, clocks, chat)
+- [x] User authentication (email/password + Google/GitHub OAuth)
+- [x] MFA (TOTP) support with backup codes
+- [x] ELO rating system with rank tiers
+- [x] Matchmaking by ELO range and stake amount
+- [x] Challenge system (direct player-to-player challenges)
+- [x] Spectator mode with real-time updates
+- [x] Betting system for spectators (database-backed)
+- [x] Wallet balance system with atomic updates (race condition fixed)
+- [x] Game clocks with Fischer increment
+
+### In Progress 🔨
+- [ ] Polygon smart contract integration
+- [ ] Multi-sig wallet setup (Gnosis Safe)
+- [ ] Redis integration for game state persistence
+
+### Next Priority 📋
+- [ ] Smart contract development (ChessEscrow.sol, GameRegistry.sol)
+- [ ] Smart contract security audit (before mainnet)
+- [ ] Redis game state (games survive server restarts)
+- [ ] Production monitoring and alerting
+- [ ] Withdrawal time-locks and rate limiting
+- [ ] Anti-cheat measures (move time analysis, engine detection)
+
+### Future Roadmap 🔮
+- [ ] Tournament system with brackets and prize pools
+- [ ] Discord bot for analytics/notifications
+- [ ] Advanced analytics dashboard
+- [ ] Streaming integration (Twitch/YouTube embed)
+- [ ] Mobile app (React Native) — desktop-first, mobile later
