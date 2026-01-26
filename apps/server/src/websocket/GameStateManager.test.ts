@@ -238,17 +238,19 @@ describe('GameStateManager', () => {
   describe('isStalemate detection', () => {
     test('should detect stalemate', async () => {
       const gameId = 'test-game-stalemate';
-      // Black king is not in check but has no legal moves
-      // Actually let's use a real stalemate position
-      const realStalemateFen = '7k/8/6K1/8/8/8/8/7Q w - - 0 1';
-      await stateManager.initializeState(gameId, realStalemateFen);
+      // Position: Black king on a8, White king on b6, White queen on c1
+      // After Qc7, black king has no legal moves but is NOT in check = stalemate
+      const preStalemateFen = 'k7/8/1K6/8/8/8/8/2Q5 w - - 0 1';
+      await stateManager.initializeState(gameId, preStalemateFen);
 
-      // Move queen to create stalemate
-      const result = await stateManager.validateAndApplyMove(gameId, 'h1', 'g1');
+      // Move queen from c1 to c7 - this creates stalemate
+      const result = await stateManager.validateAndApplyMove(gameId, 'c1', 'c7');
 
-      // This position should lead to stalemate after some moves
-      // For simplicity, let's just verify the method works
       expect(result).not.toBeNull();
+      expect(result!.isStalemate).toBe(true);
+      expect(result!.isGameOver).toBe(true);
+      expect(result!.isDraw).toBe(true); // Stalemate is a draw
+      expect(result!.isCheckmate).toBe(false);
     });
   });
 
