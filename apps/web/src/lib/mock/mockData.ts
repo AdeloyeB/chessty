@@ -106,7 +106,7 @@ export interface MockChallenge {
   gameMode: 'standard' | 'chess960';
   timeControlKey: string;
   timeControl: { initial: number; increment: number };
-  stakeAmount: number;
+  wagerAmount: number;
   minElo: number | null;
   maxElo: number | null;
   status: 'open';
@@ -125,8 +125,8 @@ export function generateMockChallenges(count: number = 12): MockChallenge[] {
     const createdAt = new Date(now.getTime() - createdMinutesAgo * 60 * 1000);
 
     // Stake amounts with realistic distribution
-    const stakeAmounts = [5, 10, 15, 20, 25, 50, 75, 100, 150, 200, 250, 500];
-    const stakeAmount = stakeAmounts[Math.floor(Math.random() * stakeAmounts.length)];
+    const wagerAmounts = [5, 10, 15, 20, 25, 50, 75, 100, 150, 200, 250, 500];
+    const wagerAmount = wagerAmounts[Math.floor(Math.random() * wagerAmounts.length)];
 
     return {
       id: `challenge-${index + 1}`,
@@ -135,7 +135,7 @@ export function generateMockChallenges(count: number = 12): MockChallenge[] {
       gameMode: Math.random() > 0.7 ? 'chess960' : 'standard',
       timeControlKey: tcKey,
       timeControl: { initial: tc.initial, increment: tc.increment },
-      stakeAmount,
+      wagerAmount,
       minElo: Math.random() > 0.6 ? Math.floor(player.eloRating - 200) : null,
       maxElo: Math.random() > 0.6 ? Math.floor(player.eloRating + 200) : null,
       status: 'open' as const,
@@ -154,7 +154,7 @@ export interface MockActiveGame {
   whitePlayer: MockPlayer;
   blackPlayer: MockPlayer;
   gameMode: 'standard' | 'chess960';
-  stakeAmount: number;
+  wagerAmount: number;
   totalPot: number;
   whiteTimeRemaining: number;
   blackTimeRemaining: number;
@@ -201,16 +201,16 @@ export function generateMockActiveGames(count: number = 6): MockActiveGame[] {
     const whiteTimeUsed = whiteMovesUsed * avgMoveTime * (0.5 + Math.random());
     const blackTimeUsed = blackMovesUsed * avgMoveTime * (0.5 + Math.random());
 
-    const stakeAmounts = [10, 25, 50, 100, 200, 500];
-    const stakeAmount = stakeAmounts[Math.floor(Math.random() * stakeAmounts.length)];
+    const wagerAmounts = [10, 25, 50, 100, 200, 500];
+    const wagerAmount = wagerAmounts[Math.floor(Math.random() * wagerAmounts.length)];
 
     games.push({
       id: `active-game-${i + 1}`,
       whitePlayer,
       blackPlayer,
       gameMode: Math.random() > 0.75 ? 'chess960' : 'standard',
-      stakeAmount,
-      totalPot: stakeAmount * 2,
+      wagerAmount,
+      totalPot: wagerAmount * 2,
       whiteTimeRemaining: Math.max(tc.initial - whiteTimeUsed + (whiteMovesUsed * tc.increment), 10),
       blackTimeRemaining: Math.max(tc.initial - blackTimeUsed + (blackMovesUsed * tc.increment), 10),
       moveCount,

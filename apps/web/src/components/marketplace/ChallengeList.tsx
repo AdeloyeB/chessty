@@ -21,8 +21,8 @@ export function ChallengeList({
   const [filters, setFilters] = useState<Filters>({
     gameMode: 'all',
     timeControlKey: 'all',
-    minStake: null,
-    maxStake: null,
+    minWager: null,
+    maxWager: null,
   });
 
   const filteredChallenges = useMemo(() => {
@@ -38,10 +38,10 @@ export function ChallengeList({
       }
 
       // Filter by stake range
-      if (filters.minStake !== null && challenge.stakeAmount < filters.minStake) {
+      if (filters.minWager !== null && challenge.wagerAmount < filters.minWager) {
         return false;
       }
-      if (filters.maxStake !== null && challenge.stakeAmount > filters.maxStake) {
+      if (filters.maxWager !== null && challenge.wagerAmount > filters.maxWager) {
         return false;
       }
 
@@ -77,7 +77,7 @@ export function ChallengeList({
               isOwnChallenge={challenge.creatorId === currentUserId}
               canAccept={
                 challenge.creatorId !== currentUserId &&
-                userBalance >= challenge.stakeAmount
+                userBalance >= challenge.wagerAmount
               }
             />
           ))}

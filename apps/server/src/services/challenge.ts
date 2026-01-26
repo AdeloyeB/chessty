@@ -25,9 +25,9 @@ function toChallengeWithCreator(
 ): ChallengeWithCreator {
   const timeControlKey = challenge.timeControlKey as keyof typeof CHALLENGE_TIME_CONTROLS;
   const timeControl = CHALLENGE_TIME_CONTROLS[timeControlKey] || { initial: 300, increment: 0 };
-  const stakeAmount = typeof challenge.stakeAmount === 'string'
-    ? parseFloat(challenge.stakeAmount)
-    : Number(challenge.stakeAmount);
+  const wagerAmount = typeof challenge.wagerAmount === 'string'
+    ? parseFloat(challenge.wagerAmount)
+    : Number(challenge.wagerAmount);
 
   return {
     id: challenge.id,
@@ -35,7 +35,7 @@ function toChallengeWithCreator(
     gameMode: challenge.gameMode as GameMode,
     timeControlKey: challenge.timeControlKey,
     timeControl: { initial: timeControl.initial, increment: timeControl.increment },
-    stakeAmount,
+    wagerAmount,
     minElo: challenge.minElo,
     maxElo: challenge.maxElo,
     status: challenge.status as any,
@@ -51,7 +51,7 @@ export async function createChallenge(
   creatorId: string,
   gameMode: GameMode,
   timeControlKey: string,
-  stakeAmount: number,
+  wagerAmount: number,
   minElo?: number,
   maxElo?: number
 ): Promise<ChallengeWithCreator> {
@@ -63,7 +63,7 @@ export async function createChallenge(
 
   // Check if user has sufficient balance
   const userBalance = parseFloat(creator.balance as unknown as string);
-  if (userBalance < stakeAmount) {
+  if (userBalance < wagerAmount) {
     throw new Error('Insufficient balance');
   }
 
@@ -78,8 +78,8 @@ export async function createChallenge(
     throw new Error('You already have an open challenge');
   }
 
-  // Reserve the stake
-  await walletService.deductStake(creatorId, stakeAmount, 'challenge-pending');
+  // Reserve the wager
+  await walletService.deductWager(creatorId, wagerAmount, 'challenge-pending');
 
   const id = crypto.randomUUID();
   const now = new Date();
@@ -94,7 +94,7 @@ export async function createChallenge(
       timeControlKey,
       timeControlInitial: timeControl.initial,
       timeControlIncrement: timeControl.increment,
-      stakeAmount: stakeAmount.toString(),
+      wagerAmount: wagerAmount.toString(),
       minElo: minElo ?? null,
       maxElo: maxElo ?? null,
       status: 'open',
@@ -115,9 +115,9 @@ export async function cancelChallenge(challengeId: string, userId: string): Prom
   if (challenge.creatorId !== userId) throw new Error('Not authorized');
   if (challenge.status !== 'open') throw new Error('Challenge cannot be cancelled');
 
-  // Refund the stake
-  const stakeAmount = parseFloat(challenge.stakeAmount as unknown as string);
-  await walletService.refundStake(userId, stakeAmount, challengeId);
+  // Refund the wager
+  const wagerAmount = parseFloat(challenge.wagerAmount as unknown as string);
+  await walletService.refundWager(userId, wagerAmount, challengeId);
 
   await db
     .update(challenges)
@@ -156,14 +156,14 @@ export async function acceptChallenge(
   }
 
   // Check if acceptor has sufficient balance
-  const stakeAmount = parseFloat(challenge.stakeAmount as unknown as string);
+  const wagerAmount = parseFloat(challenge.wagerAmount as unknown as string);
   const userBalance = parseFloat(acceptor.balance as unknown as string);
-  if (userBalance < stakeAmount) {
+  if (userBalance < wagerAmount) {
     throw new Error('Insufficient balance');
   }
 
-  // Reserve the acceptor's stake
-  await walletService.deductStake(acceptorId, stakeAmount, `challenge-${challengeId}`);
+  // Reserve the acceptor's wager
+  await walletService.deductWager(acceptorId, wagerAmount, `challenge-${challengeId}`);
 
   const [updated] = await db
     .update(challenges)
@@ -229,10 +229,10 @@ export async function declineChallenge(
     throw new Error('Not authorized');
   }
 
-  // Refund the acceptor's stake
-  const stakeAmount = parseFloat(challenge.stakeAmount as unknown as string);
+  // Refund the acceptor's wager
+  const wagerAmount = parseFloat(challenge.wagerAmount as unknown as string);
   if (challenge.acceptedById) {
-    await walletService.refundStake(challenge.acceptedById, stakeAmount, challengeId);
+    await walletService.refundWager(challenge.acceptedById, wagerAmount, challengeId);
   }
 
   // Reset challenge to open state
@@ -271,10 +271,10 @@ export async function createGameFromChallenge(
     ? chess960Service.generateChess960Position()
     : STARTING_FEN;
 
-  const stakeAmount = typeof challenge.stakeAmount === 'string'
-    ? parseFloat(challenge.stakeAmount)
-    : challenge.stakeAmount;
-  const totalPot = stakeAmount * 2;
+  const wagerAmount = typeof challenge.wagerAmount === 'string'
+    ? parseFloat(challenge.wagerAmount)
+    : challenge.wagerAmount;
+  const totalPot = wagerAmount * 2;
 
   const gameId = crypto.randomUUID();
   const now = new Date();
@@ -295,7 +295,7 @@ export async function createGameFromChallenge(
       timeControlIncrement: challenge.timeControlIncrement,
       whiteTimeRemaining: challenge.timeControlInitial,
       blackTimeRemaining: challenge.timeControlInitial,
-      stakeAmount: stakeAmount.toString(),
+      wagerAmount: wagerAmount.toString(),
       totalPot: totalPot.toString(),
       whiteEloAtStart: whitePlayer.eloRating,
       blackEloAtStart: blackPlayer.eloRating,
@@ -322,12 +322,12 @@ export async function expireChallenge(challengeId: string): Promise<void> {
   if (!challenge) return;
   if (challenge.status !== 'open' && challenge.status !== 'accepted') return;
 
-  // Refund stakes
-  const stakeAmount = parseFloat(challenge.stakeAmount as unknown as string);
-  await walletService.refundStake(challenge.creatorId, stakeAmount, challengeId);
+  // Refund wagers
+  const wagerAmount = parseFloat(challenge.wagerAmount as unknown as string);
+  await walletService.refundWager(challenge.creatorId, wagerAmount, challengeId);
 
   if (challenge.acceptedById) {
-    await walletService.refundStake(challenge.acceptedById, stakeAmount, challengeId);
+    await walletService.refundWager(challenge.acceptedById, wagerAmount, challengeId);
   }
 
   await db

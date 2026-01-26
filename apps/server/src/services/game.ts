@@ -113,11 +113,11 @@ export async function endGame(
   if (winnerId) {
     await walletService.awardWinnings(winnerId, totalPot, gameId);
   } else {
-    // Draw - return stakes
-    const stakeAmount = parseFloat(game.stakeAmount);
+    // Draw - return wagers
+    const wagerAmount = parseFloat(game.wagerAmount);
     await Promise.all([
-      walletService.awardWinnings(game.whitePlayerId, stakeAmount, gameId),
-      walletService.awardWinnings(game.blackPlayerId, stakeAmount, gameId),
+      walletService.awardWinnings(game.whitePlayerId, wagerAmount, gameId),
+      walletService.awardWinnings(game.blackPlayerId, wagerAmount, gameId),
     ]);
   }
 
@@ -262,12 +262,12 @@ export async function getUserGameHistoryFiltered(
     conditions.push(eq(games.gameMode, filters.gameMode));
   }
 
-  // Stake filters
-  if (filters.minStake !== undefined) {
-    conditions.push(gte(games.stakeAmount, filters.minStake.toString()));
+  // Wager filters
+  if (filters.minWager !== undefined) {
+    conditions.push(gte(games.wagerAmount, filters.minWager.toString()));
   }
-  if (filters.maxStake !== undefined) {
-    conditions.push(lte(games.stakeAmount, filters.maxStake.toString()));
+  if (filters.maxWager !== undefined) {
+    conditions.push(lte(games.wagerAmount, filters.maxWager.toString()));
   }
 
   // Get all matching games with players
@@ -339,7 +339,7 @@ export async function getUserGameHistoryFiltered(
       timeControlInitial: game.timeControlInitial,
       timeControlIncrement: game.timeControlIncrement,
       timeControlLabel: getTimeLabel(game.timeControlInitial, game.timeControlIncrement),
-      stakeAmount: parseFloat(game.stakeAmount as any),
+      wagerAmount: parseFloat(game.wagerAmount as any),
       totalPot: parseFloat(game.totalPot as any),
       eloChange,
       eloAtStart: playerIsWhite ? game.whiteEloAtStart : game.blackEloAtStart,
@@ -420,15 +420,15 @@ export async function getUserHistoryStats(
     const playerIsWhite = game.whitePlayerId === userId;
     const isWin = game.winnerId === userId;
     const isDraw = game.winnerId === null && game.result !== 'abandonment';
-    const stakeAmount = parseFloat(game.stakeAmount as any);
+    const wagerAmount = parseFloat(game.wagerAmount as any);
     const gameEloChange = game.eloChange || 0;
 
-    totalWagered += stakeAmount;
+    totalWagered += wagerAmount;
 
     if (isWin) {
       wins++;
-      totalWon += stakeAmount * 2;
-      if (stakeAmount > biggestWin) biggestWin = stakeAmount;
+      totalWon += wagerAmount * 2;
+      if (wagerAmount > biggestWin) biggestWin = wagerAmount;
       eloChange += gameEloChange;
       tempWinStreak++;
       tempLossStreak = 0;
@@ -438,8 +438,8 @@ export async function getUserHistoryStats(
       // Draw returns stake, no profit/loss
     } else {
       losses++;
-      totalLost += stakeAmount;
-      if (stakeAmount > biggestLoss) biggestLoss = stakeAmount;
+      totalLost += wagerAmount;
+      if (wagerAmount > biggestLoss) biggestLoss = wagerAmount;
       eloChange -= gameEloChange;
       tempLossStreak++;
       tempWinStreak = 0;
@@ -623,7 +623,7 @@ export async function getUserFinancialSummary(
         gameWins += txAmount;
         totalGames++;
         break;
-      case 'game_stake':
+      case 'game_wager':
         gameLosses += Math.abs(txAmount);
         break;
       case 'deposit':

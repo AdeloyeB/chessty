@@ -21,7 +21,7 @@ interface GameState {
 
   // Queue state
   queueTimeControl: TimeControl | null;
-  queueStakeAmount: number;
+  queueWagerAmount: number;
   queueJoinedAt: Date | null;
 
   // Actions
@@ -35,7 +35,7 @@ interface GameState {
   setMyTurn: (isMyTurn: boolean) => void;
   setDrawOffered: (offered: boolean, byMe: boolean) => void;
   endGame: (result: string, eloChange: number | null) => void;
-  setQueueParams: (timeControl: TimeControl, stakeAmount: number) => void;
+  setQueueParams: (timeControl: TimeControl, wagerAmount: number) => void;
   joinQueue: () => void;
   leaveQueue: () => void;
   reset: () => void;
@@ -57,7 +57,7 @@ const initialState = {
   result: null,
   eloChange: null,
   queueTimeControl: null,
-  queueStakeAmount: 0,
+  queueWagerAmount: 0,
   queueJoinedAt: null,
 };
 
@@ -116,8 +116,8 @@ export const useGameStore = create<GameState>((set, get) => ({
   endGame: (result, eloChange) =>
     set({ status: 'ended', result, eloChange }),
 
-  setQueueParams: (timeControl, stakeAmount) =>
-    set({ queueTimeControl: timeControl, queueStakeAmount: stakeAmount }),
+  setQueueParams: (timeControl, wagerAmount) =>
+    set({ queueTimeControl: timeControl, queueWagerAmount: wagerAmount }),
 
   joinQueue: () => set({ status: 'queuing', queueJoinedAt: new Date() }),
 

@@ -1,11 +1,11 @@
 import { z } from 'zod';
 import type { ApiResponse, TimeControl } from '@chess-game/shared';
-import { MIN_STAKE, MAX_STAKE } from '@chess-game/shared';
+import { MIN_WAGER, MAX_WAGER } from '@chess-game/shared';
 import * as matchmakingService from '../services/matchmaking';
 import { authenticateRequest } from './auth';
 
 const JoinQueueSchema = z.object({
-  stakeAmount: z.number().positive().min(MIN_STAKE).max(MAX_STAKE),
+  wagerAmount: z.number().positive().min(MIN_WAGER).max(MAX_WAGER),
   timeControl: z.object({
     initial: z.number().positive().min(60).max(3600), // 1 min to 1 hour
     increment: z.number().min(0).max(60),
@@ -40,11 +40,11 @@ export async function handleJoinQueue(req: Request): Promise<Response> {
       );
     }
 
-    const { stakeAmount, timeControl, minElo, maxElo } = parsed.data;
+    const { wagerAmount, timeControl, minElo, maxElo } = parsed.data;
 
     const entry = await matchmakingService.joinQueue(
       auth.userId,
-      stakeAmount,
+      wagerAmount,
       timeControl as TimeControl,
       minElo,
       maxElo
@@ -61,7 +61,7 @@ export async function handleJoinQueue(req: Request): Promise<Response> {
           gameId: match.gameId,
           whitePlayerId: match.whitePlayerId,
           blackPlayerId: match.blackPlayerId,
-          stakeAmount: match.stakeAmount,
+          wagerAmount: match.wagerAmount,
           timeControl: match.timeControl,
         },
       } satisfies ApiResponse<unknown>);

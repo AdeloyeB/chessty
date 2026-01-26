@@ -38,7 +38,7 @@ export function ChallengeAcceptDialog({
   const timeControl =
     CHALLENGE_TIME_CONTROLS[challenge.timeControlKey as keyof typeof CHALLENGE_TIME_CONTROLS];
   const timeLabel = timeControl?.label || challenge.timeControlKey;
-  const canAfford = userBalance >= challenge.stakeAmount;
+  const canAfford = userBalance >= challenge.wagerAmount;
 
   // Calculate all the metrics
   const analysis = useMemo(() => {
@@ -46,7 +46,7 @@ export function ChallengeAcceptDialog({
     const eloDiff = opponentElo - userElo;
     const winProb = calculateWinProbability(userElo, opponentElo);
     const eloChange = calculateExpectedEloChange(userElo, opponentElo);
-    const riskPercent = userBalance > 0 ? (challenge.stakeAmount / userBalance) * 100 : 100;
+    const riskPercent = userBalance > 0 ? (challenge.wagerAmount / userBalance) * 100 : 100;
 
     // Opponent stats
     const opponentWinRate = challenge.creator.gamesPlayed > 0
@@ -68,8 +68,8 @@ export function ChallengeAcceptDialog({
     }
 
     // Expected value calculation (simplified)
-    const potentialWin = challenge.stakeAmount;
-    const potentialLoss = challenge.stakeAmount;
+    const potentialWin = challenge.wagerAmount;
+    const potentialLoss = challenge.wagerAmount;
     const expectedValue = (winProb / 100 * potentialWin) - ((100 - winProb) / 100 * potentialLoss);
 
     return {
@@ -81,8 +81,8 @@ export function ChallengeAcceptDialog({
       riskColor,
       opponentWinRate,
       expectedValue,
-      balanceAfterWin: userBalance + challenge.stakeAmount,
-      balanceAfterLoss: userBalance - challenge.stakeAmount,
+      balanceAfterWin: userBalance + challenge.wagerAmount,
+      balanceAfterLoss: userBalance - challenge.wagerAmount,
     };
   }, [challenge, userElo, userBalance]);
 
@@ -194,18 +194,18 @@ export function ChallengeAcceptDialog({
                 </div>
                 <div className="flex justify-between">
                   <span className="text-sm font-mono text-mid-light">total_pot</span>
-                  <USDCAmount amount={challenge.stakeAmount * 2} size="sm" />
+                  <USDCAmount amount={challenge.wagerAmount * 2} size="sm" />
                 </div>
               </div>
             </div>
 
-            {/* Stakes */}
+            {/* Wager */}
             <div className="p-4 bg-pure-black border border-mid/30">
-              <p className="text-xs font-mono text-mid-light mb-3">your_stake</p>
+              <p className="text-xs font-mono text-mid-light mb-3">your_wager</p>
               <div className="space-y-2">
                 <div className="flex justify-between">
                   <span className="text-sm font-mono text-mid-light">amount</span>
-                  <USDCAmount amount={challenge.stakeAmount} size="sm" />
+                  <USDCAmount amount={challenge.wagerAmount} size="sm" />
                 </div>
                 <div className="flex justify-between">
                   <span className="text-sm font-mono text-mid-light">risk</span>
@@ -269,7 +269,7 @@ export function ChallengeAcceptDialog({
             <div className="p-4 bg-red-500/10 border border-red-500/30 mb-6">
               <p className="text-sm font-mono text-red-400">
                 ⚠ insufficient balance - you need{' '}
-                <USDCAmount amount={challenge.stakeAmount - userBalance} size="sm" className="inline" />{' '}
+                <USDCAmount amount={challenge.wagerAmount - userBalance} size="sm" className="inline" />{' '}
                 more to accept
               </p>
             </div>
@@ -279,7 +279,7 @@ export function ChallengeAcceptDialog({
           {canAfford && analysis.riskLevel === 'extreme' && (
             <div className="p-4 bg-red-500/10 border border-red-500/30 mb-6">
               <p className="text-sm font-mono text-red-400">
-                ⚠ extreme risk: you're staking {analysis.riskPercent.toFixed(0)}% of your balance
+                ⚠ extreme risk: you're wagering {analysis.riskPercent.toFixed(0)}% of your balance
               </p>
             </div>
           )}

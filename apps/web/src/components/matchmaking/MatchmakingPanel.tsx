@@ -5,7 +5,7 @@ import { useGameStore } from '@/store/game';
 import { useAuthStore } from '@/store/auth';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { useWallet } from '@/hooks/useWallet';
-import { TIME_CONTROLS, STAKE_PRESETS } from '@chess-game/shared';
+import { TIME_CONTROLS, WAGER_PRESETS } from '@chess-game/shared';
 import { formatUSDC, formatTime } from '@/lib/utils';
 import { USDCAmount } from '../wallet/USDCAmount';
 
@@ -121,7 +121,7 @@ export function MatchmakingPanel() {
           )}
         </div>
         <div className="grid grid-cols-4 gap-2 mb-3">
-          {STAKE_PRESETS.map((amount) => (
+          {WAGER_PRESETS.map((amount) => (
             <button
               key={amount}
               onClick={() => {

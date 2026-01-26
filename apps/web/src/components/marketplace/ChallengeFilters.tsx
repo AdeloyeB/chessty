@@ -11,8 +11,8 @@ interface ChallengeFiltersProps {
 export interface ChallengeFilters {
   gameMode: GameMode | 'all';
   timeControlKey: string | 'all';
-  minStake: number | null;
-  maxStake: number | null;
+  minWager: number | null;
+  maxWager: number | null;
 }
 
 export function ChallengeFilters({ onFilterChange }: ChallengeFiltersProps) {
@@ -24,8 +24,8 @@ export function ChallengeFilters({ onFilterChange }: ChallengeFiltersProps) {
     onFilterChange({
       gameMode: mode,
       timeControlKey,
-      minStake: null,
-      maxStake: null,
+      minWager: null,
+      maxWager: null,
     });
   };
 
@@ -34,8 +34,8 @@ export function ChallengeFilters({ onFilterChange }: ChallengeFiltersProps) {
     onFilterChange({
       gameMode,
       timeControlKey: key,
-      minStake: null,
-      maxStake: null,
+      minWager: null,
+      maxWager: null,
     });
   };
 

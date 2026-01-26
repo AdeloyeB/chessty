@@ -36,9 +36,11 @@ export interface OAuthProfile {
 
 /**
  * Internal type for tracking state tokens with their creation time.
+ * For Twitter OAuth 2.0, we also store a codeVerifier for PKCE.
  */
 interface StateEntry {
   createdAt: number; // Unix timestamp when the state was created
+  codeVerifier?: string; // For Twitter OAuth 2.0 PKCE flow
 }
 
 // ============================================================================
@@ -53,6 +55,8 @@ const GOOGLE_CLIENT_ID = Bun.env.GOOGLE_CLIENT_ID;
 const GOOGLE_CLIENT_SECRET = Bun.env.GOOGLE_CLIENT_SECRET;
 const GITHUB_CLIENT_ID = Bun.env.GITHUB_CLIENT_ID;
 const GITHUB_CLIENT_SECRET = Bun.env.GITHUB_CLIENT_SECRET;
+const TWITTER_CLIENT_ID = Bun.env.TWITTER_CLIENT_ID;
+const TWITTER_CLIENT_SECRET = Bun.env.TWITTER_CLIENT_SECRET;
 
 // State token expiry time (10 minutes in milliseconds)
 const STATE_EXPIRY_MS = 10 * 60 * 1000;
@@ -79,20 +83,27 @@ const STATE_CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
  * 4. When we get the callback, verify the state matches what we stored
  *
  * This proves the callback is from a flow we initiated, not an attacker.
+ *
+ * For Twitter OAuth 2.0, we also store a codeVerifier for PKCE (Proof Key for
+ * Code Exchange). PKCE adds an extra layer of security by proving that the
+ * same client that started the flow is the one completing it.
  */
 const stateStore = new Map<string, StateEntry>();
 
 /**
  * Generate a cryptographically random state token for CSRF protection.
  * Returns the state string that should be included in the OAuth redirect URL.
+ *
+ * @param codeVerifier - Optional PKCE code verifier for Twitter OAuth 2.0
  */
-export function generateState(): string {
+export function generateState(codeVerifier?: string): string {
   // crypto.randomUUID() generates a cryptographically secure random UUID
   // This is built into modern JavaScript runtimes (including Bun)
   const state = crypto.randomUUID();
 
   stateStore.set(state, {
     createdAt: Date.now(),
+    codeVerifier,
   });
 
   return state;
@@ -100,12 +111,14 @@ export function generateState(): string {
 
 /**
  * Validate a state token from an OAuth callback.
- * Returns true if the state is valid, false otherwise.
+ * Returns the state entry if valid, null otherwise.
  *
  * This function:
  * 1. Checks if the state exists in our store
  * 2. Checks if it hasn't expired (10 minute limit)
  * 3. Deletes the state after use (one-time use)
+ *
+ * Returns the StateEntry so callers can access the codeVerifier for Twitter PKCE.
  */
 export function validateState(state: string): boolean {
   const entry = stateStore.get(state);
@@ -125,6 +138,32 @@ export function validateState(state: string): boolean {
   }
 
   return true;
+}
+
+/**
+ * Validate a state token and return the full entry (including codeVerifier).
+ * Used for Twitter OAuth 2.0 PKCE flow where we need the codeVerifier.
+ *
+ * @param state - The state token from the callback
+ * @returns The state entry if valid, null otherwise
+ */
+export function validateStateAndGetEntry(state: string): StateEntry | null {
+  const entry = stateStore.get(state);
+
+  if (!entry) {
+    return null;
+  }
+
+  // Delete immediately (one-time use, prevents replay attacks)
+  stateStore.delete(state);
+
+  // Check if expired
+  const ageMs = Date.now() - entry.createdAt;
+  if (ageMs > STATE_EXPIRY_MS) {
+    return null;
+  }
+
+  return entry;
 }
 
 /**
@@ -484,6 +523,240 @@ export async function fetchGithubEmail(accessToken: string): Promise<string | nu
 }
 
 // ============================================================================
+// Twitter OAuth 2.0 (with PKCE)
+// ============================================================================
+
+/**
+ * Twitter OAuth 2.0 endpoints:
+ * - Authorization: Where we redirect users to log in
+ * - Token: Where we exchange the code for an access token
+ * - User: Where we fetch the user's profile data
+ *
+ * What's different about Twitter?
+ * Twitter uses OAuth 2.0 with PKCE (Proof Key for Code Exchange). PKCE is a
+ * security enhancement designed for public clients (like mobile apps or SPAs)
+ * but is now recommended for all OAuth 2.0 flows.
+ *
+ * PKCE works like this:
+ * 1. We generate a random "code verifier" (a secret string)
+ * 2. We hash it to create a "code challenge"
+ * 3. We send the code challenge to Twitter (not the verifier)
+ * 4. When we get the callback, we send the original verifier
+ * 5. Twitter hashes it and verifies it matches the challenge
+ *
+ * This proves that the same client that started the flow is completing it,
+ * even if the authorization code was somehow intercepted.
+ */
+const TWITTER_AUTH_URL = 'https://twitter.com/i/oauth2/authorize';
+const TWITTER_TOKEN_URL = 'https://api.twitter.com/2/oauth2/token';
+const TWITTER_USER_URL = 'https://api.twitter.com/2/users/me';
+
+/**
+ * Generate a PKCE code verifier.
+ *
+ * What is this?
+ * A code verifier is a high-entropy random string between 43-128 characters.
+ * It's used as the "secret" in PKCE - only the client that generated it
+ * should be able to provide it later.
+ *
+ * @returns A random 64-character URL-safe string
+ */
+export function generateCodeVerifier(): string {
+  // Generate 48 random bytes and convert to base64url
+  // 48 bytes = 64 base64 characters (within the 43-128 requirement)
+  const randomBytes = crypto.getRandomValues(new Uint8Array(48));
+  return base64UrlEncode(randomBytes);
+}
+
+/**
+ * Generate a PKCE code challenge from a code verifier.
+ *
+ * What is this?
+ * The code challenge is a SHA-256 hash of the code verifier, encoded in base64url.
+ * We send this to Twitter, but NOT the verifier itself. Later, when exchanging
+ * the code, we send the original verifier and Twitter verifies it matches.
+ *
+ * @param verifier - The code verifier to hash
+ * @returns The SHA-256 hash of the verifier in base64url format
+ */
+export async function generateCodeChallenge(verifier: string): Promise<string> {
+  // Hash the verifier using SHA-256
+  const encoder = new TextEncoder();
+  const data = encoder.encode(verifier);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+
+  // Convert to base64url
+  return base64UrlEncode(new Uint8Array(hashBuffer));
+}
+
+/**
+ * Encode bytes to base64url format.
+ *
+ * What is base64url?
+ * It's like regular base64 but URL-safe. It replaces '+' with '-' and '/' with '_',
+ * and removes padding ('='). This makes it safe to include in URLs without encoding.
+ *
+ * @param bytes - The bytes to encode
+ * @returns The base64url-encoded string
+ */
+function base64UrlEncode(bytes: Uint8Array): string {
+  // Convert to regular base64
+  let base64 = '';
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+
+  for (let i = 0; i < bytes.length; i += 3) {
+    const a = bytes[i];
+    const b = bytes[i + 1] || 0;
+    const c = bytes[i + 2] || 0;
+
+    const triplet = (a << 16) | (b << 8) | c;
+
+    base64 += chars[(triplet >> 18) & 0x3f];
+    base64 += chars[(triplet >> 12) & 0x3f];
+    base64 += i + 1 < bytes.length ? chars[(triplet >> 6) & 0x3f] : '';
+    base64 += i + 2 < bytes.length ? chars[triplet & 0x3f] : '';
+  }
+
+  // Convert to base64url (URL-safe variant)
+  return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+}
+
+/**
+ * Build the URL to redirect users to for Twitter login.
+ *
+ * @param state - CSRF protection token (from generateState())
+ * @param codeChallenge - PKCE code challenge (hashed verifier)
+ * @returns The full Twitter authorization URL
+ */
+export function getTwitterAuthUrl(state: string, codeChallenge: string): string {
+  if (!TWITTER_CLIENT_ID) {
+    throw new Error('Twitter OAuth is not configured');
+  }
+
+  const params = new URLSearchParams({
+    response_type: 'code',
+    client_id: TWITTER_CLIENT_ID,
+    redirect_uri: `${API_BASE_URL}/api/auth/twitter/callback`,
+    scope: 'tweet.read users.read', // Basic read permissions
+    state, // Our CSRF protection token
+    code_challenge: codeChallenge,
+    code_challenge_method: 'S256', // SHA-256 hashing method
+  });
+
+  return `${TWITTER_AUTH_URL}?${params.toString()}`;
+}
+
+/**
+ * Exchange an authorization code for an access token using PKCE.
+ *
+ * Twitter OAuth 2.0 requires:
+ * 1. Basic Auth header with client_id:client_secret
+ * 2. The code verifier (the original unhashed secret)
+ *
+ * @param code - The authorization code from the callback
+ * @param codeVerifier - The original PKCE code verifier
+ * @returns The access token
+ */
+export async function exchangeTwitterCode(code: string, codeVerifier: string): Promise<string> {
+  if (!TWITTER_CLIENT_ID || !TWITTER_CLIENT_SECRET) {
+    throw new Error('Twitter OAuth is not configured');
+  }
+
+  try {
+    // Twitter requires Basic Auth for the token endpoint
+    const credentials = Buffer.from(`${TWITTER_CLIENT_ID}:${TWITTER_CLIENT_SECRET}`).toString('base64');
+
+    const response = await fetch(TWITTER_TOKEN_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Authorization: `Basic ${credentials}`,
+      },
+      body: new URLSearchParams({
+        code,
+        grant_type: 'authorization_code',
+        redirect_uri: `${API_BASE_URL}/api/auth/twitter/callback`,
+        code_verifier: codeVerifier, // The original verifier, not the hash
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[OAuth] Twitter token exchange failed:', errorText);
+      throw new Error('Failed to exchange Twitter authorization code');
+    }
+
+    const data = (await response.json()) as { access_token?: string; error?: string };
+
+    if (data.error || !data.access_token) {
+      console.error('[OAuth] Twitter token error:', data.error);
+      throw new Error('Failed to obtain Twitter access token');
+    }
+
+    return data.access_token;
+  } catch (error) {
+    console.error('[OAuth] Twitter code exchange error:', error);
+    throw new Error('Failed to authenticate with Twitter');
+  }
+}
+
+/**
+ * Fetch the user's profile from Twitter using an access token.
+ *
+ * Note: Twitter API v2 doesn't return email by default - you need elevated
+ * API access (which requires approval from Twitter). For now, we'll generate
+ * a placeholder email using the username.
+ *
+ * @param accessToken - The access token from exchangeTwitterCode()
+ * @returns Normalized OAuth profile
+ */
+export async function fetchTwitterProfile(accessToken: string): Promise<OAuthProfile> {
+  try {
+    const response = await fetch(TWITTER_USER_URL, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[OAuth] Twitter profile fetch failed:', errorText);
+      throw new Error('Failed to fetch Twitter profile');
+    }
+
+    const data = (await response.json()) as {
+      data: {
+        id: string;
+        name: string;
+        username: string;
+      };
+    };
+
+    if (!data.data) {
+      console.error('[OAuth] Twitter profile response missing data');
+      throw new Error('Invalid Twitter profile response');
+    }
+
+    // Twitter API v2 doesn't return email without elevated access
+    // We'll use a placeholder email that can be updated later
+    // Format: username@twitter.user (clearly indicates it's a placeholder)
+    const placeholderEmail = `${data.data.username}@twitter.user`;
+
+    // Normalize to our standard profile format
+    return {
+      id: data.data.id,
+      email: placeholderEmail,
+      name: data.data.name || data.data.username,
+      // Twitter API v2 doesn't include profile_image_url by default
+      // Would need to add 'profile_image_url' to user.fields query param
+    };
+  } catch (error) {
+    console.error('[OAuth] Twitter profile fetch error:', error);
+    throw new Error('Failed to fetch Twitter profile');
+  }
+}
+
+// ============================================================================
 // Utility Functions
 // ============================================================================
 
@@ -501,4 +774,325 @@ export function isGoogleConfigured(): boolean {
  */
 export function isGithubConfigured(): boolean {
   return Boolean(GITHUB_CLIENT_ID && GITHUB_CLIENT_SECRET);
+}
+
+/**
+ * Check if Twitter OAuth is configured.
+ * Useful for conditionally showing/hiding the Twitter login button.
+ */
+export function isTwitterConfigured(): boolean {
+  return Boolean(TWITTER_CLIENT_ID && TWITTER_CLIENT_SECRET);
+}
+
+// ============================================================================
+// Apple Sign In OAuth
+// ============================================================================
+
+/**
+ * Apple Sign In OAuth endpoints and configuration.
+ *
+ * What's different about Apple Sign In?
+ * 1. Apple uses `response_mode: form_post` - the callback data comes as a POST
+ *    request with form data, not GET query parameters like other providers.
+ * 2. Apple requires a client_secret that is a JWT signed with your private key.
+ *    This JWT must be regenerated periodically (max 6 months validity).
+ * 3. Apple returns user info (name, email) in an `id_token` JWT, not via a
+ *    separate API call like Google/GitHub.
+ * 4. The user's name is ONLY sent on the FIRST authorization - you must capture
+ *    it immediately or it's lost forever.
+ *
+ * Environment variables needed:
+ * - APPLE_CLIENT_ID: Your Services ID (e.g., com.yourapp.auth)
+ * - APPLE_TEAM_ID: Your Apple Developer Team ID (10 characters)
+ * - APPLE_KEY_ID: Key ID for your Sign In with Apple key
+ * - APPLE_PRIVATE_KEY: Contents of the .p8 private key file
+ */
+const APPLE_AUTH_URL = 'https://appleid.apple.com/auth/authorize';
+const APPLE_TOKEN_URL = 'https://appleid.apple.com/auth/token';
+
+// Apple OAuth credentials from environment variables
+const APPLE_CLIENT_ID = Bun.env.APPLE_CLIENT_ID;
+const APPLE_TEAM_ID = Bun.env.APPLE_TEAM_ID;
+const APPLE_KEY_ID = Bun.env.APPLE_KEY_ID;
+const APPLE_PRIVATE_KEY = Bun.env.APPLE_PRIVATE_KEY;
+
+/**
+ * The decoded payload from an Apple ID token.
+ * Apple returns user info as a JWT (id_token) rather than via an API endpoint.
+ */
+export interface AppleIdTokenPayload {
+  iss: string; // Issuer: "https://appleid.apple.com"
+  sub: string; // Subject: The unique Apple user ID (use this as provider ID)
+  aud: string; // Audience: Your client ID
+  iat: number; // Issued at timestamp
+  exp: number; // Expiration timestamp
+  email?: string; // User's email (if they shared it)
+  email_verified?: string | boolean; // "true" or true if email is verified
+  is_private_email?: string | boolean; // "true" if using Apple's relay email
+  auth_time: number; // When the user authenticated
+  nonce_supported: boolean;
+}
+
+/**
+ * Check if Apple Sign In is configured.
+ * Requires all four environment variables to be set.
+ */
+export function isAppleConfigured(): boolean {
+  return Boolean(APPLE_CLIENT_ID && APPLE_TEAM_ID && APPLE_KEY_ID && APPLE_PRIVATE_KEY);
+}
+
+/**
+ * Generate the Apple client_secret JWT.
+ *
+ * What is this?
+ * Unlike other OAuth providers that use a simple client_secret string, Apple
+ * requires a JWT (JSON Web Token) signed with your private key. This proves
+ * you own the private key that corresponds to the public key Apple has.
+ *
+ * The JWT contains:
+ * - iss: Your Team ID
+ * - iat: When the token was created
+ * - exp: When the token expires (max 6 months)
+ * - aud: "https://appleid.apple.com" (who this token is for)
+ * - sub: Your Client ID (Services ID)
+ *
+ * @returns A JWT string to use as the client_secret
+ */
+export async function generateAppleClientSecret(): Promise<string> {
+  if (!APPLE_CLIENT_ID || !APPLE_TEAM_ID || !APPLE_KEY_ID || !APPLE_PRIVATE_KEY) {
+    throw new Error('Apple Sign In is not configured');
+  }
+
+  const now = Math.floor(Date.now() / 1000);
+  const expiry = now + 60 * 60 * 24 * 180; // 180 days (max allowed by Apple)
+
+  // JWT Header
+  const header = {
+    alg: 'ES256', // Apple requires ES256 (ECDSA with P-256 and SHA-256)
+    kid: APPLE_KEY_ID, // Key ID from Apple Developer
+    typ: 'JWT',
+  };
+
+  // JWT Payload
+  const payload = {
+    iss: APPLE_TEAM_ID, // Team ID
+    iat: now, // Issued at
+    exp: expiry, // Expiration
+    aud: 'https://appleid.apple.com', // Audience
+    sub: APPLE_CLIENT_ID, // Subject (your Services ID)
+  };
+
+  // Encode header and payload
+  const encodedHeader = base64UrlEncodeJson(header);
+  const encodedPayload = base64UrlEncodeJson(payload);
+  const signingInput = `${encodedHeader}.${encodedPayload}`;
+
+  // Import the private key and sign
+  // Apple's private key is in PKCS#8 PEM format
+  const privateKeyPem = APPLE_PRIVATE_KEY.replace(/\\n/g, '\n');
+
+  const privateKey = await crypto.subtle.importKey(
+    'pkcs8',
+    pemToArrayBuffer(privateKeyPem),
+    { name: 'ECDSA', namedCurve: 'P-256' },
+    false,
+    ['sign']
+  );
+
+  // Sign the JWT
+  const signature = await crypto.subtle.sign(
+    { name: 'ECDSA', hash: 'SHA-256' },
+    privateKey,
+    new TextEncoder().encode(signingInput)
+  );
+
+  // Convert signature from DER format to raw format that JWT expects
+  const signatureBytes = new Uint8Array(signature);
+  const encodedSignature = base64UrlEncode(signatureBytes);
+
+  return `${signingInput}.${encodedSignature}`;
+}
+
+/**
+ * Build the URL to redirect users to for Apple Sign In.
+ *
+ * @param state - CSRF protection token (from generateState())
+ * @returns The full Apple authorization URL
+ */
+export function getAppleAuthUrl(state: string): string {
+  if (!APPLE_CLIENT_ID) {
+    throw new Error('Apple Sign In is not configured');
+  }
+
+  const params = new URLSearchParams({
+    client_id: APPLE_CLIENT_ID,
+    redirect_uri: `${API_BASE_URL}/api/auth/apple/callback`,
+    response_type: 'code id_token', // We want both the code and the id_token
+    response_mode: 'form_post', // Apple sends data as POST form data
+    scope: 'name email', // Request name and email
+    state, // Our CSRF protection token
+  });
+
+  return `${APPLE_AUTH_URL}?${params.toString()}`;
+}
+
+/**
+ * Exchange an Apple authorization code for tokens.
+ *
+ * Apple returns both an access_token and an id_token. The id_token contains
+ * the user's info (email, etc.) and is what we actually need.
+ *
+ * @param code - The authorization code from the callback
+ * @returns Both the access token and id token
+ */
+export async function exchangeAppleCode(code: string): Promise<{ accessToken: string; idToken: string }> {
+  if (!APPLE_CLIENT_ID) {
+    throw new Error('Apple Sign In is not configured');
+  }
+
+  try {
+    // Generate the client secret JWT
+    const clientSecret = await generateAppleClientSecret();
+
+    const response = await fetch(APPLE_TOKEN_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        client_id: APPLE_CLIENT_ID,
+        client_secret: clientSecret,
+        code,
+        grant_type: 'authorization_code',
+        redirect_uri: `${API_BASE_URL}/api/auth/apple/callback`,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[OAuth] Apple token exchange failed:', errorText);
+      throw new Error('Failed to exchange Apple authorization code');
+    }
+
+    const data = (await response.json()) as {
+      access_token?: string;
+      id_token?: string;
+      error?: string;
+    };
+
+    if (data.error || !data.access_token || !data.id_token) {
+      console.error('[OAuth] Apple token error:', data.error);
+      throw new Error('Failed to obtain Apple tokens');
+    }
+
+    return {
+      accessToken: data.access_token,
+      idToken: data.id_token,
+    };
+  } catch (error) {
+    console.error('[OAuth] Apple code exchange error:', error);
+    throw new Error('Failed to authenticate with Apple');
+  }
+}
+
+/**
+ * Decode an Apple ID token to extract user information.
+ *
+ * What is an ID token?
+ * It's a JWT (JSON Web Token) that contains claims about the user's identity.
+ * Apple signs this token with their private key, so we can verify it's authentic.
+ *
+ * Note: For production, you should verify the token signature using Apple's
+ * public keys (available at https://appleid.apple.com/auth/keys). For now,
+ * we just decode it since it came directly from Apple's token endpoint.
+ *
+ * @param idToken - The JWT id_token from Apple
+ * @returns The decoded payload with user info
+ */
+export function decodeAppleIdToken(idToken: string): AppleIdTokenPayload {
+  try {
+    // JWT format: header.payload.signature
+    const parts = idToken.split('.');
+    if (parts.length !== 3) {
+      throw new Error('Invalid ID token format');
+    }
+
+    // Decode the payload (second part)
+    const payloadBase64 = parts[1];
+    const payloadJson = base64UrlDecode(payloadBase64);
+    const payload = JSON.parse(payloadJson) as AppleIdTokenPayload;
+
+    // Verify basic claims
+    if (payload.iss !== 'https://appleid.apple.com') {
+      throw new Error('Invalid token issuer');
+    }
+
+    if (payload.aud !== APPLE_CLIENT_ID) {
+      throw new Error('Invalid token audience');
+    }
+
+    // Check expiration
+    const now = Math.floor(Date.now() / 1000);
+    if (payload.exp < now) {
+      throw new Error('Token has expired');
+    }
+
+    return payload;
+  } catch (error) {
+    console.error('[OAuth] Failed to decode Apple ID token:', error);
+    throw new Error('Invalid Apple ID token');
+  }
+}
+
+// ============================================================================
+// Helper Functions for Apple Sign In
+// ============================================================================
+
+/**
+ * Encode a JSON object to base64url format (for JWT).
+ */
+function base64UrlEncodeJson(obj: Record<string, unknown>): string {
+  const json = JSON.stringify(obj);
+  const bytes = new TextEncoder().encode(json);
+  return base64UrlEncode(bytes);
+}
+
+/**
+ * Decode a base64url string to a regular string.
+ */
+function base64UrlDecode(str: string): string {
+  // Add padding if needed
+  let base64 = str.replace(/-/g, '+').replace(/_/g, '/');
+  const pad = base64.length % 4;
+  if (pad) {
+    base64 += '='.repeat(4 - pad);
+  }
+
+  // Decode base64
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return new TextDecoder().decode(bytes);
+}
+
+/**
+ * Convert a PEM-encoded private key to an ArrayBuffer.
+ * Apple's private key comes in PKCS#8 PEM format.
+ */
+function pemToArrayBuffer(pem: string): ArrayBuffer {
+  // Remove PEM header/footer and whitespace
+  const base64 = pem
+    .replace(/-----BEGIN PRIVATE KEY-----/g, '')
+    .replace(/-----END PRIVATE KEY-----/g, '')
+    .replace(/\s/g, '');
+
+  // Decode base64
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes.buffer;
 }

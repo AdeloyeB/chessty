@@ -18,7 +18,7 @@ export function exportGamesToCSV(games: HistoryGame[], filename: string = 'game_
     { header: 'Result Detail', accessor: 'resultDetail' },
     { header: 'Game Mode', accessor: 'gameMode' },
     { header: 'Time Control', accessor: 'timeControl' },
-    { header: 'Stake (USDC)', accessor: 'stake' },
+    { header: 'Wager (USDC)', accessor: 'wager' },
     { header: 'Profit/Loss (USDC)', accessor: 'profit' },
     { header: 'ELO Change', accessor: 'eloChange' },
     { header: 'Opening', accessor: 'opening' },
@@ -29,8 +29,8 @@ export function exportGamesToCSV(games: HistoryGame[], filename: string = 'game_
 
   const rows: GameExportRow[] = games.map(game => {
     let profit = 0;
-    if (game.result === 'win') profit = game.stakeAmount;
-    else if (game.result === 'loss') profit = -game.stakeAmount;
+    if (game.result === 'win') profit = game.wagerAmount;
+    else if (game.result === 'loss') profit = -game.wagerAmount;
 
     return {
       date: formatDateForCSV(game.endedAt),
@@ -41,7 +41,7 @@ export function exportGamesToCSV(games: HistoryGame[], filename: string = 'game_
       resultDetail: formatResultDetail(game.resultDetail),
       gameMode: game.gameMode === 'chess960' ? 'Chess960' : 'Standard',
       timeControl: game.timeControlLabel,
-      stake: parseFloat(formatAmount(game.stakeAmount)),
+      wager: parseFloat(formatAmount(game.wagerAmount)),
       profit: parseFloat(formatAmount(profit)),
       eloChange: game.eloChange,
       opening: game.opening || 'Unknown',
@@ -114,7 +114,7 @@ function formatTransactionType(type: string): string {
     bet_won: 'Bet Won',
     bet_lost: 'Bet Lost',
     bet_refunded: 'Bet Refunded',
-    game_stake: 'Game Stake',
+    game_wager: 'Game Wager',
     game_win: 'Game Win',
     bonus: 'Bonus',
   };

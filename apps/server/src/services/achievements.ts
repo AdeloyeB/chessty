@@ -17,7 +17,7 @@ export interface UserProfileData {
   longestStreak: number;
   totalCheckmates: number;
   quickestWin: number | null;
-  biggestStakeWin: number;
+  biggestWagerWin: number;
 }
 
 // Get user's unlocked achievements
@@ -49,7 +49,7 @@ const DEFAULT_PROFILE: UserProfileData = {
   longestStreak: 0,
   totalCheckmates: 0,
   quickestWin: null,
-  biggestStakeWin: 0,
+  biggestWagerWin: 0,
 };
 
 // Get or create user profile
@@ -68,7 +68,7 @@ export async function getUserProfile(userId: string): Promise<UserProfileData> {
         longestStreak: existing[0].longestStreak,
         totalCheckmates: existing[0].totalCheckmates,
         quickestWin: existing[0].quickestWin,
-        biggestStakeWin: parseFloat(existing[0].biggestStakeWin || '0'),
+        biggestWagerWin: parseFloat(existing[0].biggestWagerWin || '0'),
       };
     }
 
@@ -79,7 +79,7 @@ export async function getUserProfile(userId: string): Promise<UserProfileData> {
       currentStreak: 0,
       longestStreak: 0,
       totalCheckmates: 0,
-      biggestStakeWin: '0',
+      biggestWagerWin: '0',
     });
 
     return DEFAULT_PROFILE;
@@ -156,7 +156,7 @@ export async function checkGameAchievements(
   isWin: boolean,
   isCheckmate: boolean,
   moveCount: number,
-  stakeAmount: number
+  wagerAmount: number
 ): Promise<UnlockedAchievement[]> {
   const unlocked: UnlockedAchievement[] = [];
 
@@ -230,8 +230,8 @@ export async function checkGameAchievements(
       if (result) unlocked.push(result);
     }
 
-    // Check high roller (win with 100+ stake)
-    if (stakeAmount >= 100) {
+    // Check high roller (win with 100+ wager)
+    if (wagerAmount >= 100) {
       const result = await unlockAchievement(userId, 'high_roller');
       if (result) unlocked.push(result);
     }
@@ -253,9 +253,9 @@ export async function checkGameAchievements(
     }
   }
 
-  // Check first stake achievement
-  if (stakeAmount > 0) {
-    const result = await unlockAchievement(userId, 'first_stake');
+  // Check first wager achievement
+  if (wagerAmount > 0) {
+    const result = await unlockAchievement(userId, 'first_wager');
     if (result) unlocked.push(result);
   }
 
@@ -295,7 +295,7 @@ export async function updateProfileStats(
   isWin: boolean,
   isCheckmate: boolean,
   moveCount: number,
-  stakeAmount: number
+  wagerAmount: number
 ): Promise<void> {
   try {
     // Get or create profile
@@ -312,7 +312,7 @@ export async function updateProfileStats(
             ? sql`${userProfiles.totalCheckmates} + 1`
             : userProfiles.totalCheckmates,
           quickestWin: sql`CASE WHEN ${userProfiles.quickestWin} IS NULL OR ${moveCount} < ${userProfiles.quickestWin} THEN ${moveCount} ELSE ${userProfiles.quickestWin} END`,
-          biggestStakeWin: sql`GREATEST(${userProfiles.biggestStakeWin}, ${stakeAmount})`,
+          biggestWagerWin: sql`GREATEST(${userProfiles.biggestWagerWin}, ${wagerAmount})`,
           updatedAt: new Date(),
         })
         .where(eq(userProfiles.userId, userId));

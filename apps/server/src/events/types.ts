@@ -37,7 +37,7 @@ export interface GameEventMap {
     whiteEloAtStart: number;
     blackEloAtStart: number;
     moveCount: number;
-    stakeAmount: number;
+    wagerAmount: number;
     eloChanges: {
       whiteChange: number;
       blackChange: number;

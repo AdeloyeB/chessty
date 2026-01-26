@@ -64,8 +64,8 @@ export function MyChallengePanel({
             <p className="text-pure-white font-mono text-sm">{timeLabel}</p>
           </div>
           <div className="p-3 bg-pure-black border border-mid/30">
-            <p className="text-xs font-mono text-mid-light">stake</p>
-            <USDCAmount amount={challenge.stakeAmount} size="sm" />
+            <p className="text-xs font-mono text-mid-light">wager</p>
+            <USDCAmount amount={challenge.wagerAmount} size="sm" />
           </div>
         </div>
 
@@ -115,8 +115,8 @@ export function MyChallengePanel({
             <p className="text-pure-white font-mono text-sm">{timeLabel}</p>
           </div>
           <div className="p-3 bg-pure-black border border-mid/30">
-            <p className="text-xs font-mono text-mid-light">stake</p>
-            <USDCAmount amount={challenge.stakeAmount} size="sm" />
+            <p className="text-xs font-mono text-mid-light">wager</p>
+            <USDCAmount amount={challenge.wagerAmount} size="sm" />
           </div>
         </div>
 

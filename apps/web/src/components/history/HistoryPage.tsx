@@ -219,7 +219,7 @@ function TransactionRow({ transaction }: { transaction: any }) {
 
   const typeColors: Record<string, string> = {
     game_win: 'text-white',
-    game_stake: 'text-white/50',
+    game_wager: 'text-white/50',
     deposit: 'text-white',
     withdrawal: 'text-white/50',
     bet_won: 'text-white',
@@ -229,7 +229,7 @@ function TransactionRow({ transaction }: { transaction: any }) {
 
   const typeLabels: Record<string, string> = {
     game_win: 'game win',
-    game_stake: 'game stake',
+    game_wager: 'game wager',
     deposit: 'deposit',
     withdrawal: 'withdrawal',
     bet_won: 'bet won',

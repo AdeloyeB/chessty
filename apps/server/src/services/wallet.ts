@@ -43,7 +43,7 @@ export async function updateBalance(
     .set({
       balance: newBalance.toString(),
       totalWagered:
-        type === 'bet_placed' || type === 'game_stake'
+        type === 'bet_placed' || type === 'game_wager'
           ? (parseFloat(user.totalWagered) + Math.abs(amount)).toString()
           : user.totalWagered,
       totalWon:
@@ -71,13 +71,13 @@ export async function updateBalance(
   return { newBalance, transaction };
 }
 
-export async function deductStake(userId: string, amount: number, gameId: string): Promise<number> {
+export async function deductWager(userId: string, amount: number, gameId: string): Promise<number> {
   const { newBalance } = await updateBalance(
     userId,
     -amount,
-    'game_stake',
+    'game_wager',
     gameId,
-    `Stake for game ${gameId}`
+    `Wager for game ${gameId}`
   );
   return newBalance;
 }
@@ -97,7 +97,7 @@ export async function awardWinnings(
   return newBalance;
 }
 
-export async function refundStake(
+export async function refundWager(
   userId: string,
   amount: number,
   referenceId: string
@@ -107,7 +107,7 @@ export async function refundStake(
     amount,
     'bet_refunded',
     referenceId,
-    `Stake refunded: ${referenceId}`
+    `Wager refunded: ${referenceId}`
   );
   return newBalance;
 }

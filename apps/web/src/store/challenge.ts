@@ -23,7 +23,7 @@ interface ChallengeState {
   // Challenge creation form state
   formGameMode: GameMode;
   formTimeControlKey: string;
-  formStakeAmount: number;
+  formWagerAmount: number;
   formMinElo: number | null;
   formMaxElo: number | null;
 
@@ -39,7 +39,7 @@ interface ChallengeState {
   // Form actions
   setFormGameMode: (mode: GameMode) => void;
   setFormTimeControlKey: (key: string) => void;
-  setFormStakeAmount: (amount: number) => void;
+  setFormWagerAmount: (amount: number) => void;
   setFormMinElo: (elo: number | null) => void;
   setFormMaxElo: (elo: number | null) => void;
 
@@ -64,7 +64,7 @@ const initialState = {
   myChallenge: null,
   formGameMode: 'standard' as GameMode,
   formTimeControlKey: 'blitz_5',
-  formStakeAmount: 25,
+  formWagerAmount: 25,
   formMinElo: null,
   formMaxElo: null,
   creatorConfirmed: false,
@@ -83,7 +83,7 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
   // Form actions
   setFormGameMode: (mode) => set({ formGameMode: mode }),
   setFormTimeControlKey: (key) => set({ formTimeControlKey: key }),
-  setFormStakeAmount: (amount) => set({ formStakeAmount: amount }),
+  setFormWagerAmount: (amount) => set({ formWagerAmount: amount }),
   setFormMinElo: (elo) => set({ formMinElo: elo }),
   setFormMaxElo: (elo) => set({ formMaxElo: elo }),
 

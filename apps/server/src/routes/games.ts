@@ -29,7 +29,7 @@ export async function handleGetActiveGames(req: Request): Promise<Response> {
           moveCount: (game.moves as unknown[]).length,
           whiteTimeRemaining: game.whiteTimeRemaining,
           blackTimeRemaining: game.blackTimeRemaining,
-          stakeAmount: parseFloat(game.stakeAmount),
+          wagerAmount: parseFloat(game.wagerAmount),
           totalPot: parseFloat(game.totalPot),
           startedAt: game.startedAt,
         };
@@ -78,7 +78,7 @@ export async function handleGetGame(req: Request, gameId: string): Promise<Respo
         moves: gameData.game.moves,
         whiteTimeRemaining: gameData.game.whiteTimeRemaining,
         blackTimeRemaining: gameData.game.blackTimeRemaining,
-        stakeAmount: parseFloat(gameData.game.stakeAmount),
+        wagerAmount: parseFloat(gameData.game.wagerAmount),
         totalPot: parseFloat(gameData.game.totalPot),
         whiteEloAtStart: gameData.game.whiteEloAtStart,
         blackEloAtStart: gameData.game.blackEloAtStart,
@@ -127,7 +127,7 @@ export async function handleGetUserGameHistory(req: Request): Promise<Response> 
         status: game.status,
         result: game.result,
         pgn: game.pgn,
-        stakeAmount: parseFloat(game.stakeAmount),
+        wagerAmount: parseFloat(game.wagerAmount),
         totalPot: parseFloat(game.totalPot),
         eloChange: game.eloChange,
         endedAt: game.endedAt,
@@ -189,7 +189,7 @@ export async function handleGetUserActiveGame(req: Request): Promise<Response> {
         moves: game.moves,
         whiteTimeRemaining: game.whiteTimeRemaining,
         blackTimeRemaining: game.blackTimeRemaining,
-        stakeAmount: parseFloat(game.stakeAmount),
+        wagerAmount: parseFloat(game.wagerAmount),
         totalPot: parseFloat(game.totalPot),
         startedAt: game.startedAt,
       },
@@ -232,8 +232,8 @@ export async function handleGetUserGameHistoryFiltered(req: Request): Promise<Re
       result: (url.searchParams.get('result') as 'all' | 'win' | 'loss' | 'draw') || 'all',
       timeControl: (url.searchParams.get('timeControl') as 'all' | 'bullet' | 'blitz' | 'rapid' | 'classical') || 'all',
       gameMode: (url.searchParams.get('gameMode') as 'all' | 'standard' | 'chess960') || 'all',
-      minStake: url.searchParams.get('minStake') ? parseFloat(url.searchParams.get('minStake')!) : undefined,
-      maxStake: url.searchParams.get('maxStake') ? parseFloat(url.searchParams.get('maxStake')!) : undefined,
+      minWager: url.searchParams.get('minWager') ? parseFloat(url.searchParams.get('minWager')!) : undefined,
+      maxWager: url.searchParams.get('maxWager') ? parseFloat(url.searchParams.get('maxWager')!) : undefined,
     };
 
     const { games, total } = await gameService.getUserGameHistoryFiltered(

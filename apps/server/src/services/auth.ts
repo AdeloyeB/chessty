@@ -273,7 +273,7 @@ export async function getUserByEmail(email: string): Promise<User | null> {
 }
 
 export async function findOrCreateOAuthUser(
-  provider: 'google' | 'github',
+  provider: 'google' | 'github' | 'twitter' | 'apple',
   providerId: string,
   email: string,
   username: string,
@@ -281,7 +281,16 @@ export async function findOrCreateOAuthUser(
 ): Promise<{ user: User; token: string }> {
   const ipAddress = context?.ipAddress || null;
   const userAgent = context?.userAgent || null;
-  const providerIdColumn = provider === 'google' ? users.googleId : users.githubId;
+
+  // Map provider to the correct database column
+  const providerIdColumn =
+    provider === 'google'
+      ? users.googleId
+      : provider === 'github'
+        ? users.githubId
+        : provider === 'twitter'
+          ? users.twitterId
+          : users.appleId;
 
   // Try to find by provider ID
   let user = await db.query.users.findFirst({
@@ -296,9 +305,17 @@ export async function findOrCreateOAuthUser(
 
     if (user) {
       // Link existing account to OAuth provider
+      const providerIdField =
+        provider === 'google'
+          ? 'googleId'
+          : provider === 'github'
+            ? 'githubId'
+            : provider === 'twitter'
+              ? 'twitterId'
+              : 'appleId';
       await db
         .update(users)
-        .set({ [provider === 'google' ? 'googleId' : 'githubId']: providerId })
+        .set({ [providerIdField]: providerId })
         .where(eq(users.id, user.id));
     } else {
       // Create new user
@@ -311,13 +328,21 @@ export async function findOrCreateOAuthUser(
         counter++;
       }
 
+      const providerIdField =
+        provider === 'google'
+          ? 'googleId'
+          : provider === 'github'
+            ? 'githubId'
+            : provider === 'twitter'
+              ? 'twitterId'
+              : 'appleId';
       const [newUser] = await db
         .insert(users)
         .values({
           id: nanoid(),
           email,
           username: uniqueUsername,
-          [provider === 'google' ? 'googleId' : 'githubId']: providerId,
+          [providerIdField]: providerId,
         })
         .returning();
 
@@ -333,8 +358,8 @@ export async function findOrCreateOAuthUser(
   return { user, token };
 }
 
-export function sanitizeUser(user: User): Omit<User, 'passwordHash' | 'googleId' | 'githubId'> {
-  const { passwordHash, googleId, githubId, ...sanitized } = user;
+export function sanitizeUser(user: User): Omit<User, 'passwordHash' | 'googleId' | 'githubId' | 'twitterId' | 'appleId'> {
+  const { passwordHash, googleId, githubId, twitterId, appleId, ...sanitized } = user;
   return sanitized;
 }
 

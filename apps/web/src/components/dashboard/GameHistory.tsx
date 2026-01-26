@@ -83,7 +83,7 @@ export function GameHistory() {
                   {game.eloChange > 0 ? '+' : ''}{game.eloChange}
                 </div>
                 <div className="text-xs font-mono text-mid-light flex items-center gap-1">
-                  <USDCAmount amount={game.stakeAmount} size="sm" /> position
+                  <USDCAmount amount={game.wagerAmount} size="sm" /> position
                 </div>
               </div>
             </div>

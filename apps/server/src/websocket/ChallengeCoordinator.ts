@@ -29,7 +29,7 @@ export class ChallengeCoordinator {
         userId,
         payload.gameMode,
         payload.timeControlKey,
-        payload.stakeAmount,
+        payload.wagerAmount,
         payload.minElo,
         payload.maxElo
       );
@@ -146,7 +146,7 @@ export class ChallengeCoordinator {
               },
               whiteTimeRemaining: game.whiteTimeRemaining,
               blackTimeRemaining: game.blackTimeRemaining,
-              stakeAmount: Number(game.stakeAmount),
+              wagerAmount: Number(game.wagerAmount),
               totalPot: Number(game.totalPot),
               whiteEloAtStart: game.whiteEloAtStart,
               blackEloAtStart: game.blackEloAtStart,

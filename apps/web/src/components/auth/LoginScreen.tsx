@@ -6,6 +6,8 @@ import { useApi } from '@/hooks/useApi';
 import { useAuthStore } from '@/store/auth';
 import { OAuthButton } from './OAuthButton';
 import { OAuthDivider } from './OAuthDivider';
+import { WalletButton } from './WalletButton';
+import { WalletHelpTooltip } from './WalletHelpTooltip';
 
 // Animated chess piece that floats across the screen
 function FloatingPiece({ piece, delay, duration, startX, startY }: {
@@ -290,14 +292,31 @@ export function LoginScreen() {
               <span className="text-5xl text-white/80">♔</span>
             </div>
             <p className="text-white/50 font-mono text-sm mt-4 lowercase">
-              play • stake • win
+              play • predict • win
             </p>
           </div>
 
           {/* OAuth Buttons */}
-          <div className="space-y-3 mb-6">
+          <div className="flex justify-center gap-3 mb-4">
             <OAuthButton provider="google" />
-            <OAuthButton provider="github" />
+            <OAuthButton provider="twitter" />
+          </div>
+
+          {/* Wallet Connection Section */}
+          <div className="mb-6">
+            <div className="flex items-center justify-center gap-2 mb-3">
+              <div className="h-px flex-1 bg-white/10" />
+              <span className="text-[10px] font-mono text-white/30 uppercase tracking-widest px-2 flex items-center gap-1.5">
+                or connect wallet
+                <WalletHelpTooltip />
+              </span>
+              <div className="h-px flex-1 bg-white/10" />
+            </div>
+            <div className="flex justify-center gap-3">
+              <WalletButton provider="phantom" />
+              <WalletButton provider="walletconnect" />
+              <WalletButton provider="coinbase" />
+            </div>
           </div>
 
           <OAuthDivider />
@@ -411,7 +430,7 @@ export function LoginScreen() {
           {/* Footer */}
           <div className="mt-6 pt-6 border-t border-white/15">
             <p className="text-white/30 text-xs font-mono text-center lowercase">
-              connect your wallet to start playing
+              predict • play chess • win rewards
             </p>
           </div>
 
@@ -454,7 +473,7 @@ export function LoginScreen() {
         {/* Decorative text */}
         <div className="absolute bottom-8 right-8 text-right">
           <p className="text-xs font-mono text-white/20 mb-1">v1.0.0</p>
-          <p className="text-xs font-mono text-white/10 lowercase">play_chess_stake_usdc</p>
+          <p className="text-xs font-mono text-white/10 lowercase">play_chess_predict_win</p>
         </div>
       </div>
     </div>

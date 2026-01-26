@@ -163,10 +163,10 @@ export function useApi() {
   }
 
   // Matchmaking methods
-  async function joinMatchmaking(stakeAmount: number, timeControl: { initial: number; increment: number }) {
+  async function joinMatchmaking(wagerAmount: number, timeControl: { initial: number; increment: number }) {
     return fetchApi<any>('/api/matchmaking/join', {
       method: 'POST',
-      body: JSON.stringify({ stakeAmount, timeControl }),
+      body: JSON.stringify({ wagerAmount, timeControl }),
     });
   }
 
@@ -254,11 +254,11 @@ export function useApi() {
     if (filters.gameMode !== 'all') {
       params.set('gameMode', filters.gameMode);
     }
-    if (filters.minStake !== undefined) {
-      params.set('minStake', String(filters.minStake));
+    if (filters.minWager !== undefined) {
+      params.set('minWager', String(filters.minWager));
     }
-    if (filters.maxStake !== undefined) {
-      params.set('maxStake', String(filters.maxStake));
+    if (filters.maxWager !== undefined) {
+      params.set('maxWager', String(filters.maxWager));
     }
 
     return fetchApi<PaginatedResponse<HistoryGame>>(`/api/games/history/filtered?${params.toString()}`);

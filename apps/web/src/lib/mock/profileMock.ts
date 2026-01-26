@@ -59,7 +59,7 @@ export function generateMockProfileData(userId?: string): UserProfileData {
     longestStreak: (hash % 15) + 5,
     totalCheckmates: Math.floor(Math.random() * 150) + 20,
     quickestWin: Math.floor(Math.random() * 15) + 12, // 12-27 moves
-    biggestStakeWin: [50, 100, 200, 500, 1000][hash % 5],
+    biggestWagerWin: [50, 100, 200, 500, 1000][hash % 5],
   };
 }
 

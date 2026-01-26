@@ -33,7 +33,7 @@ interface ActiveGame {
   moveCount: number;
   whiteTimeRemaining: number;
   blackTimeRemaining: number;
-  stakeAmount: number;
+  wagerAmount: number;
   totalPot: number;
   startedAt: string | null;
 }

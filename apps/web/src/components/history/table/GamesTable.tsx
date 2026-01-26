@@ -10,7 +10,7 @@ interface GamesTableProps {
   onGameClick: (game: HistoryGame) => void;
 }
 
-type SortField = 'date' | 'opponent' | 'result' | 'stake' | 'elo';
+type SortField = 'date' | 'opponent' | 'result' | 'wager' | 'elo';
 type SortDirection = 'asc' | 'desc';
 
 export function GamesTable({ games, isLoading, onGameClick }: GamesTableProps) {
@@ -36,8 +36,8 @@ export function GamesTable({ games, isLoading, onGameClick }: GamesTableProps) {
       case 'result':
         const resultOrder = { win: 0, draw: 1, loss: 2 };
         return dir * (resultOrder[a.result] - resultOrder[b.result]);
-      case 'stake':
-        return dir * (a.stakeAmount - b.stakeAmount);
+      case 'wager':
+        return dir * (a.wagerAmount - b.wagerAmount);
       case 'elo':
         return dir * (a.eloChange - b.eloChange);
       default:
@@ -104,12 +104,12 @@ export function GamesTable({ games, isLoading, onGameClick }: GamesTableProps) {
         <div className="col-span-1">time</div>
         <SortableHeader
           className="col-span-2"
-          field="stake"
+          field="wager"
           currentField={sortField}
           direction={sortDir}
           onSort={handleSort}
         >
-          stake
+          wager
         </SortableHeader>
         <SortableHeader
           className="col-span-1"
@@ -177,15 +177,15 @@ export function GamesTable({ games, isLoading, onGameClick }: GamesTableProps) {
               )}
             </div>
 
-            {/* Stake */}
+            {/* Wager */}
             <div className="col-span-2 flex flex-col justify-center">
-              <USDCAmount amount={game.stakeAmount} size="sm" />
+              <USDCAmount amount={game.wagerAmount} size="sm" />
               <p className={`text-xs font-mono ${
                 game.result === 'win' ? 'text-green-400' :
                 game.result === 'loss' ? 'text-red-400' : 'text-white/50'
               }`}>
                 {game.result === 'win' ? '+' : game.result === 'loss' ? '-' : ''}
-                ${game.result === 'draw' ? '0' : game.stakeAmount.toFixed(2)}
+                ${game.result === 'draw' ? '0' : game.wagerAmount.toFixed(2)}
               </p>
             </div>
 

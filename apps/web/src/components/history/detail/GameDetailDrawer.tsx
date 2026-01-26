@@ -170,14 +170,14 @@ function ResultBanner({ game }: { game: HistoryGame }) {
         <div className="text-right">
           <div className="flex items-center gap-4">
             <div>
-              <p className="text-xs font-mono opacity-60">stake</p>
-              <USDCAmount amount={game.stakeAmount} size="sm" />
+              <p className="text-xs font-mono opacity-60">wager</p>
+              <USDCAmount amount={game.wagerAmount} size="sm" />
             </div>
             <div>
               <p className="text-xs font-mono opacity-60">profit</p>
               <p className="font-mono text-sm">
                 {game.result === 'win' ? '+' : game.result === 'loss' ? '-' : ''}
-                ${game.result === 'draw' ? '0' : game.stakeAmount.toFixed(2)}
+                ${game.result === 'draw' ? '0' : game.wagerAmount.toFixed(2)}
               </p>
             </div>
             <div>

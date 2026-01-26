@@ -11,7 +11,7 @@ export const ELO_SEARCH_EXPANSION_RATE = 50; // points per 10 seconds
 export const ELO_SEARCH_EXPANSION_INTERVAL = 10000; // milliseconds
 
 // Matchmaking constants
-export const STAKE_TOLERANCE_PERCENT = 0.2; // 20% tolerance
+export const WAGER_TOLERANCE_PERCENT = 0.2; // 20% tolerance
 
 // Betting constants
 export const HOUSE_EDGE_SPECTATOR = 0.05; // 5%
@@ -45,12 +45,12 @@ export const CHALLENGE_TIME_CONTROLS = {
 
 export type ChallengeTimeControlKey = keyof typeof CHALLENGE_TIME_CONTROLS;
 
-// Stake presets
-export const STAKE_PRESETS = [10, 25, 50, 100, 250, 500, 1000];
+// Wager presets
+export const WAGER_PRESETS = [10, 25, 50, 100, 250, 500, 1000];
 
-// Minimum and maximum stakes
-export const MIN_STAKE = 10;
-export const MAX_STAKE = 10000;
+// Minimum and maximum wagers
+export const MIN_WAGER = 10;
+export const MAX_WAGER = 10000;
 export const MIN_BET = 5;
 export const MAX_BET = 5000;
 

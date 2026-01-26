@@ -382,7 +382,7 @@ export function ProfilePage() {
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-sm font-mono text-white/50 lowercase">biggest_win</span>
-                    <span className="text-sm font-mono text-white">${profile.biggestStakeWin}</span>
+                    <span className="text-sm font-mono text-white">${profile.biggestWagerWin}</span>
                   </div>
                 </div>
 
