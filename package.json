@@ -2,7 +2,10 @@
   "name": "the-chess-game",
   "version": "1.0.0",
   "private": true,
-  "workspaces": ["apps/*", "packages/*"],
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "packageManager": "pnpm@9.0.0",
   "scripts": {
     "dev": "turbo dev",
@@ -15,9 +18,13 @@
     "build:desktop": "turbo build --filter=@chess-game/desktop",
     "db:generate": "pnpm --filter=@chess-game/server db:generate",
     "db:migrate": "pnpm --filter=@chess-game/server db:migrate",
-    "db:studio": "pnpm --filter=@chess-game/server db:studio"
+    "db:studio": "pnpm --filter=@chess-game/server db:studio",
+    "test": "pnpm --filter=@chess-game/server test",
+    "test:coverage": "pnpm --filter=@chess-game/server test --coverage",
+    "prepare": "husky"
   },
   "devDependencies": {
+    "husky": "^9.1.7",
     "turbo": "^2.0.0",
     "typescript": "^5.4.0"
   }

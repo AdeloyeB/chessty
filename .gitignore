@@ -44,3 +44,6 @@ log/
 
 # Claude local settings
 .claude/settings.local.json
+
+# GitHub Actions (using local Husky hooks instead)
+.github/

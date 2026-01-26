@@ -1,0 +1,18 @@
+#!/bin/sh
+
+# Run server tests before committing
+# Fails the commit if any tests fail
+
+echo "Running tests before commit..."
+
+cd apps/server
+bun test
+
+if [ $? -ne 0 ]; then
+  echo ""
+  echo "Tests failed. Commit aborted."
+  echo "Fix the failing tests and try again."
+  exit 1
+fi
+
+echo "All tests passed!"
