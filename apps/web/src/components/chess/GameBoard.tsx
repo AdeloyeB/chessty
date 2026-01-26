@@ -45,7 +45,8 @@ export function GameBoard() {
   const boardOrientation = playerColor === 'black' ? 'black' : 'white';
 
   // Get initial time from game time control (default to 3 minutes)
-  const initialTime = game?.timeControl?.initial || 180;
+  // Use ?? instead of || to preserve 0 for unlimited time controls
+  const initialTime = game?.timeControl?.initial ?? 180;
 
   return (
     <div className="max-w-6xl mx-auto">

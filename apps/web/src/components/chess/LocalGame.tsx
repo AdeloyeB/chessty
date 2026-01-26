@@ -96,13 +96,14 @@ export function LocalGame() {
   const scoreDiff = whiteScore - blackScore;
 
   // Elapsed time counter - stops when game ends
+  // Include isGameOver in guard to prevent timer restart during position review
   useEffect(() => {
-    if (!gameStarted || gameResult) return;
+    if (!gameStarted || gameResult || isGameOver) return;
     const interval = setInterval(() => {
       setElapsedTime(Math.floor((Date.now() - sessionStart.getTime()) / 1000));
     }, 1000);
     return () => clearInterval(interval);
-  }, [sessionStart, gameStarted, gameResult]);
+  }, [sessionStart, gameStarted, gameResult, isGameOver]);
 
   // Chess clock countdown
   useEffect(() => {

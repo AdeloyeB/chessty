@@ -166,7 +166,7 @@ export function ChallengeTable({
                 </div>
               </div>
 
-              {/* Stake */}
+              {/* Wager */}
               <div className="col-span-2 flex flex-col justify-center">
                 <USDCAmount amount={challenge.wagerAmount} size="sm" />
                 <div className="flex items-center gap-2 mt-1">

@@ -15,7 +15,7 @@
  * ─────────────────────────────────────────────────
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type KeyboardEvent } from 'react';
 import type { AchievementCategory } from '@chess-game/shared';
 
 interface AchievementToastProps {
@@ -27,13 +27,14 @@ interface AchievementToastProps {
   onDismiss: (id: string) => void;
 }
 
-// Category colors for different achievement types
+// Category colors using standardized palette (mid, mid-light, light, pure-white)
+// Instead of non-existent Tailwind colors like blue-400, purple-400, etc.
 const categoryColors: Record<AchievementCategory, string> = {
-  games: 'border-blue-400/50 shadow-blue-400/20',
-  elo: 'border-purple-400/50 shadow-purple-400/20',
-  streaks: 'border-orange-400/50 shadow-orange-400/20',
-  special_moves: 'border-green-400/50 shadow-green-400/20',
-  milestones: 'border-yellow-400/50 shadow-yellow-400/20',
+  games: 'border-mid/50 shadow-mid/20',
+  elo: 'border-mid-light/50 shadow-mid-light/20',
+  streaks: 'border-light/50 shadow-light/20',
+  special_moves: 'border-mid-light/60 shadow-mid-light/25',
+  milestones: 'border-pure-white/50 shadow-pure-white/20',
 };
 
 export function AchievementToast({
@@ -59,19 +60,31 @@ export function AchievementToast({
     setTimeout(() => onDismiss(id), 200);
   };
 
+  // Keyboard accessibility - allow Enter/Space to dismiss
+  const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      handleDismiss();
+    }
+  };
+
   const colorClasses = categoryColors[category];
 
   return (
     <div
       role="alert"
       aria-live="polite"
+      tabIndex={0}
+      aria-label="Dismiss achievement notification"
       onClick={handleDismiss}
+      onKeyDown={handleKeyDown}
       className={`
         relative overflow-hidden
         bg-off-black border ${colorClasses}
-        shadow-lg shadow-${category === 'milestones' ? 'yellow' : 'blue'}-400/10
+        shadow-lg
         cursor-pointer
         transition-all duration-200 ease-out
+        focus:outline-none focus:ring-1 focus:ring-white/50
         ${isVisible && !isLeaving
           ? 'opacity-100 translate-x-0'
           : 'opacity-0 translate-x-4'

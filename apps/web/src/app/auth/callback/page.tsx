@@ -31,7 +31,12 @@ function AuthCallbackContent() {
       // Handle error
       if (error) {
         setState('error');
-        setErrorMessage(decodeURIComponent(error));
+        // Wrap decodeURIComponent in try-catch to handle malformed URIs
+        try {
+          setErrorMessage(decodeURIComponent(error));
+        } catch {
+          setErrorMessage(error); // Fallback to raw error string
+        }
         return;
       }
 
