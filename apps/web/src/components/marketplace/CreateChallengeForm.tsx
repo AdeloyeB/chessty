@@ -20,6 +20,8 @@ interface CreateChallengeFormProps {
   userElo: number;
   userStats: UserStats;
   isConnected: boolean;
+  isWebSocketConnected: boolean;
+  isCreating: boolean;
   onSubmit: () => void;
   onOpenWallet: () => void;
 }
@@ -39,6 +41,8 @@ export function CreateChallengeForm({
   userElo,
   userStats,
   isConnected,
+  isWebSocketConnected,
+  isCreating,
   onSubmit,
   onOpenWallet,
 }: CreateChallengeFormProps) {
@@ -60,6 +64,7 @@ export function CreateChallengeForm({
 
   const wagerAmount = customWager ? parseInt(customWager) || 0 : formWagerAmount;
   const canAfford = isConnected && userBalance >= wagerAmount && wagerAmount > 0;
+  const canSubmit = canAfford && isWebSocketConnected && !isCreating;
   const winRate = userStats.gamesPlayed > 0
     ? Math.round((userStats.gamesWon / userStats.gamesPlayed) * 100)
     : 0;
@@ -100,7 +105,7 @@ export function CreateChallengeForm({
   }, [wagerAmount, userBalance, formTimeControlKey]);
 
   const handleSubmit = () => {
-    if (!canAfford) return;
+    if (!canSubmit) return;
     if (customWager) {
       setFormWagerAmount(parseInt(customWager));
     }
@@ -431,14 +436,18 @@ export function CreateChallengeForm({
               ) : (
                 <button
                   onClick={handleSubmit}
-                  disabled={!canAfford}
+                  disabled={!canSubmit}
                   className={`w-full p-4 font-mono transition-all lowercase ${
-                    canAfford
+                    canSubmit
                       ? 'bg-white text-black hover:bg-white/90'
                       : 'bg-black text-white/20 border border-white/15 cursor-not-allowed'
                   }`}
                 >
-                  {!canAfford
+                  {isCreating
+                    ? 'creating...'
+                    : !isWebSocketConnected
+                    ? 'connecting...'
+                    : !canAfford
                     ? wagerAmount > userBalance
                       ? 'insufficient balance'
                       : 'enter wager amount'
