@@ -1,7 +1,18 @@
 'use client';
 
 import { useAuthStore } from '@/store/auth';
-import type { HistoryFilters, HistoryGame, HistoryStats, HistoryTransaction, FinancialSummary, DateRange, PaginatedResponse } from '@chess-game/shared';
+import type {
+  HistoryFilters,
+  HistoryGame,
+  HistoryStats,
+  HistoryTransaction,
+  FinancialSummary,
+  DateRange,
+  PaginatedResponse,
+  ProfileResponse,
+  PublicProfileResponse,
+  UpdateProfileInput,
+} from '@chess-game/shared';
 import {
   USE_MOCK_DATA,
   mockDelay,
@@ -9,6 +20,10 @@ import {
   generateMockWinningsLeaderboard,
   generateMockActiveGames,
 } from '@/lib/mock/mockData';
+import {
+  generateMockProfile,
+  generateMockPublicProfile,
+} from '@/lib/mock/profileMock';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -249,6 +264,32 @@ export function useApi() {
     return fetchApi<FinancialSummary>(`/api/games/history/financial${query ? '?' + query : ''}`);
   }
 
+  // Profile methods
+  async function getProfile(): Promise<ProfileResponse> {
+    if (USE_MOCK_DATA) {
+      return generateMockProfile();
+    }
+    return fetchApi<ProfileResponse>('/api/profile');
+  }
+
+  async function getPublicProfile(userId: string): Promise<PublicProfileResponse> {
+    if (USE_MOCK_DATA) {
+      return generateMockPublicProfile(userId);
+    }
+    return fetchApi<PublicProfileResponse>(`/api/profile/${userId}`);
+  }
+
+  async function updateProfile(data: UpdateProfileInput): Promise<{ success: boolean }> {
+    if (USE_MOCK_DATA) {
+      await mockDelay();
+      return { success: true };
+    }
+    return fetchApi<{ success: boolean }>('/api/profile', {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
   return {
     // Auth
     login,
@@ -283,5 +324,9 @@ export function useApi() {
     getHistoryStats,
     getTransactionsFiltered,
     getFinancialSummary,
+    // Profile
+    getProfile,
+    getPublicProfile,
+    updateProfile,
   };
 }
