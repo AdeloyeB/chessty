@@ -169,6 +169,18 @@ export const userProfiles = pgTable('user_profiles', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().$defaultFn(() => new Date()),
 });
 
+// MFA enrollments table (Two-Factor Authentication)
+export const mfaEnrollments = pgTable('mfa_enrollments', {
+  userId: text('user_id').primaryKey().references(() => users.id),
+  totpSecret: text('totp_secret').notNull(), // Encrypted TOTP secret
+  backupCodes: text('backup_codes').notNull(), // JSON stringified array of hashed codes
+  enabled: boolean('enabled').default(false).notNull(),
+  enrolledAt: timestamp('enrolled_at', { withTimezone: true }),
+  lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().$defaultFn(() => new Date()),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().$defaultFn(() => new Date()),
+});
+
 // Security audit log table
 export const securityAuditLog = pgTable('security_audit_log', {
   id: text('id').primaryKey(),
@@ -210,6 +222,10 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   profile: one(userProfiles, {
     fields: [users.id],
     references: [userProfiles.userId],
+  }),
+  mfaEnrollment: one(mfaEnrollments, {
+    fields: [users.id],
+    references: [mfaEnrollments.userId],
   }),
 }));
 
@@ -331,6 +347,13 @@ export const userProfilesRelations = relations(userProfiles, ({ one }) => ({
   }),
 }));
 
+export const mfaEnrollmentsRelations = relations(mfaEnrollments, ({ one }) => ({
+  user: one(users, {
+    fields: [mfaEnrollments.userId],
+    references: [users.id],
+  }),
+}));
+
 // Type exports
 export type FeatureFlag = typeof featureFlags.$inferSelect;
 export type NewFeatureFlag = typeof featureFlags.$inferInsert;
@@ -358,3 +381,5 @@ export type UserAchievement = typeof userAchievements.$inferSelect;
 export type NewUserAchievement = typeof userAchievements.$inferInsert;
 export type UserProfile = typeof userProfiles.$inferSelect;
 export type NewUserProfile = typeof userProfiles.$inferInsert;
+export type MfaEnrollment = typeof mfaEnrollments.$inferSelect;
+export type NewMfaEnrollment = typeof mfaEnrollments.$inferInsert;

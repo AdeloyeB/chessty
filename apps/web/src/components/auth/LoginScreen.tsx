@@ -1,8 +1,11 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { useApi } from '@/hooks/useApi';
 import { useAuthStore } from '@/store/auth';
+import { OAuthButton } from './OAuthButton';
+import { OAuthDivider } from './OAuthDivider';
 
 // Animated chess piece that floats across the screen
 function FloatingPiece({ piece, delay, duration, startX, startY }: {
@@ -237,8 +240,9 @@ export function LoginScreen() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
+  const router = useRouter();
   const { login, register } = useApi();
-  const { setUser, setToken } = useAuthStore();
+  const { setUser, setToken, setMfaRequired } = useAuthStore();
 
   // Dev login for testing without backend
   const handleDevLogin = () => {
@@ -253,7 +257,18 @@ export function LoginScreen() {
 
     try {
       if (isLogin) {
-        await login(email, password);
+        const result = await login(email, password);
+
+        // Check if MFA verification is required
+        if ('requiresMfa' in result && result.requiresMfa) {
+          // MFA is required - redirect to MFA verification page
+          // The tempToken is already stored in the auth store by the login function
+          router.push(`/auth/verify-mfa?temp_token=${encodeURIComponent(result.tempToken)}`);
+          return;
+        }
+
+        // Normal login success - no MFA required
+        // User and token are already set by the login function
       } else {
         await register(email, username, password);
       }
@@ -278,6 +293,14 @@ export function LoginScreen() {
               play • stake • win
             </p>
           </div>
+
+          {/* OAuth Buttons */}
+          <div className="space-y-3 mb-6">
+            <OAuthButton provider="google" />
+            <OAuthButton provider="github" />
+          </div>
+
+          <OAuthDivider />
 
           {/* Tab Navigation */}
           <div className="flex mb-8 border-b border-white/15">

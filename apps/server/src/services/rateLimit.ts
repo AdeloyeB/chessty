@@ -188,6 +188,22 @@ export const passwordResetLimiter = new RateLimiter({
   blockDuration: 60 * 60, // 1 hour block
 });
 
+// MFA verification: 5 attempts per 5 minutes per IP
+// Stricter because an attacker might try to brute-force TOTP codes
+export const mfaVerifyLimiter = new RateLimiter({
+  points: 5,
+  duration: 5 * 60, // 5 minutes
+  blockDuration: 5 * 60, // 5 minute block
+});
+
+// MFA enrollment: 3 attempts per hour per user
+// Prevents abuse of the enrollment process
+export const mfaEnrollLimiter = new RateLimiter({
+  points: 3,
+  duration: 60 * 60, // 1 hour
+  blockDuration: 60 * 60, // 1 hour block
+});
+
 /**
  * Create a rate limit response
  */
