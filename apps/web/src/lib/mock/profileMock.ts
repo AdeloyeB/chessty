@@ -3,7 +3,7 @@
  * Used when USE_MOCK_DATA is true for development/demos
  */
 
-import type { ProfileResponse, ProfileUser, ProfileRank, ProfileStats, UserProfileData, AchievementProgress } from '@chess-game/shared';
+import type { ProfileResponse, PublicProfileResponse, ProfileUser, ProfileRank, ProfileStats, UserProfileData, AchievementProgress } from '@chess-game/shared';
 import { ACHIEVEMENTS, getRankTier, getNextRankTier, getProgressToNextRank, type AchievementCategory, type RankTier } from '@chess-game/shared';
 import { mockDelay, MOCK_PLAYERS } from './mockData';
 
@@ -128,7 +128,7 @@ export async function generateMockProfile(userId?: string): Promise<ProfileRespo
 /**
  * Generate mock public profile (for viewing other users)
  */
-export async function generateMockPublicProfile(userId: string): Promise<ProfileResponse & { isPrivate: boolean }> {
+export async function generateMockPublicProfile(userId: string): Promise<PublicProfileResponse> {
   const profile = await generateMockProfile(userId);
 
   // 20% chance profile is private

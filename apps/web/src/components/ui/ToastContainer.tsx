@@ -19,20 +19,24 @@ import { useNotificationStore, type Notification, type AchievementNotification }
 import { AchievementToast } from './AchievementToast';
 
 /**
- * Generic toast for non-achievement notifications
+ * Props for the GenericToast component
  */
-function GenericToast({
-  notification,
-  onDismiss,
-}: {
+interface GenericToastProps {
   notification: Notification;
   onDismiss: (id: string) => void;
-}) {
+}
+
+/**
+ * Generic toast for non-achievement notifications
+ */
+function GenericToast({ notification, onDismiss }: GenericToastProps) {
+  // Use standardized color palette (mid, mid-light, light, pure-white)
+  // Instead of non-existent Tailwind colors like green-400, red-400, etc.
   const typeStyles = {
-    success: 'border-green-400/50 text-green-400',
-    error: 'border-red-400/50 text-red-400',
-    info: 'border-blue-400/50 text-blue-400',
-    achievement: 'border-yellow-400/50 text-yellow-400',
+    success: 'border-light/50 text-light',
+    error: 'border-mid/50 text-mid-light',
+    info: 'border-mid-light/50 text-mid-light',
+    achievement: 'border-pure-white/50 text-pure-white',
   };
 
   const icons = {

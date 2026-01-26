@@ -410,13 +410,13 @@ export function ChallengeMarketplace() {
         {/* Mobile Content */}
         {viewMode === 'browse' ? (
           <div>
-            {/* Mobile Filters */}
-            <div className="flex overflow-x-auto border-b border-white/15">
+            {/* Mobile Filters - use flex-wrap instead of overflow-x-auto to avoid horizontal scrolling */}
+            <div className="flex flex-wrap border-b border-white/15">
               {(['all', 'standard', 'chess960'] as const).map((mode, i) => (
                 <button
                   key={mode}
                   onClick={() => setFilterMode(mode)}
-                  className={`px-4 py-2 text-xs font-mono whitespace-nowrap lowercase ${
+                  className={`px-4 py-2 text-xs font-mono lowercase ${
                     i < 2 ? 'border-r border-white/15' : ''
                   } ${
                     filterMode === mode

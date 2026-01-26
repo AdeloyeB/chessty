@@ -131,10 +131,14 @@ export function registerBroadcastHandlers(events: GameEventEmitter, broadcast: B
   events.on(
     'achievement:unlocked',
     (payload) => {
+      // Normalize unlockedAt: could be Date or string depending on database driver
+      const normalizeUnlockedAt = (value: Date | string) =>
+        typeof value === 'string' ? value : value.toISOString();
+
       const achievementPayload: AchievementUnlockedPayload = {
         achievements: payload.achievements.map((a) => ({
           ...a,
-          unlockedAt: a.unlockedAt.toISOString(),
+          unlockedAt: normalizeUnlockedAt(a.unlockedAt),
         })),
       };
 

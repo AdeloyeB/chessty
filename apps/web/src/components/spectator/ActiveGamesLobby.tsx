@@ -68,12 +68,14 @@ export function ActiveGamesLobby() {
           const isRightColumn = index % 2 === 1;
           const isNotLastRow = index < games.length - 2 || (games.length % 2 === 1 && index < games.length - 1);
           return (
-            <div
+            <button
+              type="button"
               key={game.id}
-              className={`p-4 bg-black cursor-pointer hover:bg-white/5 transition-colors ${
+              className={`w-full text-left p-4 bg-black cursor-pointer hover:bg-white/5 transition-colors focus:outline-none focus:ring-1 focus:ring-white/50 ${
                 !isRightColumn ? 'md:border-r md:border-white/15' : ''
               } ${isNotLastRow ? 'border-b border-white/15' : ''}`}
               onClick={() => spectateGame(game.id)}
+              aria-label={`Watch ${game.whitePlayer.username} vs ${game.blackPlayer.username}`}
             >
               <div className="flex justify-between items-start mb-4">
                 <div className="space-y-2">
@@ -121,7 +123,7 @@ export function ActiveGamesLobby() {
               <div className="mt-4 text-center">
                 <span className="text-white text-xs font-mono border-b border-white/50 lowercase">watch</span>
               </div>
-            </div>
+            </button>
           );
         })}
       </div>

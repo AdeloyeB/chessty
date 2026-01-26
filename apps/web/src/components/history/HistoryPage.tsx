@@ -224,6 +224,8 @@ function TransactionRow({ transaction }: { transaction: any }) {
     withdrawal: 'text-white/50',
     bet_won: 'text-white',
     bet_lost: 'text-white/50',
+    bet_placed: 'text-white/50',
+    bet_refunded: 'text-white',
     bonus: 'text-usdc',
   };
 

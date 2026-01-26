@@ -44,79 +44,35 @@ export function ProfilePage() {
     isUpdating,
   } = useProfileData();
 
-  // Handle loading state
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-black">
-        <nav className="border-b border-white/15 bg-black sticky top-0 z-50">
-          <div className="container mx-auto px-6">
-            <div className="flex items-center justify-between h-16">
-              <div className="flex items-center gap-4">
-                <Link href="/" className="text-3xl hover:opacity-80 transition-opacity">♔</Link>
-                <span className="text-white/50 font-mono">/</span>
-                <span className="text-white font-mono lowercase">profile</span>
-              </div>
-            </div>
-          </div>
-        </nav>
-        <main className="container mx-auto px-6 py-8">
-          <ProfileSkeleton />
-        </main>
-      </div>
-    );
-  }
+  // Extract data from profile response (use defaults for loading/error states)
+  // IMPORTANT: All hooks must be called unconditionally before any returns (Rules of Hooks)
+  const profileUser = profileData?.user;
+  const profile = profileData?.profile;
+  const achievements = profileData?.achievements ?? [];
+  const isPublic = profile?.isPublic ?? false;
 
-  // Handle error state
-  if (isError || !profileData) {
-    return (
-      <div className="min-h-screen bg-black">
-        <nav className="border-b border-white/15 bg-black sticky top-0 z-50">
-          <div className="container mx-auto px-6">
-            <div className="flex items-center justify-between h-16">
-              <div className="flex items-center gap-4">
-                <Link href="/" className="text-3xl hover:opacity-80 transition-opacity">♔</Link>
-                <span className="text-white/50 font-mono">/</span>
-                <span className="text-white font-mono lowercase">profile</span>
-              </div>
-              <Link
-                href="/"
-                className="text-white/50 hover:text-white transition-colors font-mono text-sm lowercase"
-              >
-                back_to_home
-              </Link>
-            </div>
-          </div>
-        </nav>
-        <main className="container mx-auto px-6 py-8">
-          <ProfileError error={error} onRetry={() => refetch()} />
-        </main>
-      </div>
-    );
-  }
-
-  // Extract data from profile response
-  const profileUser = profileData.user;
-  const profile = profileData.profile;
-  const achievements = profileData.achievements;
-  const isPublic = profile.isPublic;
-
-  // Handle visibility toggle
-  const handleVisibilityToggle = () => {
+  // Handle visibility toggle - useCallback must be called unconditionally
+  const handleVisibilityToggle = useCallback(() => {
     updateProfile({ isPublic: !isPublic });
-  };
+  }, [updateProfile, isPublic]);
 
-  // Memoize expensive calculations
-  const { rank, nextRank, progress, winRate, netProfit } = useMemo(() => ({
-    rank: getRankTier(profileUser.eloRating),
-    nextRank: getNextRankTier(profileUser.eloRating),
-    progress: getProgressToNextRank(profileUser.eloRating),
-    winRate: profileUser.gamesPlayed > 0
-      ? Math.round((profileUser.gamesWon / profileUser.gamesPlayed) * 100)
-      : 0,
-    netProfit: profileUser.totalWon - profileUser.totalWagered,
-  }), [profileUser.eloRating, profileUser.gamesPlayed, profileUser.gamesWon, profileUser.totalWon, profileUser.totalWagered]);
+  // Memoize expensive calculations - useMemo must be called unconditionally
+  const { rank, nextRank, progress, winRate, netProfit } = useMemo(() => {
+    if (!profileUser) {
+      return { rank: null, nextRank: null, progress: 0, winRate: 0, netProfit: 0 };
+    }
+    return {
+      rank: getRankTier(profileUser.eloRating),
+      nextRank: getNextRankTier(profileUser.eloRating),
+      progress: getProgressToNextRank(profileUser.eloRating),
+      winRate: profileUser.gamesPlayed > 0
+        ? Math.round((profileUser.gamesWon / profileUser.gamesPlayed) * 100)
+        : 0,
+      netProfit: profileUser.totalWon - profileUser.totalWagered,
+    };
+  }, [profileUser]);
 
-  // Memoize achievement data
+  // Memoize achievement data - useMemo must be called unconditionally
   const { unlockedCount, totalCount, achievementMap, visibleAchievements, recentUnlocked } = useMemo(() => {
     const map = new Map(achievements.map((a) => [a.id, a]));
     const unlocked = achievements.filter((a) => a.unlocked);
@@ -138,7 +94,7 @@ export function ProfilePage() {
     };
   }, [achievements, selectedCategory]);
 
-  // Achievement card renderer for PaginatedGrid
+  // Achievement card renderer for PaginatedGrid - useCallback must be called unconditionally
   const renderAchievementCard = useCallback((achievement: Achievement) => {
     const progressData = achievementMap.get(achievement.id);
     const isUnlocked = progressData?.unlocked || false;
@@ -188,6 +144,61 @@ export function ProfilePage() {
       </div>
     );
   }, [achievementMap]);
+
+  // Handle loading state - AFTER all hooks are called
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-black">
+        <nav className="border-b border-white/15 bg-black sticky top-0 z-50">
+          <div className="container mx-auto px-6">
+            <div className="flex items-center justify-between h-16">
+              <div className="flex items-center gap-4">
+                <Link href="/" className="text-3xl hover:opacity-80 transition-opacity">♔</Link>
+                <span className="text-white/50 font-mono">/</span>
+                <span className="text-white font-mono lowercase">profile</span>
+              </div>
+            </div>
+          </div>
+        </nav>
+        <main className="container mx-auto px-6 py-8">
+          <ProfileSkeleton />
+        </main>
+      </div>
+    );
+  }
+
+  // Handle error state - AFTER all hooks are called
+  if (isError || !profileData || !profileUser || !profile) {
+    return (
+      <div className="min-h-screen bg-black">
+        <nav className="border-b border-white/15 bg-black sticky top-0 z-50">
+          <div className="container mx-auto px-6">
+            <div className="flex items-center justify-between h-16">
+              <div className="flex items-center gap-4">
+                <Link href="/" className="text-3xl hover:opacity-80 transition-opacity">♔</Link>
+                <span className="text-white/50 font-mono">/</span>
+                <span className="text-white font-mono lowercase">profile</span>
+              </div>
+              <Link
+                href="/"
+                className="text-white/50 hover:text-white transition-colors font-mono text-sm lowercase"
+              >
+                back_to_home
+              </Link>
+            </div>
+          </div>
+        </nav>
+        <main className="container mx-auto px-6 py-8">
+          <ProfileError error={error} onRetry={() => refetch()} />
+        </main>
+      </div>
+    );
+  }
+
+  // Type narrowing: at this point we know rank is not null
+  if (!rank) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-black">

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 
 interface OAuthButtonProps {
   provider: 'google' | 'twitter';
@@ -50,6 +50,15 @@ export function OAuthButton({ provider, isLoading = false, disabled = false }: O
   const [isRedirecting, setIsRedirecting] = useState(false);
   const [showTooltip, setShowTooltip] = useState(false);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Clean up timeout on unmount to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, []);
 
   const handleMouseEnter = () => {
     timeoutRef.current = setTimeout(() => setShowTooltip(true), 400);

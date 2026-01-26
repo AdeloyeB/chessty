@@ -48,9 +48,9 @@ export function DateRangePicker({
           <button
             key={value}
             onClick={() => handlePresetClick(value)}
-            className={`px-3 py-1.5 font-mono text-xs transition-colors lowercase ${
-              index === 0 ? 'border-l' : ''
-            } border-y border-r border-white/15 ${
+            className={`px-3 py-1.5 font-mono text-xs transition-colors lowercase border border-white/15 ${
+              index > 0 ? '-ml-px' : ''
+            } ${
               preset === value && !showCustom
                 ? 'bg-white text-black'
                 : 'bg-black text-white/50 hover:text-white'
@@ -61,7 +61,7 @@ export function DateRangePicker({
         ))}
         <button
           onClick={() => setShowCustom(!showCustom)}
-          className={`px-3 py-1.5 font-mono text-xs border-y border-r border-white/15 transition-colors lowercase ${
+          className={`px-3 py-1.5 font-mono text-xs border border-white/15 -ml-px transition-colors lowercase ${
             preset === 'custom'
               ? 'bg-white text-black'
               : 'bg-black text-white/50 hover:text-white'

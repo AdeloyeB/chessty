@@ -21,6 +21,8 @@ import * as authService from '../services/auth';
 import { hasMFAEnabled } from '../services/mfa';
 import { loginLimiter, getClientIp } from '../services/rateLimit';
 
+// Import generateTempToken for MFA flow (short-lived token that can only be used for MFA verification)
+
 // ============================================================================
 // Configuration
 // ============================================================================
@@ -173,10 +175,11 @@ export async function handleGoogleCallback(req: Request): Promise<Response> {
     if (mfaEnabled) {
       // User has MFA enabled - they need to verify before getting a full token
       // Generate a temporary token that can only be used for MFA verification
-      // For now, we'll use the same token but flag the frontend to require MFA
+      // SECURITY: Use generateTempToken, NOT the full session token
+      const tempToken = await authService.generateTempToken(user.id);
       return redirectToFrontend({
         requires_mfa: 'true',
-        temp_token: token,
+        temp_token: tempToken,
       });
     }
 
@@ -298,11 +301,11 @@ export async function handleGithubCallback(req: Request): Promise<Response> {
 
     if (mfaEnabled) {
       // User has MFA enabled - they need to verify before getting a full token
-      // Generate a temporary token that can only be used for MFA verification
-      // For now, we'll use the same token but flag the frontend to require MFA
+      // SECURITY: Use generateTempToken, NOT the full session token
+      const tempToken = await authService.generateTempToken(user.id);
       return redirectToFrontend({
         requires_mfa: 'true',
-        temp_token: token,
+        temp_token: tempToken,
       });
     }
 
@@ -449,9 +452,11 @@ export async function handleTwitterCallback(req: Request): Promise<Response> {
 
     if (mfaEnabled) {
       // User has MFA enabled - they need to verify before getting a full token
+      // SECURITY: Use generateTempToken, NOT the full session token
+      const tempToken = await authService.generateTempToken(user.id);
       return redirectToFrontend({
         requires_mfa: 'true',
-        temp_token: token,
+        temp_token: tempToken,
       });
     }
 
@@ -616,9 +621,11 @@ export async function handleAppleCallback(req: Request): Promise<Response> {
 
     if (mfaEnabled) {
       // User has MFA enabled - they need to verify before getting a full token
+      // SECURITY: Use generateTempToken, NOT the full session token
+      const tempToken = await authService.generateTempToken(user.id);
       return redirectToFrontend({
         requires_mfa: 'true',
-        temp_token: token,
+        temp_token: tempToken,
       });
     }
 
