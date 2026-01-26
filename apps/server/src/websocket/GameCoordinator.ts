@@ -141,7 +141,7 @@ export class GameCoordinator {
     }
 
     // Cleanup any room state
-    this.cleanupGame(gameId);
+    await this.cleanupGame(gameId);
   }
 
   // --- Game Lifecycle ---
@@ -164,11 +164,12 @@ export class GameCoordinator {
     }
 
     // Initialize chess state if needed
-    this.gameState.initializeState(gameId, game.currentFen);
+    await this.gameState.initializeState(gameId, game.currentFen);
 
-    // Initialize clock if needed
-    if (!this.clock.getClockState(gameId)) {
-      this.clock.initializeClock(
+    // Initialize clock if needed (use sync version for quick check)
+    const existingClock = this.clock.getClockStateSync(gameId);
+    if (!existingClock) {
+      await this.clock.initializeClock(
         gameId,
         game.whiteTimeRemaining,
         game.blackTimeRemaining,
@@ -207,7 +208,10 @@ export class GameCoordinator {
     // Clean up if room is empty
     if (this.rooms.getPlayerCount(gameId) === 0) {
       this.rooms.deleteRoom(gameId);
-      this.cleanupGame(gameId);
+      // Fire-and-forget async cleanup (don't block WebSocket handler)
+      this.cleanupGame(gameId).catch((err) => {
+        console.error(`[GameCoordinator] Error during cleanup for ${gameId}:`, err);
+      });
     }
   }
 
@@ -284,20 +288,20 @@ export class GameCoordinator {
       return false;
     }
 
-    const moveResult = this.gameState.validateAndApplyMove(gameId, from, to, promotion);
+    const moveResult = await this.gameState.validateAndApplyMove(gameId, from, to, promotion);
     if (!moveResult) {
       this.broadcast.sendError(userId, 'INVALID_MOVE', 'Invalid move');
       return false;
     }
 
-    // Switch clock turn and add increment
-    this.clock.switchTurn(gameId, game.timeControlIncrement);
+    // Switch clock turn and add increment (async for Redis update)
+    await this.clock.switchTurn(gameId, game.timeControlIncrement);
 
     // Clear any draw offer
-    this.gameState.clearDrawOffer(gameId);
+    await this.gameState.clearDrawOffer(gameId);
 
-    // Get current clock state
-    const clockState = this.clock.getClockState(gameId);
+    // Get current clock state (use sync for immediate response, state was just updated)
+    const clockState = this.clock.getClockStateSync(gameId);
 
     // Emit move event (triggers persistence, broadcast, odds)
     await this.events.emit('game:move_made', {
@@ -367,7 +371,7 @@ export class GameCoordinator {
       return;
     }
 
-    this.gameState.setDrawOffer(gameId, userId);
+    await this.gameState.setDrawOffer(gameId, userId);
 
     const opponentId = userId === game.whitePlayerId ? game.blackPlayerId : game.whitePlayerId;
     await this.events.emit('game:draw_offered', {
@@ -378,7 +382,7 @@ export class GameCoordinator {
   }
 
   async handleDrawAccept(userId: string, gameId: string): Promise<void> {
-    const offeredBy = this.gameState.getDrawOffer(gameId);
+    const offeredBy = await this.gameState.getDrawOffer(gameId);
     if (!offeredBy || offeredBy === userId) {
       this.broadcast.sendError(userId, 'NO_DRAW_OFFER', 'No draw offer to accept');
       return;
@@ -389,10 +393,10 @@ export class GameCoordinator {
   }
 
   async handleDrawDecline(userId: string, gameId: string): Promise<void> {
-    const offeredBy = this.gameState.getDrawOffer(gameId);
+    const offeredBy = await this.gameState.getDrawOffer(gameId);
     if (!offeredBy) return;
 
-    this.gameState.clearDrawOffer(gameId);
+    await this.gameState.clearDrawOffer(gameId);
     await this.events.emit('game:draw_declined', { gameId, declinedBy: userId, offeredBy });
   }
 
@@ -422,12 +426,12 @@ export class GameCoordinator {
     });
 
     // Cleanup
-    this.cleanupGame(gameId);
+    await this.cleanupGame(gameId);
   }
 
-  private cleanupGame(gameId: string): void {
-    this.gameState.cleanupState(gameId);
-    this.clock.cleanup(gameId);
+  private async cleanupGame(gameId: string): Promise<void> {
+    await this.gameState.cleanupState(gameId);
+    await this.clock.cleanup(gameId);
     this.rooms.deleteSpectatorRoom(gameId);
   }
 

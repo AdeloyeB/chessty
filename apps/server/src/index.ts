@@ -87,6 +87,9 @@ import { initializeFeatureFlags } from './services/featureFlags';
 import { db } from './drizzle';
 import { sql } from 'drizzle-orm';
 import type { WebSocketData } from './websocket/handler';
+import { initRedis, isRedisAvailable } from './redis/client';
+import { recoverActiveGames } from './redis/recovery';
+import { clockManager, gameStateManager } from './websocket/handler';
 
 const PORT = parseInt(process.env.PORT || '3001');
 const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:3000';
@@ -345,7 +348,14 @@ const server = Bun.serve<WebSocketData>({
       }
       // Health check
       else if (path === '/health' && method === 'GET') {
-        response = Response.json({ status: 'ok', timestamp: new Date().toISOString() });
+        response = Response.json({
+          status: 'ok',
+          timestamp: new Date().toISOString(),
+          services: {
+            database: 'connected', // If we got here, DB is working
+            redis: isRedisAvailable() ? 'connected' : 'disconnected',
+          },
+        });
       }
       // 404
       else {
@@ -377,6 +387,42 @@ const server = Bun.serve<WebSocketData>({
 db.execute(sql`SELECT 1`)
   .then(() => console.log('[Database] Neon connection established'))
   .catch((error) => console.error('[Database] Failed to connect to Neon:', error));
+
+// Initialize Redis connection (optional - server works without it, just no persistence)
+initRedis()
+  .then(async () => {
+    if (isRedisAvailable()) {
+      console.log('[Redis] Game state persistence enabled');
+    }
+
+    // Recover active games from database (works with or without Redis)
+    // This restores clock intervals and game state for any games that were
+    // in progress when the server last stopped
+    try {
+      const recoveryStats = await recoverActiveGames(clockManager, gameStateManager);
+      if (recoveryStats.total > 0) {
+        console.log(`[Recovery] Restored ${recoveryStats.recovered}/${recoveryStats.total} active games`);
+      }
+    } catch (recoveryError) {
+      console.error('[Recovery] Failed to recover active games:', recoveryError);
+      // Non-fatal - server continues but active games may be stuck
+    }
+  })
+  .catch((error) => {
+    // Non-fatal - server can run without Redis, games just won't survive restarts
+    console.warn('[Redis] Failed to connect (game state will be in-memory only):', error.message);
+
+    // Still try to recover games even without Redis
+    recoverActiveGames(clockManager, gameStateManager)
+      .then((recoveryStats) => {
+        if (recoveryStats.total > 0) {
+          console.log(`[Recovery] Restored ${recoveryStats.recovered}/${recoveryStats.total} active games (without Redis)`);
+        }
+      })
+      .catch((recoveryError) => {
+        console.error('[Recovery] Failed to recover active games:', recoveryError);
+      });
+  });
 
 // Initialize feature flags on server start
 initializeFeatureFlags().catch((error) => {

@@ -38,6 +38,9 @@ registerAllHandlers(gameEvents, broadcastService);
 // --- Exports for index.ts ---
 export { type WebSocketData } from './ConnectionManager';
 
+// Export managers for game recovery on server restart
+export { clockManager, gameStateManager };
+
 export async function handleWebSocketUpgrade(req: Request, server: any): Promise<Response | undefined> {
   const url = new URL(req.url);
   const token = url.searchParams.get('token') || req.headers.get('Authorization')?.replace('Bearer ', '');

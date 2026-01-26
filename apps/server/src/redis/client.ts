@@ -1,55 +1,82 @@
 /**
  * Redis client singleton using ioredis.
- * Reads REDIS_URL from environment (default: redis://localhost:6379).
+ * Reads REDIS_URL from environment.
  *
- * NOTE: ioredis is not yet installed. Run `pnpm add ioredis` when ready to use.
- * This file is prepared for the Redis state extraction phase.
+ * Redis Cloud connection string format:
+ * redis://default:password@hostname:port
  */
 
-// import Redis from 'ioredis';
+import Redis from 'ioredis';
 
-const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
+const REDIS_URL = process.env.REDIS_URL;
 
-let redisClient: any | null = null;
+let redisClient: Redis | null = null;
 
 /**
  * Initialize the Redis connection.
- * Call this at server startup when Redis is ready to be used.
+ * Call this at server startup.
  */
 export async function initRedis(): Promise<void> {
-  // Uncomment when ioredis is installed:
-  // const Redis = (await import('ioredis')).default;
-  // redisClient = new Redis(REDIS_URL, {
-  //   maxRetriesPerRequest: 3,
-  //   retryStrategy(times) {
-  //     const delay = Math.min(times * 50, 2000);
-  //     return delay;
-  //   },
-  //   lazyConnect: true,
-  // });
-  //
-  // redisClient.on('error', (err: Error) => {
-  //   console.error('[Redis] Connection error:', err.message);
-  // });
-  //
-  // redisClient.on('connect', () => {
-  //   console.log('[Redis] Connected to', REDIS_URL);
-  // });
-  //
-  // await redisClient.connect();
+  if (!REDIS_URL) {
+    console.warn('[Redis] REDIS_URL not set. Redis features disabled.');
+    return;
+  }
 
-  console.log('[Redis] Client initialization prepared (not yet connected)');
+  try {
+    redisClient = new Redis(REDIS_URL, {
+      maxRetriesPerRequest: 3,
+      retryStrategy(times) {
+        // Exponential backoff: 50ms, 100ms, 200ms, ... up to 2 seconds
+        const delay = Math.min(times * 50, 2000);
+        console.log(`[Redis] Retry attempt ${times}, waiting ${delay}ms`);
+        return delay;
+      },
+      // Don't connect immediately - we'll call connect() explicitly
+      lazyConnect: true,
+    });
+
+    redisClient.on('error', (err: Error) => {
+      console.error('[Redis] Connection error:', err.message);
+    });
+
+    redisClient.on('connect', () => {
+      console.log('[Redis] Connected successfully');
+    });
+
+    redisClient.on('ready', () => {
+      console.log('[Redis] Ready to accept commands');
+    });
+
+    redisClient.on('close', () => {
+      console.log('[Redis] Connection closed');
+    });
+
+    // Actually connect
+    await redisClient.connect();
+
+    // Test the connection with a ping
+    const pong = await redisClient.ping();
+    console.log(`[Redis] Ping response: ${pong}`);
+  } catch (error) {
+    console.error('[Redis] Failed to initialize:', error);
+    redisClient = null;
+    throw error;
+  }
 }
 
 /**
  * Get the Redis client instance.
- * Throws if Redis has not been initialized.
+ * Returns null if Redis is not configured or failed to connect.
  */
-export function getRedis(): any {
-  if (!redisClient) {
-    throw new Error('[Redis] Client not initialized. Call initRedis() first.');
-  }
+export function getRedis(): Redis | null {
   return redisClient;
+}
+
+/**
+ * Check if Redis is available and connected.
+ */
+export function isRedisAvailable(): boolean {
+  return redisClient !== null && redisClient.status === 'ready';
 }
 
 /**
@@ -58,8 +85,8 @@ export function getRedis(): any {
  */
 export async function shutdownRedis(): Promise<void> {
   if (redisClient) {
-    // await redisClient.quit();
+    await redisClient.quit();
     redisClient = null;
-    console.log('[Redis] Connection closed');
+    console.log('[Redis] Connection closed gracefully');
   }
 }
