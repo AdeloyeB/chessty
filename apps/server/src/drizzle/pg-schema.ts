@@ -173,7 +173,7 @@ export const userProfiles = pgTable('user_profiles', {
 
 // MFA enrollments table (Two-Factor Authentication)
 export const mfaEnrollments = pgTable('mfa_enrollments', {
-  userId: text('user_id').primaryKey().references(() => users.id),
+  userId: text('user_id').primaryKey().references(() => users.id, { onDelete: 'cascade' }),
   totpSecret: text('totp_secret').notNull(), // Encrypted TOTP secret
   backupCodes: text('backup_codes').notNull(), // JSON stringified array of hashed codes
   enabled: boolean('enabled').default(false).notNull(),

@@ -26,7 +26,7 @@ export type PublicUser = Pick<
 >;
 
 // Game types
-export const GameStatusSchema = z.enum(['pending', 'active', 'completed', 'abandoned', 'draw']);
+export const GameStatusSchema = z.enum(['pending', 'active', 'completed', 'abandoned', 'draw', 'cancelled']);
 export type GameStatus = z.infer<typeof GameStatusSchema>;
 
 export const GameResultSchema = z.enum([
