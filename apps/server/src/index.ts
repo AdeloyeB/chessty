@@ -11,8 +11,6 @@ import {
   handleGithubCallback,
   handleTwitterAuth,
   handleTwitterCallback,
-  handleAppleAuth,
-  handleAppleCallback,
 } from './routes/oauth';
 import {
   handleStartEnrollment,
@@ -166,8 +164,6 @@ const server = Bun.serve<WebSocketData>({
       '/api/auth/github/callback',
       '/api/auth/twitter',
       '/api/auth/twitter/callback',
-      '/api/auth/apple',
-      '/api/auth/apple/callback',
       '/api/auth/mfa/verify',
       '/api/mfa/enroll/start',
       '/api/mfa/enroll/complete',
@@ -223,11 +219,6 @@ const server = Bun.serve<WebSocketData>({
         response = await handleTwitterAuth(req);
       } else if (path === '/api/auth/twitter/callback' && method === 'GET') {
         response = await handleTwitterCallback(req);
-      } else if (path === '/api/auth/apple' && method === 'GET') {
-        response = await handleAppleAuth(req);
-      } else if (path === '/api/auth/apple/callback' && method === 'POST') {
-        // Note: Apple uses form_post response mode, so callback is POST not GET
-        response = await handleAppleCallback(req);
       }
       // MFA routes
       else if (path === '/api/mfa/enroll/start' && method === 'POST') {
