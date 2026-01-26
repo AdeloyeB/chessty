@@ -18,7 +18,7 @@ const roomManager = new RoomManager();
 const broadcastService = new BroadcastService(connectionManager, roomManager);
 const clockManager = new ClockManager(gameEvents);
 const gameStateManager = new GameStateManager();
-const challengeCoordinator = new ChallengeCoordinator(gameEvents, broadcastService);
+const challengeCoordinator = new ChallengeCoordinator(gameEvents, broadcastService, connectionManager);
 const gameCoordinator = new GameCoordinator(
   gameStateManager,
   clockManager,
@@ -27,6 +27,10 @@ const gameCoordinator = new GameCoordinator(
   broadcastService,
   gameEvents
 );
+
+// Set up the circular reference between coordinators
+// ChallengeCoordinator needs GameCoordinator to auto-join players after game creation
+challengeCoordinator.setGameCoordinator(gameCoordinator);
 
 // Register all event handlers
 registerAllHandlers(gameEvents, broadcastService);
