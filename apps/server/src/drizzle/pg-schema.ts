@@ -9,6 +9,8 @@ export const users = pgTable('users', {
   passwordHash: text('password_hash'),
   googleId: text('google_id').unique(),
   githubId: text('github_id').unique(),
+  twitterId: text('twitter_id').unique(),
+  appleId: text('apple_id').unique(),
   eloRating: integer('elo_rating').notNull().default(1200),
   peakEloRating: integer('peak_elo_rating').notNull().default(1200),
   gamesPlayed: integer('games_played').notNull().default(0),
@@ -43,7 +45,7 @@ export const games = pgTable('games', {
   timeControlIncrement: integer('time_control_increment').notNull().default(0),
   whiteTimeRemaining: integer('white_time_remaining').notNull(),
   blackTimeRemaining: integer('black_time_remaining').notNull(),
-  stakeAmount: numeric('stake_amount', { precision: 12, scale: 2 }).notNull(),
+  wagerAmount: numeric('wager_amount', { precision: 12, scale: 2 }).notNull(),
   totalPot: numeric('total_pot', { precision: 12, scale: 2 }).notNull(),
   whiteEloAtStart: integer('white_elo_at_start').notNull(),
   blackEloAtStart: integer('black_elo_at_start').notNull(),
@@ -86,7 +88,7 @@ export const transactions = pgTable('transactions', {
 export const matchmakingQueue = pgTable('matchmaking_queue', {
   userId: text('user_id').primaryKey().references(() => users.id),
   eloRating: integer('elo_rating').notNull(),
-  stakeAmount: numeric('stake_amount', { precision: 12, scale: 2 }).notNull(),
+  wagerAmount: numeric('wager_amount', { precision: 12, scale: 2 }).notNull(),
   timeControlInitial: integer('time_control_initial').notNull(),
   timeControlIncrement: integer('time_control_increment').notNull().default(0),
   minElo: integer('min_elo'),
@@ -113,7 +115,7 @@ export const challenges = pgTable('challenges', {
   timeControlKey: text('time_control_key').notNull(),
   timeControlInitial: integer('time_control_initial').notNull(),
   timeControlIncrement: integer('time_control_increment').notNull().default(0),
-  stakeAmount: numeric('stake_amount', { precision: 12, scale: 2 }).notNull(),
+  wagerAmount: numeric('wager_amount', { precision: 12, scale: 2 }).notNull(),
   minElo: integer('min_elo'),
   maxElo: integer('max_elo'),
   status: text('status').notNull().default('open'),
@@ -165,7 +167,19 @@ export const userProfiles = pgTable('user_profiles', {
   longestStreak: integer('longest_streak').notNull().default(0),
   totalCheckmates: integer('total_checkmates').notNull().default(0),
   quickestWin: integer('quickest_win'), // fewest moves to win
-  biggestStakeWin: numeric('biggest_stake_win', { precision: 12, scale: 2 }).default('0'),
+  biggestWagerWin: numeric('biggest_wager_win', { precision: 12, scale: 2 }).default('0'),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().$defaultFn(() => new Date()),
+});
+
+// MFA enrollments table (Two-Factor Authentication)
+export const mfaEnrollments = pgTable('mfa_enrollments', {
+  userId: text('user_id').primaryKey().references(() => users.id),
+  totpSecret: text('totp_secret').notNull(), // Encrypted TOTP secret
+  backupCodes: text('backup_codes').notNull(), // JSON stringified array of hashed codes
+  enabled: boolean('enabled').default(false).notNull(),
+  enrolledAt: timestamp('enrolled_at', { withTimezone: true }),
+  lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().$defaultFn(() => new Date()),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().$defaultFn(() => new Date()),
 });
 
@@ -210,6 +224,10 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   profile: one(userProfiles, {
     fields: [users.id],
     references: [userProfiles.userId],
+  }),
+  mfaEnrollment: one(mfaEnrollments, {
+    fields: [users.id],
+    references: [mfaEnrollments.userId],
   }),
 }));
 
@@ -331,6 +349,13 @@ export const userProfilesRelations = relations(userProfiles, ({ one }) => ({
   }),
 }));
 
+export const mfaEnrollmentsRelations = relations(mfaEnrollments, ({ one }) => ({
+  user: one(users, {
+    fields: [mfaEnrollments.userId],
+    references: [users.id],
+  }),
+}));
+
 // Type exports
 export type FeatureFlag = typeof featureFlags.$inferSelect;
 export type NewFeatureFlag = typeof featureFlags.$inferInsert;
@@ -358,3 +383,5 @@ export type UserAchievement = typeof userAchievements.$inferSelect;
 export type NewUserAchievement = typeof userAchievements.$inferInsert;
 export type UserProfile = typeof userProfiles.$inferSelect;
 export type NewUserProfile = typeof userProfiles.$inferInsert;
+export type MfaEnrollment = typeof mfaEnrollments.$inferSelect;
+export type NewMfaEnrollment = typeof mfaEnrollments.$inferInsert;

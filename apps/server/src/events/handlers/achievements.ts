@@ -19,7 +19,7 @@ export function registerAchievementHandlers(events: GameEventEmitter) {
         whiteEloAtStart,
         blackEloAtStart,
         moveCount,
-        stakeAmount,
+        wagerAmount,
         eloChanges,
       } = payload;
 
@@ -32,14 +32,14 @@ export function registerAchievementHandlers(events: GameEventEmitter) {
         whiteWon,
         whiteWon && isCheckmate,
         moveCount,
-        stakeAmount
+        wagerAmount
       );
       const whiteGameAchievements = await achievementService.checkGameAchievements(
         whitePlayerId,
         whiteWon,
         whiteWon && isCheckmate,
         moveCount,
-        stakeAmount
+        wagerAmount
       );
 
       // Check ELO achievements for white player
@@ -82,14 +82,14 @@ export function registerAchievementHandlers(events: GameEventEmitter) {
         blackWon,
         blackWon && isCheckmate,
         moveCount,
-        stakeAmount
+        wagerAmount
       );
       const blackGameAchievements = await achievementService.checkGameAchievements(
         blackPlayerId,
         blackWon,
         blackWon && isCheckmate,
         moveCount,
-        stakeAmount
+        wagerAmount
       );
 
       // Check ELO achievements for black player

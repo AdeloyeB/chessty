@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import type { GameMode } from '@chess-game/shared';
-import { CHALLENGE_TIME_CONTROLS, STAKE_PRESETS } from '@chess-game/shared';
+import { CHALLENGE_TIME_CONTROLS, WAGER_PRESETS } from '@chess-game/shared';
 import { useChallengeStore } from '@/store/challenge';
 import { USDCAmount } from '../wallet/USDCAmount';
 import { formatUSDC } from '@/lib/utils';
@@ -45,31 +45,31 @@ export function CreateChallengeForm({
   const {
     formGameMode,
     formTimeControlKey,
-    formStakeAmount,
+    formWagerAmount,
     formMinElo,
     formMaxElo,
     setFormGameMode,
     setFormTimeControlKey,
-    setFormStakeAmount,
+    setFormWagerAmount,
     setFormMinElo,
     setFormMaxElo,
   } = useChallengeStore();
 
-  const [customStake, setCustomStake] = useState('');
+  const [customWager, setCustomWager] = useState('');
   const [showEloRange, setShowEloRange] = useState(false);
 
-  const stakeAmount = customStake ? parseInt(customStake) || 0 : formStakeAmount;
-  const canAfford = isConnected && userBalance >= stakeAmount && stakeAmount > 0;
+  const wagerAmount = customWager ? parseInt(customWager) || 0 : formWagerAmount;
+  const canAfford = isConnected && userBalance >= wagerAmount && wagerAmount > 0;
   const winRate = userStats.gamesPlayed > 0
     ? Math.round((userStats.gamesWon / userStats.gamesPlayed) * 100)
     : 0;
 
   // Calculate risk metrics
   const riskMetrics = useMemo(() => {
-    const riskPercent = userBalance > 0 ? (stakeAmount / userBalance) * 100 : 100;
+    const riskPercent = userBalance > 0 ? (wagerAmount / userBalance) * 100 : 100;
     const timeEstimate = TIME_ESTIMATES[formTimeControlKey] || { min: 5, max: 15, avg: 10 };
 
-    // Risk level based on stake % of balance
+    // Risk level based on wager % of balance
     let riskLevel: 'low' | 'medium' | 'high' | 'extreme' = 'low';
     let riskColor = 'text-green-400';
     if (riskPercent > 75) {
@@ -84,9 +84,9 @@ export function CreateChallengeForm({
     }
 
     // Potential outcomes
-    const potentialWin = stakeAmount * 2;
-    const balanceAfterWin = userBalance + stakeAmount;
-    const balanceAfterLoss = userBalance - stakeAmount;
+    const potentialWin = wagerAmount * 2;
+    const balanceAfterWin = userBalance + wagerAmount;
+    const balanceAfterLoss = userBalance - wagerAmount;
 
     return {
       riskPercent,
@@ -97,19 +97,19 @@ export function CreateChallengeForm({
       balanceAfterWin,
       balanceAfterLoss,
     };
-  }, [stakeAmount, userBalance, formTimeControlKey]);
+  }, [wagerAmount, userBalance, formTimeControlKey]);
 
   const handleSubmit = () => {
     if (!canAfford) return;
-    if (customStake) {
-      setFormStakeAmount(parseInt(customStake));
+    if (customWager) {
+      setFormWagerAmount(parseInt(customWager));
     }
     onSubmit();
   };
 
-  const handleStakePreset = (amount: number) => {
-    setFormStakeAmount(amount);
-    setCustomStake('');
+  const handleWagerPreset = (amount: number) => {
+    setFormWagerAmount(amount);
+    setCustomWager('');
   };
 
   return (
@@ -190,10 +190,10 @@ export function CreateChallengeForm({
               </div>
             </div>
 
-            {/* Stake Selection */}
+            {/* Wager Selection */}
             <div>
               <div className="flex items-center justify-between mb-3">
-                <p className="text-xs font-mono text-white/50 lowercase">stake_amount</p>
+                <p className="text-xs font-mono text-white/50 lowercase">wager_amount</p>
                 {isConnected ? (
                   <p className="text-xs font-mono text-white/50 lowercase">
                     <USDCAmount amount={userBalance} size="sm" className="inline" /> available
@@ -208,16 +208,16 @@ export function CreateChallengeForm({
                 )}
               </div>
 
-              {/* Stake Presets */}
+              {/* Wager Presets */}
               <div className="flex mb-3">
-                {STAKE_PRESETS.slice(0, 4).map((amount, index) => {
-                  const isSelected = formStakeAmount === amount && !customStake;
+                {WAGER_PRESETS.slice(0, 4).map((amount, index) => {
+                  const isSelected = formWagerAmount === amount && !customWager;
                   const affordable = isConnected && userBalance >= amount;
                   const isFirst = index === 0;
                   return (
                     <button
                       key={amount}
-                      onClick={() => handleStakePreset(amount)}
+                      onClick={() => handleWagerPreset(amount)}
                       disabled={!affordable}
                       className={`flex-1 p-2 font-mono text-sm transition-all border-y border-r ${
                         isFirst ? 'border-l' : ''
@@ -235,12 +235,12 @@ export function CreateChallengeForm({
                 })}
               </div>
 
-              {/* Custom Stake Input */}
+              {/* Custom Wager Input */}
               <div className="relative">
                 <input
                   type="number"
-                  value={customStake}
-                  onChange={(e) => setCustomStake(e.target.value)}
+                  value={customWager}
+                  onChange={(e) => setCustomWager(e.target.value)}
                   placeholder="custom amount..."
                   className="w-full bg-black border border-white/15 text-white px-4 py-3 font-mono text-sm placeholder:text-white/30 focus:border-white focus:outline-none lowercase"
                   min={1}
@@ -359,8 +359,8 @@ export function CreateChallengeForm({
                   </span>
                 </div>
                 <div className="flex justify-between items-center p-3">
-                  <span className="text-sm font-mono text-white/50 lowercase">your_stake</span>
-                  <USDCAmount amount={stakeAmount} size="sm" />
+                  <span className="text-sm font-mono text-white/50 lowercase">your_wager</span>
+                  <USDCAmount amount={wagerAmount} size="sm" />
                 </div>
                 <div className="flex justify-between items-center p-3">
                   <span className="text-sm font-mono text-white/50 lowercase">total_pot</span>
@@ -439,9 +439,9 @@ export function CreateChallengeForm({
                   }`}
                 >
                   {!canAfford
-                    ? stakeAmount > userBalance
+                    ? wagerAmount > userBalance
                       ? 'insufficient balance'
-                      : 'enter stake amount'
+                      : 'enter wager amount'
                     : 'create game'}
                 </button>
               )}
@@ -451,7 +451,7 @@ export function CreateChallengeForm({
             {canAfford && riskMetrics.riskLevel === 'extreme' && (
               <div className="p-3 border border-red-500/30 bg-red-500/10">
                 <p className="text-xs font-mono text-red-400 lowercase">
-                  ⚠ high risk: staking {riskMetrics.riskPercent.toFixed(0)}% of your balance
+                  ⚠ high risk: wagering {riskMetrics.riskPercent.toFixed(0)}% of your balance
                 </p>
               </div>
             )}

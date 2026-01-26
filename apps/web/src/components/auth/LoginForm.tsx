@@ -37,7 +37,7 @@ export function LoginForm() {
         <div className="text-center mb-8">
           <span className="text-5xl">♔</span>
           <p className="text-mid-light mt-4 font-mono text-sm">
-            play • stake • win
+            play • predict • win
           </p>
         </div>
 

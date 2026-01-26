@@ -34,10 +34,16 @@ if (JWT_SECRET_RAW && JWT_SECRET_RAW.length < 32) {
 
 const JWT_SECRET = new TextEncoder().encode(JWT_SECRET_RAW || 'dev-only-secret-not-for-production');
 const TOKEN_EXPIRY = '7d';
+const TEMP_TOKEN_EXPIRY = '5m'; // Short-lived token for MFA verification
 
 export interface AuthPayload {
   userId: string;
   sessionId: string;
+}
+
+export interface TempAuthPayload {
+  userId: string;
+  type: 'mfa_pending';
 }
 
 export async function hashPassword(password: string): Promise<string> {
@@ -102,6 +108,48 @@ export async function verifyToken(token: string): Promise<AuthPayload | null> {
 
 export async function invalidateSession(sessionId: string): Promise<void> {
   await db.delete(sessions).where(eq(sessions.id, sessionId));
+}
+
+/**
+ * Generate a temporary token for MFA verification
+ *
+ * This token is short-lived (5 minutes) and is used between password verification
+ * and MFA code verification. It doesn't grant access to the app - just proves
+ * that the user passed the password check and needs to complete MFA.
+ *
+ * @param userId - The user's ID
+ * @returns A short-lived JWT token
+ */
+export async function generateTempToken(userId: string): Promise<string> {
+  const token = await new SignJWT({ userId, type: 'mfa_pending' })
+    .setProtectedHeader({ alg: 'HS256' })
+    .setIssuedAt()
+    .setExpirationTime(TEMP_TOKEN_EXPIRY)
+    .sign(JWT_SECRET);
+
+  return token;
+}
+
+/**
+ * Verify a temporary MFA token
+ *
+ * @param token - The temp token to verify
+ * @returns The userId if valid, null otherwise
+ */
+export async function verifyTempToken(token: string): Promise<TempAuthPayload | null> {
+  try {
+    const { payload } = await jwtVerify(token, JWT_SECRET);
+    const { userId, type } = payload as unknown as TempAuthPayload;
+
+    // Ensure this is a temp token, not a regular auth token
+    if (type !== 'mfa_pending') {
+      return null;
+    }
+
+    return { userId, type };
+  } catch {
+    return null;
+  }
 }
 
 export async function register(
@@ -225,7 +273,7 @@ export async function getUserByEmail(email: string): Promise<User | null> {
 }
 
 export async function findOrCreateOAuthUser(
-  provider: 'google' | 'github',
+  provider: 'google' | 'github' | 'twitter' | 'apple',
   providerId: string,
   email: string,
   username: string,
@@ -233,7 +281,16 @@ export async function findOrCreateOAuthUser(
 ): Promise<{ user: User; token: string }> {
   const ipAddress = context?.ipAddress || null;
   const userAgent = context?.userAgent || null;
-  const providerIdColumn = provider === 'google' ? users.googleId : users.githubId;
+
+  // Map provider to the correct database column
+  const providerIdColumn =
+    provider === 'google'
+      ? users.googleId
+      : provider === 'github'
+        ? users.githubId
+        : provider === 'twitter'
+          ? users.twitterId
+          : users.appleId;
 
   // Try to find by provider ID
   let user = await db.query.users.findFirst({
@@ -248,9 +305,17 @@ export async function findOrCreateOAuthUser(
 
     if (user) {
       // Link existing account to OAuth provider
+      const providerIdField =
+        provider === 'google'
+          ? 'googleId'
+          : provider === 'github'
+            ? 'githubId'
+            : provider === 'twitter'
+              ? 'twitterId'
+              : 'appleId';
       await db
         .update(users)
-        .set({ [provider === 'google' ? 'googleId' : 'githubId']: providerId })
+        .set({ [providerIdField]: providerId })
         .where(eq(users.id, user.id));
     } else {
       // Create new user
@@ -263,13 +328,21 @@ export async function findOrCreateOAuthUser(
         counter++;
       }
 
+      const providerIdField =
+        provider === 'google'
+          ? 'googleId'
+          : provider === 'github'
+            ? 'githubId'
+            : provider === 'twitter'
+              ? 'twitterId'
+              : 'appleId';
       const [newUser] = await db
         .insert(users)
         .values({
           id: nanoid(),
           email,
           username: uniqueUsername,
-          [provider === 'google' ? 'googleId' : 'githubId']: providerId,
+          [providerIdField]: providerId,
         })
         .returning();
 
@@ -285,8 +358,8 @@ export async function findOrCreateOAuthUser(
   return { user, token };
 }
 
-export function sanitizeUser(user: User): Omit<User, 'passwordHash' | 'googleId' | 'githubId'> {
-  const { passwordHash, googleId, githubId, ...sanitized } = user;
+export function sanitizeUser(user: User): Omit<User, 'passwordHash' | 'googleId' | 'githubId' | 'twitterId' | 'appleId'> {
+  const { passwordHash, googleId, githubId, twitterId, appleId, ...sanitized } = user;
   return sanitized;
 }
 

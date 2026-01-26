@@ -17,9 +17,9 @@ interface ChallengeTableProps {
   userBalance: number;
   userElo: number;
   onAccept: (challengeId: string) => void;
-  sortBy: 'stake' | 'elo' | 'time' | 'winProb';
+  sortBy: 'wager' | 'elo' | 'time' | 'winProb';
   sortDir: 'asc' | 'desc';
-  onSort: (column: 'stake' | 'elo' | 'time' | 'winProb') => void;
+  onSort: (column: 'wager' | 'elo' | 'time' | 'winProb') => void;
 }
 
 function SortIcon({ active, dir }: { active: boolean; dir: 'asc' | 'desc' }) {
@@ -93,10 +93,10 @@ export function ChallengeTable({
         <div className="col-span-3">opponent</div>
         <button
           className="col-span-2 text-left hover:text-pure-white transition-colors flex items-center"
-          onClick={() => onSort('stake')}
+          onClick={() => onSort('wager')}
         >
-          stake
-          <SortIcon active={sortBy === 'stake'} dir={sortDir} />
+          wager
+          <SortIcon active={sortBy === 'wager'} dir={sortDir} />
         </button>
         <button
           className="col-span-1 text-left hover:text-pure-white transition-colors flex items-center"
@@ -122,7 +122,7 @@ export function ChallengeTable({
           const timeControl = CHALLENGE_TIME_CONTROLS[
             challenge.timeControlKey as keyof typeof CHALLENGE_TIME_CONTROLS
           ];
-          const canAfford = userBalance >= challenge.stakeAmount;
+          const canAfford = userBalance >= challenge.wagerAmount;
           const isHigherRated = challenge.creator.eloRating > userElo;
 
           return (
@@ -168,7 +168,7 @@ export function ChallengeTable({
 
               {/* Stake */}
               <div className="col-span-2 flex flex-col justify-center">
-                <USDCAmount amount={challenge.stakeAmount} size="sm" />
+                <USDCAmount amount={challenge.wagerAmount} size="sm" />
                 <div className="flex items-center gap-2 mt-1">
                   <span className="text-xs font-mono text-mid-light">
                     {challenge.riskPercent.toFixed(1)}% of bal
@@ -212,7 +212,7 @@ export function ChallengeTable({
                   </div>
                 </div>
                 <span className="text-xs font-mono text-mid-light mt-1">
-                  pot: <USDCAmount amount={challenge.stakeAmount * 2} size="sm" className="inline" />
+                  pot: <USDCAmount amount={challenge.wagerAmount * 2} size="sm" className="inline" />
                 </span>
               </div>
 
@@ -227,7 +227,7 @@ export function ChallengeTable({
                   </button>
                 ) : (
                   <span className="text-xs font-mono text-mid-light">
-                    need <USDCAmount amount={challenge.stakeAmount - userBalance} size="sm" className="inline" />
+                    need <USDCAmount amount={challenge.wagerAmount - userBalance} size="sm" className="inline" />
                   </span>
                 )}
               </div>
@@ -243,7 +243,7 @@ export function ChallengeTable({
         </div>
         <div className="col-span-2">
           total: <USDCAmount
-            amount={challenges.reduce((sum, c) => sum + c.stakeAmount, 0)}
+            amount={challenges.reduce((sum, c) => sum + c.wagerAmount, 0)}
             size="sm"
             className="inline"
           />
@@ -254,7 +254,7 @@ export function ChallengeTable({
         </div>
         <div className="col-span-2"></div>
         <div className="col-span-2 text-right">
-          {challenges.filter(c => userBalance >= c.stakeAmount).length} affordable
+          {challenges.filter(c => userBalance >= c.wagerAmount).length} affordable
         </div>
       </div>
     </div>

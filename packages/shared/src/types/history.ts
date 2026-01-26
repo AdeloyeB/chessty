@@ -13,8 +13,8 @@ export interface HistoryFilters {
   result: 'all' | 'win' | 'loss' | 'draw';
   timeControl: 'all' | 'bullet' | 'blitz' | 'rapid' | 'classical';
   gameMode: 'all' | GameMode;
-  minStake?: number;
-  maxStake?: number;
+  minWager?: number;
+  maxWager?: number;
 }
 
 // Enhanced game with opponent info for history display
@@ -28,7 +28,7 @@ export interface HistoryGame {
   timeControlInitial: number;
   timeControlIncrement: number;
   timeControlLabel: string;
-  stakeAmount: number;
+  wagerAmount: number;
   totalPot: number;
   eloChange: number;
   eloAtStart: number;
@@ -146,7 +146,7 @@ export interface GameExportRow {
   resultDetail: string;
   gameMode: string;
   timeControl: string;
-  stake: number;
+  wager: number;
   profit: number;
   eloChange: number;
   opening: string;

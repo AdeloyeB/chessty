@@ -227,9 +227,9 @@ export const ACHIEVEMENTS: Achievement[] = [
 
   // Milestones / Special
   {
-    id: 'first_stake',
+    id: 'first_wager',
     name: 'Skin in the Game',
-    description: 'Play your first staked game',
+    description: 'Play your first wagered game',
     category: 'milestones',
     icon: '💰',
     requirement: 1,
@@ -237,7 +237,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   {
     id: 'high_roller',
     name: 'High Roller',
-    description: 'Win a game with 100+ USDC stake',
+    description: 'Win a game with 100+ USDC wager',
     category: 'milestones',
     icon: '💎',
     requirement: 100,

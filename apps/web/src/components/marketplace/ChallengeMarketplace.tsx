@@ -33,7 +33,7 @@ function calculateExpectedEloChange(yourElo: number, opponentElo: number, kFacto
 export function ChallengeMarketplace() {
   const [viewMode, setViewMode] = useState<ViewMode>('browse');
   const [challengeToAccept, setChallengeToAccept] = useState<ChallengeWithCreator | null>(null);
-  const [sortBy, setSortBy] = useState<'stake' | 'elo' | 'time' | 'winProb'>('stake');
+  const [sortBy, setSortBy] = useState<'wager' | 'elo' | 'time' | 'winProb'>('wager');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [filterMode, setFilterMode] = useState<GameMode | 'all'>('all');
   const [filterTime, setFilterTime] = useState<string>('all');
@@ -46,7 +46,7 @@ export function ChallengeMarketplace() {
     myChallenge,
     formGameMode,
     formTimeControlKey,
-    formStakeAmount,
+    formWagerAmount,
     formMinElo,
     formMaxElo,
   } = useChallengeStore();
@@ -69,7 +69,7 @@ export function ChallengeMarketplace() {
       .map(challenge => {
         const winProb = calculateWinProbability(userElo, challenge.creator.eloRating);
         const eloChange = calculateExpectedEloChange(userElo, challenge.creator.eloRating);
-        const riskPercent = balance > 0 ? (challenge.stakeAmount / balance) * 100 : 100;
+        const riskPercent = balance > 0 ? (challenge.wagerAmount / balance) * 100 : 100;
         const eloDiff = challenge.creator.eloRating - userElo;
         const creatorWinRate = challenge.creator.gamesPlayed > 0
           ? Math.round((challenge.creator.gamesWon / challenge.creator.gamesPlayed) * 100)
@@ -101,8 +101,8 @@ export function ChallengeMarketplace() {
     filtered.sort((a, b) => {
       let comparison = 0;
       switch (sortBy) {
-        case 'stake':
-          comparison = a.stakeAmount - b.stakeAmount;
+        case 'wager':
+          comparison = a.wagerAmount - b.wagerAmount;
           break;
         case 'elo':
           comparison = a.creator.eloRating - b.creator.eloRating;
@@ -123,11 +123,11 @@ export function ChallengeMarketplace() {
   // Stats calculations
   const marketStats = useMemo(() => {
     const total = challenges.length;
-    const totalStake = challenges.reduce((sum, c) => sum + c.stakeAmount, 0);
+    const totalStake = challenges.reduce((sum, c) => sum + c.wagerAmount, 0);
     const avgStake = total > 0 ? totalStake / total : 0;
     const standardCount = challenges.filter(c => c.gameMode === 'standard').length;
     const chess960Count = challenges.filter(c => c.gameMode === 'chess960').length;
-    const affordableCount = enhancedChallenges.filter(c => c.stakeAmount <= balance).length;
+    const affordableCount = enhancedChallenges.filter(c => c.wagerAmount <= balance).length;
 
     return { total, totalStake, avgStake, standardCount, chess960Count, affordableCount };
   }, [challenges, enhancedChallenges, balance]);
@@ -149,7 +149,7 @@ export function ChallengeMarketplace() {
     createChallenge({
       gameMode: formGameMode,
       timeControlKey: formTimeControlKey,
-      stakeAmount: formStakeAmount,
+      wagerAmount: formWagerAmount,
       minElo: formMinElo || undefined,
       maxElo: formMaxElo || undefined,
     });
@@ -271,11 +271,11 @@ export function ChallengeMarketplace() {
                 <span className="font-mono text-white">{marketStats.total}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-xs font-mono text-white/30 lowercase">total_stake</span>
+                <span className="text-xs font-mono text-white/30 lowercase">total_wagers</span>
                 <USDCAmount amount={marketStats.totalStake} size="sm" />
               </div>
               <div className="flex justify-between">
-                <span className="text-xs font-mono text-white/30 lowercase">avg_stake</span>
+                <span className="text-xs font-mono text-white/30 lowercase">avg_wager</span>
                 <USDCAmount amount={marketStats.avgStake} size="sm" />
               </div>
               <div className="flex justify-between">
@@ -494,7 +494,7 @@ interface MobileChallengeCardProps {
 
 function MobileChallengeCard({ challenge, userBalance, onAccept }: MobileChallengeCardProps) {
   const timeControl = CHALLENGE_TIME_CONTROLS[challenge.timeControlKey as keyof typeof CHALLENGE_TIME_CONTROLS];
-  const canAfford = userBalance >= challenge.stakeAmount;
+  const canAfford = userBalance >= challenge.wagerAmount;
 
   return (
     <div className="bg-black border-b border-white/15 p-4">
@@ -521,8 +521,8 @@ function MobileChallengeCard({ challenge, userBalance, onAccept }: MobileChallen
           <p className="text-xs text-white/30 font-mono lowercase">time</p>
         </div>
         <div className="p-2 border-r border-white/15">
-          <USDCAmount amount={challenge.stakeAmount} size="sm" />
-          <p className="text-xs text-white/30 font-mono lowercase">stake</p>
+          <USDCAmount amount={challenge.wagerAmount} size="sm" />
+          <p className="text-xs text-white/30 font-mono lowercase">wager</p>
         </div>
         <div className="p-2 border-r border-white/15">
           <p className={`font-mono text-sm ${challenge.winProb >= 50 ? 'text-white' : 'text-white/50'}`}>

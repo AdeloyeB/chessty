@@ -50,10 +50,10 @@ export function GameEndDialog() {
             <USDCAmount
               amount={
                 isDraw
-                  ? Number(game?.stakeAmount ?? 0)
+                  ? Number(game?.wagerAmount ?? 0)
                   : isWinner
                   ? Number(game?.totalPot ?? 0)
-                  : Number(game?.stakeAmount ?? 0)
+                  : Number(game?.wagerAmount ?? 0)
               }
               size="lg"
               className="justify-center"

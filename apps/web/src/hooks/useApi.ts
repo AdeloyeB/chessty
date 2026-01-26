@@ -31,8 +31,37 @@ interface ApiOptions extends RequestInit {
   auth?: boolean;
 }
 
+// MFA-related response types
+interface MFARequiredResponse {
+  requiresMfa: true;
+  tempToken: string;
+}
+
+interface MFAVerifyResponse {
+  user: any;
+  token: string;
+}
+
+interface MFAEnrollStartResponse {
+  secret: string;
+  qrCodeUri: string;
+}
+
+interface MFAEnrollCompleteResponse {
+  backupCodes: string[];
+}
+
+interface MFAStatusResponse {
+  enabled: boolean;
+  backupCodesRemaining: number;
+}
+
+interface MFABackupCodesResponse {
+  backupCodes: string[];
+}
+
 export function useApi() {
-  const { token, setUser, setToken, logout } = useAuthStore();
+  const { token, setUser, setToken, logout, setMfaRequired, clearMfaState } = useAuthStore();
 
   async function fetchApi<T>(endpoint: string, options: ApiOptions = {}): Promise<T> {
     const { auth = true, ...fetchOptions } = options;
@@ -62,15 +91,27 @@ export function useApi() {
 
   // Auth methods
   async function login(email: string, password: string) {
-    const data = await fetchApi<{ user: any; token: string }>('/api/auth/login', {
-      method: 'POST',
-      body: JSON.stringify({ email, password }),
-      auth: false,
-    });
+    // Login can return either a full auth response or an MFA-required response
+    const data = await fetchApi<{ user?: any; token?: string; requiresMfa?: boolean; tempToken?: string }>(
+      '/api/auth/login',
+      {
+        method: 'POST',
+        body: JSON.stringify({ email, password }),
+        auth: false,
+      }
+    );
 
+    // Check if MFA is required
+    if (data.requiresMfa && data.tempToken) {
+      setMfaRequired(true, data.tempToken);
+      return { requiresMfa: true as const, tempToken: data.tempToken };
+    }
+
+    // Normal login - no MFA required
     setUser(data.user);
-    setToken(data.token);
-    return data;
+    setToken(data.token!);
+    clearMfaState();
+    return { user: data.user, token: data.token! };
   }
 
   async function register(email: string, username: string, password: string) {
@@ -122,10 +163,10 @@ export function useApi() {
   }
 
   // Matchmaking methods
-  async function joinMatchmaking(stakeAmount: number, timeControl: { initial: number; increment: number }) {
+  async function joinMatchmaking(wagerAmount: number, timeControl: { initial: number; increment: number }) {
     return fetchApi<any>('/api/matchmaking/join', {
       method: 'POST',
-      body: JSON.stringify({ stakeAmount, timeControl }),
+      body: JSON.stringify({ wagerAmount, timeControl }),
     });
   }
 
@@ -213,11 +254,11 @@ export function useApi() {
     if (filters.gameMode !== 'all') {
       params.set('gameMode', filters.gameMode);
     }
-    if (filters.minStake !== undefined) {
-      params.set('minStake', String(filters.minStake));
+    if (filters.minWager !== undefined) {
+      params.set('minWager', String(filters.minWager));
     }
-    if (filters.maxStake !== undefined) {
-      params.set('maxStake', String(filters.maxStake));
+    if (filters.maxWager !== undefined) {
+      params.set('maxWager', String(filters.maxWager));
     }
 
     return fetchApi<PaginatedResponse<HistoryGame>>(`/api/games/history/filtered?${params.toString()}`);
@@ -290,12 +331,95 @@ export function useApi() {
     });
   }
 
+  // ============================================================================
+  // MFA Methods
+  // ============================================================================
+
+  /**
+   * Verify MFA code during login
+   * Called after password verification when MFA is enabled
+   *
+   * @param tempToken - The temporary token received after password verification
+   * @param code - The 6-digit TOTP code from the authenticator app or a backup code
+   * @param isBackupCode - Whether the code is a backup code (affects server-side handling)
+   */
+  async function verifyMFA(tempToken: string, code: string, isBackupCode: boolean = false) {
+    const data = await fetchApi<MFAVerifyResponse>('/api/auth/mfa/verify', {
+      method: 'POST',
+      body: JSON.stringify({ tempToken, code, isBackupCode }),
+      auth: false, // Using tempToken, not a regular auth token
+    });
+
+    // MFA verification successful - set the full session
+    setUser(data.user);
+    setToken(data.token);
+    clearMfaState();
+    return data;
+  }
+
+  /**
+   * Start MFA enrollment - generates a TOTP secret
+   * Requires authentication (user must be logged in)
+   */
+  async function startMFAEnrollment() {
+    return fetchApi<MFAEnrollStartResponse>('/api/mfa/enroll/start', {
+      method: 'POST',
+    });
+  }
+
+  /**
+   * Complete MFA enrollment by verifying the first TOTP code
+   * Returns backup codes that the user should save
+   */
+  async function completeMFAEnrollment(code: string) {
+    return fetchApi<MFAEnrollCompleteResponse>('/api/mfa/enroll/complete', {
+      method: 'POST',
+      body: JSON.stringify({ code }),
+    });
+  }
+
+  /**
+   * Get the current user's MFA status
+   */
+  async function getMFAStatus() {
+    return fetchApi<MFAStatusResponse>('/api/mfa/status');
+  }
+
+  /**
+   * Disable MFA for the current user
+   * Requires password and current TOTP code for verification
+   */
+  async function disableMFA(password: string, code: string) {
+    return fetchApi<{ success: boolean }>('/api/mfa/disable', {
+      method: 'POST',
+      body: JSON.stringify({ password, code }),
+    });
+  }
+
+  /**
+   * Regenerate backup codes
+   * Requires password for verification (in case authenticator is lost)
+   */
+  async function regenerateBackupCodes(password: string) {
+    return fetchApi<MFABackupCodesResponse>('/api/mfa/backup-codes', {
+      method: 'POST',
+      body: JSON.stringify({ password }),
+    });
+  }
+
   return {
     // Auth
     login,
     register,
     logout: logoutUser,
     getMe,
+    // MFA
+    verifyMFA,
+    startMFAEnrollment,
+    completeMFAEnrollment,
+    getMFAStatus,
+    disableMFA,
+    regenerateBackupCodes,
     // Games
     getActiveGames,
     getGame,

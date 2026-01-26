@@ -69,7 +69,7 @@ export const GameSchema = z.object({
   timeControl: TimeControlSchema,
   whiteTimeRemaining: z.number(),
   blackTimeRemaining: z.number(),
-  stakeAmount: z.number(),
+  wagerAmount: z.number(),
   totalPot: z.number(),
   whiteEloAtStart: z.number(),
   blackEloAtStart: z.number(),
@@ -109,7 +109,7 @@ export const TransactionTypeSchema = z.enum([
   'bet_won',
   'bet_lost',
   'bet_refunded',
-  'game_stake',
+  'game_wager',
   'game_win',
   'bonus',
 ]);
@@ -131,7 +131,7 @@ export type Transaction = z.infer<typeof TransactionSchema>;
 export const MatchmakingEntrySchema = z.object({
   userId: z.string(),
   eloRating: z.number(),
-  stakeAmount: z.number(),
+  wagerAmount: z.number(),
   timeControl: TimeControlSchema,
   minElo: z.number().nullable(),
   maxElo: z.number().nullable(),
@@ -217,7 +217,7 @@ export interface GameMovePayload {
 }
 
 export interface QueueJoinPayload {
-  stakeAmount: number;
+  wagerAmount: number;
   timeControl: TimeControl;
   minElo?: number;
   maxElo?: number;
@@ -264,7 +264,7 @@ export interface MatchFoundPayload {
   gameId: string;
   opponent: PublicUser;
   playerColor: 'white' | 'black';
-  stakeAmount: number;
+  wagerAmount: number;
   timeControl: TimeControl;
 }
 
@@ -283,7 +283,7 @@ export interface ErrorPayload {
 export interface ChallengeCreatePayload {
   gameMode: GameMode;
   timeControlKey: string;
-  stakeAmount: number;
+  wagerAmount: number;
   minElo?: number;
   maxElo?: number;
 }
@@ -434,7 +434,7 @@ export const ChallengeSchema = z.object({
   gameMode: GameModeSchema,
   timeControlKey: z.string(),
   timeControl: TimeControlSchema,
-  stakeAmount: z.number(),
+  wagerAmount: z.number(),
   minElo: z.number().nullable(),
   maxElo: z.number().nullable(),
   status: ChallengeStatusSchema,
@@ -492,7 +492,7 @@ export interface UserProfileData {
   longestStreak: number;
   totalCheckmates: number;
   quickestWin: number | null;
-  biggestStakeWin: number;
+  biggestWagerWin: number;
 }
 
 export interface AchievementProgress {

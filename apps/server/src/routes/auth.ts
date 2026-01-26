@@ -1,11 +1,20 @@
 import { LoginSchema, RegisterSchema, type ApiResponse, type AuthResponse } from '@chess-game/shared';
 import * as authService from '../services/auth';
+import { hasMFAEnabled } from '../services/mfa';
 import {
   loginLimiter,
   registerLimiter,
   rateLimitResponse,
   getClientIp,
 } from '../services/rateLimit';
+
+/**
+ * Response type when MFA is required after password verification
+ */
+interface MFARequiredResponse {
+  requiresMfa: true;
+  tempToken: string;
+}
 
 /**
  * Extract request context (IP, user agent) for security tracking
@@ -94,9 +103,28 @@ export async function handleLogin(req: Request): Promise<Response> {
     const { email, password } = parsed.data;
     const result = await authService.login(email, password, context);
 
-    // Reset rate limiter on successful login
+    // Reset rate limiter on successful password verification
     loginLimiter.reset(context.ipAddress || 'unknown');
 
+    // Check if user has MFA enabled
+    const mfaEnabled = await hasMFAEnabled(result.user.id);
+
+    if (mfaEnabled) {
+      // User needs to complete MFA - issue a temp token instead of a full session
+      const tempToken = await authService.generateTempToken(result.user.id);
+
+      const response: ApiResponse<MFARequiredResponse> = {
+        success: true,
+        data: {
+          requiresMfa: true,
+          tempToken,
+        },
+      };
+
+      return Response.json(response);
+    }
+
+    // No MFA - proceed with normal login (full session token)
     const response: ApiResponse<AuthResponse> = {
       success: true,
       data: {

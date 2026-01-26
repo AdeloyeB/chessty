@@ -319,8 +319,8 @@ export function useWebSocket() {
 
   // Queue actions
   const joinQueue = useCallback(
-    (stakeAmount: number, timeControl: { initial: number; increment: number }) =>
-      send('queue:join', { stakeAmount, timeControl }),
+    (wagerAmount: number, timeControl: { initial: number; increment: number }) =>
+      send('queue:join', { wagerAmount, timeControl }),
     [send]
   );
 
@@ -348,7 +348,7 @@ export function useWebSocket() {
     (params: {
       gameMode: GameMode;
       timeControlKey: string;
-      stakeAmount: number;
+      wagerAmount: number;
       minElo?: number;
       maxElo?: number;
     }) => {

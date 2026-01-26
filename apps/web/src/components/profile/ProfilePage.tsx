@@ -8,6 +8,7 @@ import { ProfileSkeleton } from './ProfileSkeleton';
 import { ProfileError } from './ProfileError';
 import { PaginatedGrid } from '../ui/PaginatedGrid';
 import { useProfileData } from '@/hooks/useProfileData';
+import { MFASettings } from './MFASettings';
 import {
   ACHIEVEMENTS,
   getAchievementsByCategory,
@@ -26,7 +27,7 @@ const CATEGORY_LABELS: Record<AchievementCategory, string> = {
   milestones: 'milestones',
 };
 
-type TabType = 'overview' | 'achievements';
+type TabType = 'overview' | 'achievements' | 'security';
 
 export function ProfilePage() {
   const [activeTab, setActiveTab] = useState<TabType>('overview');
@@ -292,7 +293,7 @@ export function ProfilePage() {
 
         {/* Tabs */}
         <div className="flex mb-6">
-          {(['overview', 'achievements'] as TabType[]).map((tab, index) => (
+          {(['overview', 'achievements', 'security'] as TabType[]).map((tab, index) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -381,7 +382,7 @@ export function ProfilePage() {
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-sm font-mono text-white/50 lowercase">biggest_win</span>
-                    <span className="text-sm font-mono text-white">${profile.biggestStakeWin}</span>
+                    <span className="text-sm font-mono text-white">${profile.biggestWagerWin}</span>
                   </div>
                 </div>
 
@@ -472,6 +473,10 @@ export function ProfilePage() {
               />
             </div>
           </div>
+        )}
+
+        {activeTab === 'security' && (
+          <MFASettings />
         )}
 
       </main>

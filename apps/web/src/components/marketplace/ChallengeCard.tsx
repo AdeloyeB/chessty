@@ -52,8 +52,8 @@ export function ChallengeCard({
           <p className="text-white font-mono text-sm lowercase">{timeLabel}</p>
         </div>
         <div className="p-2 bg-black">
-          <p className="text-xs font-mono text-white/50 lowercase">stake</p>
-          <USDCAmount amount={challenge.stakeAmount} size="sm" />
+          <p className="text-xs font-mono text-white/50 lowercase">wager</p>
+          <USDCAmount amount={challenge.wagerAmount} size="sm" />
         </div>
       </div>
 

@@ -5,6 +5,24 @@ import {
   handleMe,
 } from './routes/auth';
 import {
+  handleGoogleAuth,
+  handleGoogleCallback,
+  handleGithubAuth,
+  handleGithubCallback,
+  handleTwitterAuth,
+  handleTwitterCallback,
+  handleAppleAuth,
+  handleAppleCallback,
+} from './routes/oauth';
+import {
+  handleStartEnrollment,
+  handleCompleteEnrollment,
+  handleMFAVerify,
+  handleGetStatus,
+  handleDisableMFA,
+  handleRegenerateBackupCodes,
+} from './routes/mfa';
+import {
   apiLimiter,
   rateLimitResponse,
   getClientIp,
@@ -139,7 +157,23 @@ const server = Bun.serve<WebSocketData>({
     }
 
     // Global API rate limiting (skip for auth endpoints - they have their own limits)
-    const skipRateLimit = ['/api/auth/login', '/api/auth/register', '/health'];
+    const skipRateLimit = [
+      '/api/auth/login',
+      '/api/auth/register',
+      '/api/auth/google',
+      '/api/auth/google/callback',
+      '/api/auth/github',
+      '/api/auth/github/callback',
+      '/api/auth/twitter',
+      '/api/auth/twitter/callback',
+      '/api/auth/apple',
+      '/api/auth/apple/callback',
+      '/api/auth/mfa/verify',
+      '/api/mfa/enroll/start',
+      '/api/mfa/enroll/complete',
+      '/api/mfa/disable',
+      '/health',
+    ];
     if (!skipRateLimit.includes(path)) {
       const rateLimitResult = apiLimiter.consume(clientIp);
       if (!rateLimitResult.allowed) {
@@ -175,6 +209,39 @@ const server = Bun.serve<WebSocketData>({
         response = await handleLogout(req);
       } else if (path === '/api/auth/me' && method === 'GET') {
         response = await handleMe(req);
+      }
+      // OAuth routes
+      else if (path === '/api/auth/google' && method === 'GET') {
+        response = await handleGoogleAuth(req);
+      } else if (path === '/api/auth/google/callback' && method === 'GET') {
+        response = await handleGoogleCallback(req);
+      } else if (path === '/api/auth/github' && method === 'GET') {
+        response = await handleGithubAuth(req);
+      } else if (path === '/api/auth/github/callback' && method === 'GET') {
+        response = await handleGithubCallback(req);
+      } else if (path === '/api/auth/twitter' && method === 'GET') {
+        response = await handleTwitterAuth(req);
+      } else if (path === '/api/auth/twitter/callback' && method === 'GET') {
+        response = await handleTwitterCallback(req);
+      } else if (path === '/api/auth/apple' && method === 'GET') {
+        response = await handleAppleAuth(req);
+      } else if (path === '/api/auth/apple/callback' && method === 'POST') {
+        // Note: Apple uses form_post response mode, so callback is POST not GET
+        response = await handleAppleCallback(req);
+      }
+      // MFA routes
+      else if (path === '/api/mfa/enroll/start' && method === 'POST') {
+        response = await handleStartEnrollment(req);
+      } else if (path === '/api/mfa/enroll/complete' && method === 'POST') {
+        response = await handleCompleteEnrollment(req);
+      } else if (path === '/api/auth/mfa/verify' && method === 'POST') {
+        response = await handleMFAVerify(req);
+      } else if (path === '/api/mfa/status' && method === 'GET') {
+        response = await handleGetStatus(req);
+      } else if (path === '/api/mfa/disable' && method === 'POST') {
+        response = await handleDisableMFA(req);
+      } else if (path === '/api/mfa/backup-codes' && method === 'POST') {
+        response = await handleRegenerateBackupCodes(req);
       }
       // Game routes
       else if (path === '/api/games/active' && method === 'GET') {

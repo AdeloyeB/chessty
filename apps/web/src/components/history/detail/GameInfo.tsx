@@ -52,12 +52,12 @@ export function GameInfo({ game }: GameInfoProps) {
           <InfoRow label="moves" value={game.moveCount.toString()} />
         </div>
 
-        {/* Stakes */}
+        {/* Wager */}
         <div className="pt-3 border-t border-mid/30">
           <div className="grid grid-cols-3 gap-4 text-sm font-mono">
             <div>
-              <p className="text-xs text-mid-light mb-1">stake</p>
-              <USDCAmount amount={game.stakeAmount} size="sm" />
+              <p className="text-xs text-mid-light mb-1">wager</p>
+              <USDCAmount amount={game.wagerAmount} size="sm" />
             </div>
             <div>
               <p className="text-xs text-mid-light mb-1">pot</p>

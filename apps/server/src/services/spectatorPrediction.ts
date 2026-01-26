@@ -100,7 +100,7 @@ export async function createPrediction(
   }
 
   // Reserve the amount
-  await walletService.deductStake(creatorId, amount, `prediction-${gameId}`);
+  await walletService.deductWager(creatorId, amount, `prediction-${gameId}`);
 
   // Get predicted winner for response
   const predictedWinner = await db.query.users.findFirst({
@@ -181,7 +181,7 @@ export async function acceptPrediction(
   }
 
   // Reserve the acceptor's amount
-  await walletService.deductStake(acceptorId, amount, `prediction-${prediction.gameId}`);
+  await walletService.deductWager(acceptorId, amount, `prediction-${prediction.gameId}`);
 
   const [updated] = await db
     .update(spectatorPredictions)
@@ -220,9 +220,9 @@ export async function settlePredictionsForGame(
 
     if (winnerId === null) {
       // Draw - refund both parties
-      await walletService.refundStake(prediction.creatorId, amount, prediction.id);
+      await walletService.refundWager(prediction.creatorId, amount, prediction.id);
       if (prediction.acceptorId) {
-        await walletService.refundStake(prediction.acceptorId, amount, prediction.id);
+        await walletService.refundWager(prediction.acceptorId, amount, prediction.id);
       }
     } else {
       // Determine prediction winner
@@ -264,7 +264,7 @@ export async function settlePredictionsForGame(
 
   for (const prediction of openPredictions) {
     const amount = parseFloat(prediction.amount as unknown as string);
-    await walletService.refundStake(prediction.creatorId, amount, prediction.id);
+    await walletService.refundWager(prediction.creatorId, amount, prediction.id);
 
     await db
       .update(spectatorPredictions)
@@ -297,7 +297,7 @@ export async function cancelPrediction(
 
   // Refund the creator
   const amount = parseFloat(prediction.amount as unknown as string);
-  await walletService.refundStake(userId, amount, predictionId);
+  await walletService.refundWager(userId, amount, predictionId);
 
   await db
     .update(spectatorPredictions)

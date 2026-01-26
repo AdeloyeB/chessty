@@ -140,7 +140,7 @@ export class GameCoordinator {
         },
         whiteTimeRemaining: game.whiteTimeRemaining,
         blackTimeRemaining: game.blackTimeRemaining,
-        stakeAmount: Number(game.stakeAmount),
+        wagerAmount: Number(game.wagerAmount),
         totalPot: Number(game.totalPot),
         whiteEloAtStart: game.whiteEloAtStart,
         blackEloAtStart: game.blackEloAtStart,
@@ -312,7 +312,7 @@ export class GameCoordinator {
       whiteEloAtStart: game.whiteEloAtStart,
       blackEloAtStart: game.blackEloAtStart,
       moveCount: Array.isArray(game.moves) ? game.moves.length : 0,
-      stakeAmount: Number(game.stakeAmount),
+      wagerAmount: Number(game.wagerAmount),
       eloChanges: {
         whiteChange: eloChanges.whiteChange,
         blackChange: eloChanges.blackChange,
@@ -358,7 +358,7 @@ export class GameCoordinator {
           moves: game.moves,
           whiteTimeRemaining: game.whiteTimeRemaining,
           blackTimeRemaining: game.blackTimeRemaining,
-          stakeAmount: Number(game.stakeAmount),
+          wagerAmount: Number(game.wagerAmount),
           totalPot: Number(game.totalPot),
         },
       });
@@ -398,7 +398,7 @@ export class GameCoordinator {
     try {
       const entry = await matchmakingService.joinQueue(
         userId,
-        payload.stakeAmount,
+        payload.wagerAmount,
         payload.timeControl,
         payload.minElo,
         payload.maxElo
@@ -432,7 +432,7 @@ export class GameCoordinator {
       gameId: match.gameId,
       opponent: authService.toPublicUser(blackPlayer),
       playerColor: 'white',
-      stakeAmount: match.stakeAmount,
+      wagerAmount: match.wagerAmount,
       timeControl: match.timeControl,
     };
     this.broadcast.sendToUser(match.whitePlayerId, 'queue:match_found', whitePayload);
@@ -441,7 +441,7 @@ export class GameCoordinator {
       gameId: match.gameId,
       opponent: authService.toPublicUser(whitePlayer),
       playerColor: 'black',
-      stakeAmount: match.stakeAmount,
+      wagerAmount: match.wagerAmount,
       timeControl: match.timeControl,
     };
     this.broadcast.sendToUser(match.blackPlayerId, 'queue:match_found', blackPayload);

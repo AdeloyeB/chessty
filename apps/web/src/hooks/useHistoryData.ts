@@ -109,7 +109,7 @@ function generateMockGames(count: number, userElo: number): HistoryGame[] {
     const timeControl = TIME_CONTROLS[i % TIME_CONTROLS.length];
     const isWhite = i % 2 === 0;
     const moveCount = 20 + Math.floor(Math.random() * 60);
-    const stakeAmount = [10, 25, 50, 100, 250, 500][i % 6];
+    const wagerAmount = [10, 25, 50, 100, 250, 500][i % 6];
 
     let eloChange = Math.floor(Math.random() * 20) + 5;
     if (result === 'loss') eloChange = -eloChange;
@@ -128,8 +128,8 @@ function generateMockGames(count: number, userElo: number): HistoryGame[] {
       timeControlInitial: timeControl.initial,
       timeControlIncrement: timeControl.increment,
       timeControlLabel: timeControl.label,
-      stakeAmount,
-      totalPot: stakeAmount * 2,
+      wagerAmount,
+      totalPot: wagerAmount * 2,
       eloChange,
       eloAtStart: userElo - eloChange,
       opponentEloAtStart: opponent.eloRating,
@@ -191,7 +191,7 @@ function generateMockTransactions(count: number): HistoryTransaction[] {
 
   const types = [
     { type: 'game_win', amountRange: [20, 1000] },
-    { type: 'game_stake', amountRange: [-500, -10] },
+    { type: 'game_wager', amountRange: [-500, -10] },
     { type: 'deposit', amountRange: [100, 1000] },
     { type: 'withdrawal', amountRange: [-500, -100] },
     { type: 'bet_won', amountRange: [10, 200] },
@@ -222,8 +222,8 @@ function getTransactionDescription(type: string, index: number): string {
   switch (type) {
     case 'game_win':
       return `Won vs ${opponents[index % opponents.length]}`;
-    case 'game_stake':
-      return `Stake for game vs ${opponents[index % opponents.length]}`;
+    case 'game_wager':
+      return `Wager for game vs ${opponents[index % opponents.length]}`;
     case 'deposit':
       return 'USDC Deposit';
     case 'withdrawal':
@@ -290,7 +290,7 @@ interface UseHistoryDataReturn {
   setResultFilter: (result: HistoryFilters['result']) => void;
   setTimeControlFilter: (tc: HistoryFilters['timeControl']) => void;
   setGameModeFilter: (mode: HistoryFilters['gameMode']) => void;
-  setStakeRange: (min?: number, max?: number) => void;
+  setWagerRange: (min?: number, max?: number) => void;
   resetFilters: () => void;
 
   // Date range
@@ -477,8 +477,8 @@ export function useHistoryData({
     resetPage();
   }, [resetPage]);
 
-  const setStakeRange = useCallback((minStake?: number, maxStake?: number) => {
-    setFilters(prev => ({ ...prev, minStake, maxStake }));
+  const setWagerRange = useCallback((minWager?: number, maxWager?: number) => {
+    setFilters(prev => ({ ...prev, minWager, maxWager }));
     resetPage();
   }, [resetPage]);
 
@@ -540,7 +540,7 @@ export function useHistoryData({
     setResultFilter,
     setTimeControlFilter,
     setGameModeFilter,
-    setStakeRange,
+    setWagerRange,
     resetFilters,
 
     // Date range

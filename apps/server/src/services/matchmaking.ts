@@ -3,7 +3,7 @@ import { nanoid } from 'nanoid';
 import { db, matchmakingQueue, games, users } from '../drizzle';
 import type { TimeControl } from '@chess-game/shared';
 import {
-  STAKE_TOLERANCE_PERCENT,
+  WAGER_TOLERANCE_PERCENT,
   MAX_ELO_SEARCH_RANGE,
   ELO_SEARCH_EXPANSION_RATE,
   ELO_SEARCH_EXPANSION_INTERVAL,
@@ -13,7 +13,7 @@ import * as walletService from './wallet';
 export interface QueueEntry {
   userId: string;
   eloRating: number;
-  stakeAmount: number;
+  wagerAmount: number;
   timeControl: TimeControl;
   minElo: number | null;
   maxElo: number | null;
@@ -24,13 +24,13 @@ export interface MatchResult {
   gameId: string;
   whitePlayerId: string;
   blackPlayerId: string;
-  stakeAmount: number;
+  wagerAmount: number;
   timeControl: TimeControl;
 }
 
 export async function joinQueue(
   userId: string,
-  stakeAmount: number,
+  wagerAmount: number,
   timeControl: TimeControl,
   minElo?: number,
   maxElo?: number
@@ -55,14 +55,14 @@ export async function joinQueue(
 
   // Check if user has enough balance
   const balance = parseFloat(user.balance);
-  if (balance < stakeAmount) {
-    throw new Error('Insufficient balance for stake');
+  if (balance < wagerAmount) {
+    throw new Error('Insufficient balance for wager');
   }
 
   const entry = {
     userId,
     eloRating: user.eloRating,
-    stakeAmount: stakeAmount.toString(),
+    wagerAmount: wagerAmount.toString(),
     timeControlInitial: timeControl.initial,
     timeControlIncrement: timeControl.increment,
     minElo: minElo ?? null,
@@ -74,7 +74,7 @@ export async function joinQueue(
   return {
     userId,
     eloRating: user.eloRating,
-    stakeAmount,
+    wagerAmount,
     timeControl,
     minElo: minElo ?? null,
     maxElo: maxElo ?? null,
@@ -96,7 +96,7 @@ export async function findMatch(userId: string): Promise<MatchResult | null> {
     return null;
   }
 
-  const userStake = parseFloat(userEntry.stakeAmount);
+  const userWager = parseFloat(userEntry.wagerAmount);
   const waitTime = Date.now() - userEntry.joinedAt.getTime();
   const eloExpansion = Math.min(
     MAX_ELO_SEARCH_RANGE,
@@ -120,12 +120,12 @@ export async function findMatch(userId: string): Promise<MatchResult | null> {
   });
 
   for (const match of potentialMatches) {
-    const matchStake = parseFloat(match.stakeAmount);
+    const matchWager = parseFloat(match.wagerAmount);
 
-    // Check stake compatibility
-    const stakeDiff = Math.abs(userStake - matchStake);
-    const maxStake = Math.max(userStake, matchStake);
-    if (stakeDiff > maxStake * STAKE_TOLERANCE_PERCENT) {
+    // Check wager compatibility
+    const wagerDiff = Math.abs(userWager - matchWager);
+    const maxWager = Math.max(userWager, matchWager);
+    if (wagerDiff > maxWager * WAGER_TOLERANCE_PERCENT) {
       continue;
     }
 
@@ -136,11 +136,11 @@ export async function findMatch(userId: string): Promise<MatchResult | null> {
     if (match.maxElo !== null && userEntry.eloRating > match.maxElo) continue;
 
     // Found a match! Create the game
-    const gameStake = Math.min(userStake, matchStake);
+    const gameWager = Math.min(userWager, matchWager);
     const gameResult = await createGame(
       userId,
       match.userId,
-      gameStake,
+      gameWager,
       {
         initial: userEntry.timeControlInitial,
         increment: userEntry.timeControlIncrement,
@@ -160,7 +160,7 @@ export async function findMatch(userId: string): Promise<MatchResult | null> {
 async function createGame(
   player1Id: string,
   player2Id: string,
-  stakeAmount: number,
+  wagerAmount: number,
   timeControl: TimeControl
 ): Promise<MatchResult> {
   // Get both players
@@ -178,10 +178,10 @@ async function createGame(
   const whitePlayer = isPlayer1White ? player1 : player2;
   const blackPlayer = isPlayer1White ? player2 : player1;
 
-  // Deduct stakes from both players
+  // Deduct wagers from both players
   await Promise.all([
-    walletService.deductStake(whitePlayer.id, stakeAmount, 'pending'),
-    walletService.deductStake(blackPlayer.id, stakeAmount, 'pending'),
+    walletService.deductWager(whitePlayer.id, wagerAmount, 'pending'),
+    walletService.deductWager(blackPlayer.id, wagerAmount, 'pending'),
   ]);
 
   const gameId = nanoid();
@@ -196,20 +196,20 @@ async function createGame(
     timeControlIncrement: timeControl.increment,
     whiteTimeRemaining: timeControl.initial,
     blackTimeRemaining: timeControl.initial,
-    stakeAmount: stakeAmount.toString(),
-    totalPot: (stakeAmount * 2).toString(),
+    wagerAmount: wagerAmount.toString(),
+    totalPot: (wagerAmount * 2).toString(),
     whiteEloAtStart: whitePlayer.eloRating,
     blackEloAtStart: blackPlayer.eloRating,
   });
 
   // Update transaction references with actual game ID
-  // (Already done in deductStake, but with 'pending' - would need to update in real implementation)
+  // (Already done in deductWager, but with 'pending' - would need to update in real implementation)
 
   return {
     gameId,
     whitePlayerId: whitePlayer.id,
     blackPlayerId: blackPlayer.id,
-    stakeAmount,
+    wagerAmount,
     timeControl,
   };
 }
@@ -226,7 +226,7 @@ export async function getQueueStatus(userId: string): Promise<QueueEntry | null>
   return {
     userId: entry.userId,
     eloRating: entry.eloRating,
-    stakeAmount: parseFloat(entry.stakeAmount),
+    wagerAmount: parseFloat(entry.wagerAmount),
     timeControl: {
       initial: entry.timeControlInitial,
       increment: entry.timeControlIncrement,
