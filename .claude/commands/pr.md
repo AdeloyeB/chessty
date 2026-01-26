@@ -4,6 +4,24 @@ You are creating a pull request for changes on the current feature branch. Follo
 
 ## Steps
 
+### 0. Run Tests First (Gate Check)
+
+Before doing anything else, run the test suite to ensure code quality:
+
+```bash
+cd apps/server && bun test
+```
+
+**If tests fail:**
+- List the failing tests and their errors
+- Do NOT proceed with the PR
+- Tell the user to fix the failing tests first
+
+**If tests pass:**
+- Report "All X tests passed" and continue to step 1
+
+This is a hard gate — no PR should be created with failing tests.
+
 ### 1. Assess Current State
 
 Run these commands to understand what's being submitted:
