@@ -49,21 +49,22 @@ export async function settleGameOnChain(
   winnerId: string | null,
   wagerAmount: number
 ): Promise<SettlementResult> {
-  // TODO: Implement when ChessEscrow.sol is deployed
-  // For now, log and return mock result for development
-  console.log(
-    `[Blockchain] STUB: settleGameOnChain(${gameId}, winner=${winnerId}, wager=${wagerAmount})`
-  );
-
   if (process.env.NODE_ENV === 'production') {
     throw new Error(
       'On-chain settlement not implemented. Cannot settle games in production without smart contracts.'
     );
   }
 
+  // Development only: log with redacted identifiers
+  const redactedGameId = gameId.slice(0, 4) + '***';
+  const redactedWinner = winnerId ? winnerId.slice(0, 4) + '***' : 'draw';
+  console.log(
+    `[Blockchain] STUB: settleGameOnChain(game=${redactedGameId}, winner=${redactedWinner}, wager=${wagerAmount})`
+  );
+
   // Development stub - return mock transaction
   return {
-    txHash: `0xstub_${gameId}_${Date.now()}`,
+    txHash: `0xstub_${Date.now()}`,
     blockNumber: 0,
     gasUsed: '0',
   };
@@ -84,18 +85,20 @@ export async function recordGameResult(
   finalFenHash: string,
   moveHistoryHash: string
 ): Promise<GameRegistryResult> {
-  console.log(
-    `[Blockchain] STUB: recordGameResult(${gameId}, fen=${finalFenHash.slice(0, 10)}..., moves=${moveHistoryHash.slice(0, 10)}...)`
-  );
-
   if (process.env.NODE_ENV === 'production') {
     throw new Error(
       'Game registry not implemented. Cannot record results in production without smart contracts.'
     );
   }
 
+  // Development only: log with redacted identifiers
+  const redactedGameId = gameId.slice(0, 4) + '***';
+  console.log(
+    `[Blockchain] STUB: recordGameResult(game=${redactedGameId}, fen=${finalFenHash.slice(0, 6)}..., moves=${moveHistoryHash.slice(0, 6)}...)`
+  );
+
   return {
-    txHash: `0xregistry_${gameId}_${Date.now()}`,
+    txHash: `0xregistry_${Date.now()}`,
   };
 }
 
