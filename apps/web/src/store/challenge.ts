@@ -8,11 +8,15 @@ type ChallengeUIState =
   | 'waiting'        // Waiting for someone to accept our challenge
   | 'accepted'       // Someone accepted our challenge, awaiting confirmations
   | 'confirming'     // We accepted a challenge, awaiting confirmations
+  | 'canceling'      // Canceling the challenge
   | 'starting';      // Both confirmed, game is starting
 
 interface ChallengeState {
   // UI state
   uiState: ChallengeUIState;
+
+  // Error state
+  error: string | null;
 
   // Challenge list (marketplace)
   challenges: ChallengeWithCreator[];
@@ -33,6 +37,7 @@ interface ChallengeState {
 
   // Actions
   setUIState: (state: ChallengeUIState) => void;
+  setError: (error: string | null) => void;
   setChallenges: (challenges: ChallengeWithCreator[]) => void;
   setMyChallenge: (challenge: ChallengeWithCreator | null) => void;
 
@@ -60,6 +65,7 @@ const mockChallenges = USE_MOCK_DATA ? generateMockChallenges(15) : [];
 
 const initialState = {
   uiState: 'idle' as ChallengeUIState,
+  error: null as string | null,
   challenges: USE_MOCK_DATA ? (mockChallenges as unknown as ChallengeWithCreator[]) : [],
   myChallenge: null,
   formGameMode: 'standard' as GameMode,
@@ -75,6 +81,8 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
   ...initialState,
 
   setUIState: (uiState) => set({ uiState }),
+
+  setError: (error) => set({ error }),
 
   setChallenges: (challenges) => set({ challenges }),
 

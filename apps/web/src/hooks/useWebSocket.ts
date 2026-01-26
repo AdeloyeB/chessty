@@ -213,6 +213,11 @@ export function useWebSocket() {
           case 'error': {
             const data = payload as any;
             console.error('WebSocket error:', data.code, data.message);
+            // Update challenge store with error and reset to idle
+            if (data.code?.startsWith('CHALLENGE_') || data.message?.toLowerCase().includes('challenge')) {
+              challengeStore.setError(data.message || 'An error occurred');
+              challengeStore.setUIState('idle');
+            }
             break;
           }
         }
