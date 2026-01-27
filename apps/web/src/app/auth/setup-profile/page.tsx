@@ -65,8 +65,12 @@ export default function SetupProfilePage() {
     }
   }, [token, user, router]);
 
-  // Check display name availability when debounced value changes
+  // Check display name availability when debounced value changes.
+  // Uses a cancelled flag to avoid setting state after the effect is cleaned up
+  // (e.g., if the user types fast and the previous check resolves after a new one starts).
   useEffect(() => {
+    let cancelled = false;
+
     const checkAvailability = async () => {
       if (!debouncedDisplayName || debouncedDisplayName.length < 3) {
         setValidationState('idle');
@@ -77,6 +81,8 @@ export default function SetupProfilePage() {
       setValidationState('checking');
 
       const result = await checkDisplayName(debouncedDisplayName);
+
+      if (cancelled) return;
 
       if (!result.valid) {
         setValidationState('invalid');
@@ -91,6 +97,8 @@ export default function SetupProfilePage() {
     };
 
     checkAvailability();
+
+    return () => { cancelled = true; };
   }, [debouncedDisplayName, checkDisplayName]);
 
   // Handle form submission
@@ -115,33 +123,14 @@ export default function SetupProfilePage() {
     }
   }, [displayName, validationState, setDisplayName, router]);
 
-  // Validation indicator component
-  const ValidationIndicator = () => {
-    if (displayName.length < 3) {
-      return null;
-    }
-
-    switch (validationState) {
-      case 'checking':
-        return (
-          <span className="text-white/50 animate-pulse">checking...</span>
-        );
-      case 'valid':
-        return (
-          <span className="text-green-400">available</span>
-        );
-      case 'taken':
-        return (
-          <span className="text-red-400">taken</span>
-        );
-      case 'invalid':
-        return (
-          <span className="text-red-400">invalid</span>
-        );
-      default:
-        return null;
-    }
-  };
+  // Validation indicator — inline logic instead of nested component
+  // (React lint forbids defining components inside render)
+  const validationIndicator = displayName.length < 3 ? null
+    : validationState === 'checking' ? <span className="text-white/50 animate-pulse">checking...</span>
+    : validationState === 'valid' ? <span className="text-green-400">available</span>
+    : validationState === 'taken' ? <span className="text-red-400">taken</span>
+    : validationState === 'invalid' ? <span className="text-red-400">invalid</span>
+    : null;
 
   return (
     <div className="min-h-screen bg-black flex items-center justify-center">
@@ -178,7 +167,7 @@ export default function SetupProfilePage() {
                 disabled={isSubmitting}
               />
               <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-mono">
-                <ValidationIndicator />
+                {validationIndicator}
               </div>
             </div>
 

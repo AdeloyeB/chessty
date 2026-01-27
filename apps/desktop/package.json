@@ -4,8 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "cargo tauri dev",
-    "build": "cargo tauri build",
-    "tauri": "tauri"
+    "build": "cargo tauri build"
   },
   "dependencies": {
     "@chess-game/web": "workspace:*"

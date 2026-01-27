@@ -75,9 +75,9 @@ export function DraggableGameTile({ game, isActive, isInGrid, onClick, onRemove 
           <div className="flex items-center gap-1.5 min-w-0">
             <span className={`w-1.5 h-1.5 flex-shrink-0 ${turn === 'white' ? 'bg-white' : 'bg-white/40 border border-white/30'}`} />
             <span className="text-[10px] font-mono text-white leading-tight">
-              {game.whitePlayer?.username ?? '?'}
+              {game.whitePlayer?.displayName ?? game.whitePlayer?.username ?? '?'}
               {' '}<span className="text-amber-400/80 animate-subtle-blink">vs</span>{' '}
-              {game.blackPlayer?.username ?? '?'}
+              {game.blackPlayer?.displayName ?? game.blackPlayer?.username ?? '?'}
             </span>
           </div>
 

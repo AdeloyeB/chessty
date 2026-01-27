@@ -228,6 +228,18 @@ export async function handleWalletVerify(req: Request): Promise<Response> {
       );
     }
 
+    // Ensure the address in the SIWE message matches the claimed address
+    // (case-insensitive since Ethereum addresses are hex and 0xABC === 0xabc)
+    if (messageAddress.toLowerCase() !== address.toLowerCase()) {
+      return Response.json(
+        {
+          success: false,
+          error: { code: 'ADDRESS_MISMATCH', message: 'Message address does not match claimed address' },
+        },
+        { status: 400 }
+      );
+    }
+
     // Verify signature matches the address
     const isValid = await verifySiweSignature({
       message,

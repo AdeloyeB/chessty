@@ -454,6 +454,13 @@ export class GameCoordinator {
         ws.data.spectatingGameIds = new Set();
       }
 
+      // Enforce multi-game feature flag: if disabled, only allow one game at a time
+      const multiGameEnabled = isFeatureEnabled('spectator_multi_game');
+      if (!multiGameEnabled && ws.data.spectatingGameIds.size >= 1 && !ws.data.spectatingGameIds.has(gameId)) {
+        // Single-game mode: leave current game first
+        this.leaveAllSpectating(userId);
+      }
+
       // Enforce max concurrent spectated games
       if (ws.data.spectatingGameIds.size >= GameCoordinator.MAX_SPECTATED_GAMES && !ws.data.spectatingGameIds.has(gameId)) {
         this.broadcast.sendError(userId, 'MAX_SPECTATING', `Cannot spectate more than ${GameCoordinator.MAX_SPECTATED_GAMES} games at once`);

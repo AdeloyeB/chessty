@@ -76,8 +76,6 @@ export function LiveGame() {
   // Determine which player is on top / bottom based on our color
   const topPlayer = playerColor === 'white' ? blackPlayer : whitePlayer;
   const bottomPlayer = playerColor === 'white' ? whitePlayer : blackPlayer;
-  const topTime = playerColor === 'white' ? blackTimeRemaining : whiteTimeRemaining;
-  const bottomTime = playerColor === 'white' ? whiteTimeRemaining : blackTimeRemaining;
   const isTopActive = !isMyTurn && status === 'playing';
   const isBottomActive = isMyTurn && status === 'playing';
 
@@ -215,16 +213,16 @@ export function LiveGame() {
             <div className="flex">
               <div className="flex-1 p-2 border-r border-white/15 text-center">
                 <div className="w-6 h-6 mx-auto mb-1 bg-white flex items-center justify-center text-black text-xs font-mono">
-                  {whitePlayer?.username?.[0]?.toLowerCase()}
+                  {(whitePlayer?.displayName ?? whitePlayer?.username)?.[0]?.toLowerCase()}
                 </div>
-                <div className="text-[10px] font-mono text-white/70 truncate">{whitePlayer?.username}</div>
+                <div className="text-[10px] font-mono text-white/70 truncate">{whitePlayer?.displayName ?? whitePlayer?.username}</div>
                 <div className="text-[10px] font-mono text-white/30">{whitePlayer?.eloRating}</div>
               </div>
               <div className="flex-1 p-2 text-center">
                 <div className="w-6 h-6 mx-auto mb-1 bg-white/50 flex items-center justify-center text-black text-xs font-mono">
-                  {blackPlayer?.username?.[0]?.toLowerCase()}
+                  {(blackPlayer?.displayName ?? blackPlayer?.username)?.[0]?.toLowerCase()}
                 </div>
-                <div className="text-[10px] font-mono text-white/70 truncate">{blackPlayer?.username}</div>
+                <div className="text-[10px] font-mono text-white/70 truncate">{blackPlayer?.displayName ?? blackPlayer?.username}</div>
                 <div className="text-[10px] font-mono text-white/30">{blackPlayer?.eloRating}</div>
               </div>
             </div>
@@ -371,7 +369,7 @@ export function LiveGame() {
             <div className="flex items-center gap-3">
               <div className={`w-3 h-3 ${playerColor === 'white' ? 'bg-white/50' : 'bg-white'}`} />
               <span className="text-sm font-mono text-white/70 lowercase">
-                {topPlayer?.username || 'opponent'}
+                {topPlayer?.displayName ?? topPlayer?.username ?? 'opponent'}
               </span>
               <span className="text-xs font-mono text-white/30">
                 {topPlayer?.eloRating}
@@ -400,7 +398,7 @@ export function LiveGame() {
             <div className="flex items-center gap-3">
               <div className={`w-3 h-3 ${playerColor === 'white' ? 'bg-white' : 'bg-white/50'}`} />
               <span className="text-sm font-mono text-white/70 lowercase">
-                {bottomPlayer?.username || 'you'}
+                {bottomPlayer?.displayName ?? bottomPlayer?.username ?? 'you'}
               </span>
               <span className="text-xs font-mono text-white/30">
                 {bottomPlayer?.eloRating}

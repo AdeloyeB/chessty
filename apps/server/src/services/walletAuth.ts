@@ -28,7 +28,7 @@
  */
 
 import { getAddress, verifyMessage, isAddress } from 'viem';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 import { db } from '../drizzle';
 import { users, type User } from '../drizzle/pg-schema';
@@ -391,9 +391,11 @@ export async function setDisplayName(
     throw new Error('Display name can only contain letters, numbers, underscores, and hyphens');
   }
 
-  // Check if display name is already taken
+  // Check if display name is already taken (case-insensitive to prevent
+  // "Player1" and "player1" from coexisting — users expect names to be unique
+  // regardless of casing)
   const existing = await db.query.users.findFirst({
-    where: eq(users.displayName, trimmed),
+    where: sql`LOWER(${users.displayName}) = LOWER(${trimmed})`,
   });
 
   if (existing && existing.id !== userId) {
@@ -437,7 +439,7 @@ export async function isDisplayNameAvailable(displayName: string): Promise<boole
   }
 
   const existing = await db.query.users.findFirst({
-    where: eq(users.displayName, trimmed),
+    where: sql`LOWER(${users.displayName}) = LOWER(${trimmed})`,
   });
 
   return !existing;

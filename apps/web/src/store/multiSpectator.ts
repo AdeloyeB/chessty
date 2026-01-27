@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { PublicUser } from '@chess-game/shared';
+import { useAuthStore } from './auth';
 
 /**
  * State for a single spectated game.
@@ -217,3 +218,11 @@ export const useMultiSpectatorStore = create<MultiSpectatorState>((set, get) => 
   getGameCount: () => Object.keys(get().games).length,
   hasGame: (gameId) => gameId in get().games,
 }));
+
+// Reset spectator state on logout — when the auth token is cleared, any
+// spectated games are stale (the WebSocket will also disconnect).
+useAuthStore.subscribe((state, prevState) => {
+  if (prevState.token && !state.token) {
+    useMultiSpectatorStore.getState().removeAllGames();
+  }
+});
