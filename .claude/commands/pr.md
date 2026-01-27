@@ -62,10 +62,20 @@ Type prefixes: `feat:` (new functionality), `fix:` (bug fix), `chore:` (deps/con
 **If the commit is blocked by the pre-commit hook (lint errors):**
 
 1. Read the error output — it shows the exact file, line, and rule that failed
-2. Fix the errors in the source files (the hook already ran `--fix` for auto-fixable issues, so remaining errors need manual fixes)
-3. Re-stage the fixed files: `git add <fixed-files>`
-4. Reattempt the commit with the same message
-5. Repeat until the commit succeeds — do NOT use `--no-verify` to skip the hook
+2. **Report the errors in the chat** — always output a summary like:
+
+```
+🔴 Lint errors found (X issues):
+  • apps/web/src/store/auth.ts:12 — 'unusedVar' is defined but never used (no-unused-vars)
+  • apps/server/src/services/game.ts:88 — 'result' is assigned but never used (no-unused-vars)
+
+Fixing now...
+```
+
+3. Fix the errors in the source files (the hook already ran `--fix` for auto-fixable issues, so remaining errors need manual fixes)
+4. Re-stage the fixed files: `git add <fixed-files>`
+5. Reattempt the commit with the same message
+6. Repeat until the commit succeeds — do NOT use `--no-verify` to skip the hook
 
 ### 2. Determine Branch and Feature
 
