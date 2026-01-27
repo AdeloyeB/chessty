@@ -32,7 +32,7 @@ export const DEFAULT_FEATURE_FLAGS = {
   spectator_predictions: {
     name: 'Spectator Predictions',
     description: 'Allow spectators to place P2P predictions on game outcomes',
-    enabled: true,
+    enabled: false, // Disabled — spectating is ON, but betting on games is not ready
   },
   chess960_mode: {
     name: 'Chess960 Mode',
@@ -75,6 +75,21 @@ export const DEFAULT_FEATURE_FLAGS = {
     description: 'Enable the challenge marketplace for creating and accepting challenges',
     enabled: true,
   },
+  spectator_mode: {
+    name: 'Spectator Mode',
+    description: 'Master toggle for the entire spectating feature — gates the spectate tab and ability to watch live games',
+    enabled: true,
+  },
+  spectator_chat: {
+    name: 'Spectator Chat',
+    description: 'Allow spectators to send chat messages while watching a game',
+    enabled: true,
+  },
+  spectator_multi_game: {
+    name: 'Multi-Game Spectating',
+    description: 'Allow spectators to watch up to 5 games simultaneously with a sub-nav and drag-and-drop grid view',
+    enabled: true,
+  },
 } as const;
 
 export type DefaultFeatureFlagId = keyof typeof DEFAULT_FEATURE_FLAGS;
@@ -83,10 +98,11 @@ export type DefaultFeatureFlagId = keyof typeof DEFAULT_FEATURE_FLAGS;
  * Feature flag categories for organization
  */
 export const FEATURE_FLAG_CATEGORIES = {
-  CORE: ['betting_enabled', 'matchmaking_v2', 'spectator_predictions', 'chess960_mode'],
+  CORE: ['betting_enabled', 'matchmaking_v2', 'chess960_mode'],
   WALLET: ['wallet_deposits', 'wallet_withdrawals'],
   SOCIAL: ['leaderboard_public', 'achievements_enabled'],
   GAME_MODES: ['practice_mode', 'challenge_marketplace'],
+  SPECTATOR: ['spectator_mode', 'spectator_predictions', 'spectator_chat', 'spectator_multi_game'],
 } as const;
 
 /**

@@ -76,7 +76,7 @@ export interface GameEventMap {
   'player:disconnected': {
     userId: string;
     gameId?: string;
-    spectatingGameId?: string;
+    spectatingGameIds?: string[];  // All games the user was spectating
   };
 
   'player:joined_game': {

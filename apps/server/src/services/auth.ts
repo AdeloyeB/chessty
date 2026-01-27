@@ -358,8 +358,8 @@ export async function findOrCreateOAuthUser(
   return { user, token };
 }
 
-export function sanitizeUser(user: User): Omit<User, 'passwordHash' | 'googleId' | 'githubId' | 'twitterId' | 'appleId'> {
-  const { passwordHash, googleId, githubId, twitterId, appleId, ...sanitized } = user;
+export function sanitizeUser(user: User): Omit<User, 'passwordHash' | 'googleId' | 'githubId' | 'twitterId' | 'appleId' | 'walletAddress'> {
+  const { passwordHash: _pw, googleId: _g, githubId: _gh, twitterId: _t, appleId: _a, walletAddress: _w, ...sanitized } = user;
   return sanitized;
 }
 
@@ -367,6 +367,7 @@ export function toPublicUser(user: User) {
   return {
     id: user.id,
     username: user.username,
+    displayName: user.displayName,
     eloRating: user.eloRating,
     peakEloRating: user.peakEloRating,
     gamesPlayed: user.gamesPlayed,

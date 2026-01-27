@@ -223,7 +223,8 @@ function AnimatedBackground() {
 // Mock user for development
 const DEV_USER = {
   id: 'dev-user-1',
-  username: 'DevPlayer',
+  username: 'dev_player',
+  displayName: 'DevPlayer',
   email: 'dev@example.com',
   eloRating: 1200,
   peakEloRating: 1350,

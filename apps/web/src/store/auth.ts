@@ -4,14 +4,16 @@ import type { PublicUser } from '@chess-game/shared';
 import { USE_MOCK_DATA } from '@/lib/mock/mockData';
 
 interface UserWithBalance extends PublicUser {
-  email: string;
+  email: string | null;
   balance: number;
+  walletAddress?: string | null;
 }
 
 // Mock user for development
 const MOCK_USER: UserWithBalance = {
   id: 'mock-user-1',
-  username: 'DemoPlayer',
+  username: 'mock_demoplayer',
+  displayName: 'DemoPlayer',
   email: 'demo@chessgame.dev',
   eloRating: 1850,
   peakEloRating: 1920,

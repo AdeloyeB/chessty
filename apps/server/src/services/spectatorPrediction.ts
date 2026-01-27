@@ -7,6 +7,7 @@ function toPublicUser(user: typeof users.$inferSelect): PublicUser {
   return {
     id: user.id,
     username: user.username,
+    displayName: user.displayName,
     eloRating: user.eloRating,
     peakEloRating: user.peakEloRating,
     gamesPlayed: user.gamesPlayed,

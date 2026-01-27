@@ -1,4 +1,4 @@
-import { eq, and, or, gt, lt, ne } from 'drizzle-orm';
+import { eq, and, or, gt, lt } from 'drizzle-orm';
 import { db, challenges, users, games } from '../drizzle';
 import type { PublicUser, ChallengeWithCreator, GameMode } from '@chess-game/shared';
 import { CHALLENGE_TIME_CONTROLS, CHALLENGE_EXPIRATION, STARTING_FEN } from '@chess-game/shared';
@@ -9,6 +9,7 @@ function toPublicUser(user: typeof users.$inferSelect): PublicUser {
   return {
     id: user.id,
     username: user.username,
+    displayName: user.displayName,
     eloRating: user.eloRating,
     peakEloRating: user.peakEloRating,
     gamesPlayed: user.gamesPlayed,

@@ -152,27 +152,22 @@ When `decorations: false` is set, the OS stops managing the window chrome entire
 
 ---
 
-## Phase 5 — Electron Removal & Cleanup
+## Phase 5 — Electron Removal & Cleanup ✅ COMPLETE
 
-### What Needs Building
+### What Was Built
 
-- [ ] Delete `electron/` folder entirely
-- [ ] Delete `dist/` folder (Electron build artifacts)
-- [ ] Delete `tsconfig.electron.json`
-- [ ] Remove Electron dependencies from `package.json` (`electron`, `electron-builder`, `electron-store`, `concurrently`, `wait-on`)
-- [ ] Remove `electron-builder` config block from `package.json`
-- [ ] Update Electron-related scripts in root `package.json`
-- [ ] Update `turbo.json` build outputs
-- [ ] Update CLAUDE.md tech stack — Electron → Tauri
-- [ ] Final smoke test on macOS
-
-### What to Review
-
-This is a "make sure nothing got missed" review:
-- Does `pnpm dev` still work end to end?
-- Does `pnpm dev:desktop` open the Tauri app?
-- Does the web app still work standalone in a browser?
-- Are there any leftover references to Electron in the codebase?
+- [x] Delete `electron/` folder entirely
+- [x] Delete `dist/` folder (Electron build artifacts)
+- [x] Delete `tsconfig.electron.json`
+- [x] Delete `test-require.js`
+- [x] Remove Electron dependencies from `package.json` (`electron`, `electron-builder`, `electron-store`, `concurrently`, `wait-on`)
+- [x] Remove `electron-builder` config block from `package.json`
+- [x] Remove `"main": "dist/main.js"` Electron entry point from `package.json`
+- [x] Rename `dev:tauri` → `dev` and `build:tauri` → `build` (Tauri is now the only desktop target)
+- [x] Remove `isElectron()`, `window.electronAPI` types, and all Electron code paths from `desktop.ts`
+- [x] Update `Platform` type: `'tauri' | 'electron' | 'browser'` → `'tauri' | 'browser'`
+- [x] Update CLAUDE.md — remove Electron references from tech stack, dev workflow, and product context
+- [x] Update ROADMAP.md — Desktop App row updated from "Electron wrapper" to "Tauri desktop app"
 
 ---
 
@@ -222,7 +217,7 @@ docs/
 └── ANTI_CHEAT_PLAN.md              # Anti-cheat system design (separate effort)
 ```
 
-### Deleted Files (Phase 5 — Not Yet Done)
+### Deleted Files (Phase 5 — Complete)
 
 ```
 apps/desktop/
