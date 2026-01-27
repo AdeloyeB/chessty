@@ -156,6 +156,13 @@ pub async fn auth_open_external(
     app: AppHandle,
     url: String,
 ) -> Result<(), String> {
+    // Validate URL scheme for security — only allow http(s) for OAuth flows.
+    // Without this check, a compromised frontend could trick the backend into
+    // opening dangerous schemes like file://, javascript:, or custom protocols.
+    if !url.starts_with("https://") && !url.starts_with("http://") {
+        return Err("Invalid URL scheme. Only https:// and http:// URLs are allowed.".to_string());
+    }
+
     // tauri-plugin-opener provides the `open_url()` method which delegates to
     // the OS's default handler for the URL scheme. For https:// URLs, that
     // means the default web browser. This replaced the deprecated

@@ -282,19 +282,31 @@ export const auth = {
       //
       // The event name 'auth:token' must match what the Rust backend
       // emits when it receives the OAuth callback.
+      //
+      // The `cancelled` flag handles a race condition in React Strict Mode:
+      // If the component unmounts before the dynamic import resolves,
+      // we need to immediately clean up the listener instead of storing
+      // a stale unlistenFn that never gets called.
       let unlistenFn: (() => void) | null = null;
+      let cancelled = false;
 
       import('@tauri-apps/api/event').then(({ listen }) => {
+        if (cancelled) return; // Already unmounted, skip setup
         listen<string>('auth:token', (event) => {
           callback(event.payload);
         }).then((unlisten) => {
-          unlistenFn = unlisten;
+          if (cancelled) {
+            unlisten(); // Unmounted during setup, clean up immediately
+          } else {
+            unlistenFn = unlisten;
+          }
         });
       });
 
       // Return a cleanup function that will unsubscribe when called.
       // This follows the React pattern for useEffect cleanup.
       return () => {
+        cancelled = true;
         if (unlistenFn) unlistenFn();
       };
     }

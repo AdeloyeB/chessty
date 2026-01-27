@@ -21,7 +21,8 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' http://localhost:* ws://localhost:* wss://localhost:* https://*.chessgamble.com wss://*.chessgamble.com; img-src 'self' data: blob: https:; font-src 'self' data:; media-src 'self'"
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self' https://*.chessgamble.com wss://*.chessgamble.com; img-src 'self' data: blob: https:; font-src 'self' data:; media-src 'self'",
+      "devCsp": "default-src 'self'; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' http://localhost:* ws://localhost:* wss://localhost:* https://*.chessgamble.com wss://*.chessgamble.com; img-src 'self' data: blob: https:; font-src 'self' data:; media-src 'self'"
     }
   },
   "bundle": {

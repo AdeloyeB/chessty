@@ -25,7 +25,7 @@
   },
   "lint-staged": {
     "*.{ts,tsx}": "eslint --fix",
-    "*.rs": "cargo clippy --fix --allow-dirty --allow-staged"
+    "*.rs": "bash -c 'source \"$HOME/.cargo/env\" 2>/dev/null; cd apps/desktop/src-tauri && cargo clippy --fix --allow-dirty --allow-staged'"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",
