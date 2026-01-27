@@ -1,0 +1,60 @@
+{
+  "$schema": "https://raw.githubusercontent.com/tauri-apps/tauri/dev/crates/tauri-cli/schema.json",
+  "productName": "Chess Gamble",
+  "version": "0.1.0",
+  "identifier": "com.chessgamble.desktop",
+  "build": {
+    "devUrl": "http://localhost:3000",
+    "beforeBuildCommand": "cd ../web && pnpm build",
+    "frontendDist": "../web/out"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Chess Gamble",
+        "width": 1280,
+        "height": 800,
+        "minWidth": 1024,
+        "minHeight": 700,
+        "decorations": false,
+        "center": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' http://localhost:* ws://localhost:* wss://localhost:* https://*.chessgamble.com wss://*.chessgamble.com; img-src 'self' data: blob: https:; font-src 'self' data:; media-src 'self'"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "macOS": {
+      "minimumSystemVersion": "10.15",
+      "frameworks": [],
+      "exceptionDomain": "",
+      "signingIdentity": null,
+      "entitlements": null
+    },
+    "windows": {
+      "certificateThumbprint": null,
+      "digestAlgorithm": "sha256",
+      "timestampUrl": ""
+    },
+    "category": "Game",
+    "shortDescription": "Real-money chess prediction and betting platform",
+    "longDescription": "Chess Gamble is a desktop chess platform where players wager USDC and spectators bet on outcomes. Powered by Tauri for a lightweight, secure experience."
+  },
+  "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": ["chessgamble"]
+      }
+    }
+  }
+}

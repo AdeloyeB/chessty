@@ -13,6 +13,7 @@
     "dev:server": "turbo dev --filter=@chess-game/server",
     "dev:desktop": "turbo dev --filter=@chess-game/desktop",
     "build:desktop": "turbo build --filter=@chess-game/desktop",
+    "dev:desktop:tauri": "turbo dev --filter=@chess-game/desktop -- --tauri",
     "db:generate": "pnpm --filter=@chess-game/server db:generate",
     "db:migrate": "pnpm --filter=@chess-game/server db:migrate",
     "db:studio": "pnpm --filter=@chess-game/server db:studio"
