@@ -2,7 +2,11 @@
   "name": "the-chess-game",
   "version": "1.0.0",
   "private": true,
-  "workspaces": ["apps/*", "packages/*"],
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "packageManager": "pnpm@9.0.0",
   "scripts": {
     "dev": "turbo dev",
@@ -16,10 +20,22 @@
     "dev:desktop:tauri": "turbo dev --filter=@chess-game/desktop -- --tauri",
     "db:generate": "pnpm --filter=@chess-game/server db:generate",
     "db:migrate": "pnpm --filter=@chess-game/server db:migrate",
-    "db:studio": "pnpm --filter=@chess-game/server db:studio"
+    "db:studio": "pnpm --filter=@chess-game/server db:studio",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": "eslint --fix",
+    "*.rs": "cargo clippy --fix --allow-dirty --allow-staged"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.2",
+    "eslint": "^9.39.2",
+    "eslint-config-next": "^16.1.5",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.2.7",
     "turbo": "^2.0.0",
-    "typescript": "^5.4.0"
+    "typescript": "^5.4.0",
+    "typescript-eslint": "^8.54.0"
   }
 }

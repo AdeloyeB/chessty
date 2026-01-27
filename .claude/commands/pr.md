@@ -1,3 +1,18 @@
+### Git Branching (GitHub Flow)
+
+All work happens on feature branches. `main` is protected — no direct pushes, PRs required.
+
+**Branch naming:**
+
+| Prefix | Use Case | Example |
+|--------|----------|---------|
+| `feature/` | New functionality | `feature/spectator-chat` |
+| `fix/` | Bug fixes | `fix/clock-timeout-leak` |
+| `refactor/` | Code restructuring | `refactor/extract-redis` |
+| `docs/` | Documentation only | `docs/api-reference` |
+| `chore/` | Deps, config, CI | `chore/add-github-actions` |
+
+
 # Open Pull Request
 
 You are creating a pull request for changes on the current feature branch. Follow the steps below exactly.
@@ -14,7 +29,16 @@ git diff --stat
 git log --oneline main..HEAD
 ```
 
-If there are uncommitted changes, stage and commit them following the commit message format:
+If there are uncommitted changes, **lint before committing**:
+
+```bash
+# Auto-fix lint errors on all staged TypeScript files
+npx eslint --fix $(git diff --cached --name-only --diff-filter=d | grep -E '\.(ts|tsx)$' | tr '\n' ' ')
+# Re-stage any auto-fixed files
+git diff --cached --name-only --diff-filter=d | grep -E '\.(ts|tsx)$' | xargs git add
+```
+
+Then stage and commit them following the commit message format:
 
 ```
 <type>: <concise summary line>
@@ -34,6 +58,14 @@ Changes:
 Type prefixes: `feat:` (new functionality), `fix:` (bug fix), `chore:` (deps/config/cleanup), `refactor:` (restructuring), `docs:` (documentation only)
 
 **Commit messages must be highly detailed.** Anyone reading the commit history should understand exactly what happened, why it happened, and what was affected — without needing to read the diff. Think of commit messages as a changelog entry for future developers.
+
+**If the commit is blocked by the pre-commit hook (lint errors):**
+
+1. Read the error output — it shows the exact file, line, and rule that failed
+2. Fix the errors in the source files (the hook already ran `--fix` for auto-fixable issues, so remaining errors need manual fixes)
+3. Re-stage the fixed files: `git add <fixed-files>`
+4. Reattempt the commit with the same message
+5. Repeat until the commit succeeds — do NOT use `--no-verify` to skip the hook
 
 ### 2. Determine Branch and Feature
 
@@ -101,6 +133,8 @@ Output the PR URL and a brief summary of what was submitted.
 
 - Never force push
 - Never push directly to main
+- **Never use `--no-verify` to skip pre-commit hooks** — fix the lint errors instead
+- If the pre-commit hook blocks a commit, fix the errors and retry (never bypass)
 - If the branch doesn't exist on remote yet, push with `-u` to set upstream
 - Base all PRs against `main` unless told otherwise
 - Use squash merge strategy (the reviewer will handle this)
