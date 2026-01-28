@@ -43,6 +43,15 @@ function toPredictionWithUsers(
   };
 }
 
+/**
+ * C4 FIX: Minimum moves and clock time required before predictions are allowed.
+ * This prevents "instant prediction" exploits where someone predicts on move 1
+ * when the outcome is obvious (e.g. rating mismatch or known position).
+ */
+const PREDICTION_MIN_MOVES = 5;
+const PREDICTION_MAX_MOVE = 60;
+const PREDICTION_MIN_CLOCK_SECONDS = 30;
+
 export async function createPrediction(
   gameId: string,
   creatorId: string,
@@ -60,6 +69,19 @@ export async function createPrediction(
 
   if (game.status !== 'active') {
     throw new Error('Game is not active');
+  }
+
+  // C4 FIX: Enforce timing rules for predictions
+  const moveCount = Array.isArray(game.moves) ? game.moves.length : 0;
+  if (moveCount < PREDICTION_MIN_MOVES) {
+    throw new Error(`Predictions open after move ${PREDICTION_MIN_MOVES}`);
+  }
+  if (moveCount > PREDICTION_MAX_MOVE) {
+    throw new Error('Predictions are closed for this game (too many moves)');
+  }
+  if (game.whiteTimeRemaining < PREDICTION_MIN_CLOCK_SECONDS ||
+      game.blackTimeRemaining < PREDICTION_MIN_CLOCK_SECONDS) {
+    throw new Error('Predictions are closed when a player has less than 30 seconds');
   }
 
   // Check if user is a player (players cannot make spectator predictions)
@@ -184,14 +206,21 @@ export async function acceptPrediction(
   // Reserve the acceptor's amount
   await walletService.deductWager(acceptorId, amount, `prediction-${prediction.gameId}`);
 
+  // C3-style FIX: Atomic update — WHERE status='open' ensures only one acceptor succeeds
   const [updated] = await db
     .update(spectatorPredictions)
     .set({
       status: 'matched',
       acceptorId,
     })
-    .where(eq(spectatorPredictions.id, predictionId))
+    .where(and(eq(spectatorPredictions.id, predictionId), eq(spectatorPredictions.status, 'open')))
     .returning();
+
+  if (!updated) {
+    // Another user accepted first — refund
+    await walletService.refundWager(acceptorId, amount, `prediction-${prediction.gameId}-rejected`);
+    throw new Error('Prediction is no longer available');
+  }
 
   return toPredictionWithUsers(updated, prediction.creator, prediction.predictedWinner, acceptor);
 }

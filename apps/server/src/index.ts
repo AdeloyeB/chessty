@@ -2,6 +2,7 @@ import {
   handleRegister,
   handleLogin,
   handleLogout,
+  handleLogoutAll,
   handleMe,
 } from './routes/auth';
 import {
@@ -219,6 +220,8 @@ Bun.serve<WebSocketData>({
         response = await handleLogin(req);
       } else if (path === '/api/auth/logout' && method === 'POST') {
         response = await handleLogout(req);
+      } else if (path === '/api/auth/logout-all' && method === 'POST') {
+        response = await handleLogoutAll(req);
       } else if (path === '/api/auth/me' && method === 'GET') {
         response = await handleMe(req);
       }
@@ -449,6 +452,19 @@ initRedis()
 initializeFeatureFlags().catch((error) => {
   console.error('[FeatureFlags] Failed to initialize:', error);
 });
+
+// C8 FIX: Periodic cleanup of expired TOTP usage records (every 5 minutes)
+import { cleanupExpiredTOTPUsage } from './services/mfa';
+setInterval(async () => {
+  try {
+    const cleaned = await cleanupExpiredTOTPUsage();
+    if (cleaned > 0) {
+      console.log(`[TOTP Cleanup] Removed ${cleaned} expired usage records`);
+    }
+  } catch (error) {
+    console.error('[TOTP Cleanup] Error:', error);
+  }
+}, 5 * 60 * 1000);
 
 console.log(`🚀 Chess Game Server running on http://localhost:${PORT}`);
 console.log(`📡 WebSocket available at ws://localhost:${PORT}/ws`);

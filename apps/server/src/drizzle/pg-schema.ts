@@ -185,6 +185,17 @@ export const mfaEnrollments = pgTable('mfa_enrollments', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().$defaultFn(() => new Date()),
 });
 
+// C8 FIX: TOTP usage tracking to prevent replay attacks
+// Each used TOTP code is recorded so it can't be reused within the time window
+export const mfaTotpUsage = pgTable('mfa_totp_usage', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull().references(() => users.id),
+  codeHash: text('code_hash').notNull(), // SHA-256 hash of the code (don't store plaintext)
+  usedAt: timestamp('used_at', { withTimezone: true }).notNull().$defaultFn(() => new Date()),
+}, (table) => [
+  unique('user_code_unique').on(table.userId, table.codeHash),
+]);
+
 // Security audit log table
 export const securityAuditLog = pgTable('security_audit_log', {
   id: text('id').primaryKey(),
@@ -358,6 +369,13 @@ export const mfaEnrollmentsRelations = relations(mfaEnrollments, ({ one }) => ({
   }),
 }));
 
+export const mfaTotpUsageRelations = relations(mfaTotpUsage, ({ one }) => ({
+  user: one(users, {
+    fields: [mfaTotpUsage.userId],
+    references: [users.id],
+  }),
+}));
+
 // Type exports
 export type FeatureFlag = typeof featureFlags.$inferSelect;
 export type NewFeatureFlag = typeof featureFlags.$inferInsert;
@@ -387,3 +405,5 @@ export type UserProfile = typeof userProfiles.$inferSelect;
 export type NewUserProfile = typeof userProfiles.$inferInsert;
 export type MfaEnrollment = typeof mfaEnrollments.$inferSelect;
 export type NewMfaEnrollment = typeof mfaEnrollments.$inferInsert;
+export type MfaTotpUsage = typeof mfaTotpUsage.$inferSelect;
+export type NewMfaTotpUsage = typeof mfaTotpUsage.$inferInsert;

@@ -110,7 +110,8 @@ export async function handleLogin(req: Request): Promise<Response> {
     const mfaEnabled = await hasMFAEnabled(result.user.id);
 
     if (mfaEnabled) {
-      // User needs to complete MFA - issue a temp token instead of a full session
+      // C2 FIX: No full session is created here — only a short-lived temp token.
+      // The full session is created only after MFA verification succeeds.
       const tempToken = await authService.generateTempToken(result.user.id);
 
       const response: ApiResponse<MFARequiredResponse> = {
@@ -124,7 +125,13 @@ export async function handleLogin(req: Request): Promise<Response> {
       return Response.json(response);
     }
 
-    // No MFA - proceed with normal login (full session token)
+    // No MFA — safe to create a full session now
+    const token = await authService.generateToken(
+      result.user.id,
+      context.ipAddress,
+      context.userAgent
+    );
+
     const response: ApiResponse<AuthResponse> = {
       success: true,
       data: {
@@ -133,7 +140,7 @@ export async function handleLogin(req: Request): Promise<Response> {
           email: result.user.email,
           balance: Number(result.user.balance),
         },
-        token: result.token,
+        token,
       },
     };
 
@@ -172,6 +179,43 @@ export async function handleLogout(req: Request): Promise<Response> {
     return Response.json({ success: true } satisfies ApiResponse<null>);
   } catch {
     return Response.json({ success: true } satisfies ApiResponse<null>);
+  }
+}
+
+/**
+ * H5 FIX: Logout from all sessions.
+ * Invalidates every active session for the authenticated user.
+ */
+export async function handleLogoutAll(req: Request): Promise<Response> {
+  try {
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return Response.json(
+        { success: false, error: { code: 'UNAUTHORIZED', message: 'No token provided' } } satisfies ApiResponse<never>,
+        { status: 401 }
+      );
+    }
+
+    const token = authHeader.slice(7);
+    const payload = await authService.verifyToken(token);
+    if (!payload) {
+      return Response.json(
+        { success: false, error: { code: 'UNAUTHORIZED', message: 'Invalid token' } } satisfies ApiResponse<never>,
+        { status: 401 }
+      );
+    }
+
+    const deletedCount = await authService.invalidateAllUserSessions(payload.userId);
+
+    return Response.json({
+      success: true,
+      data: { sessionsInvalidated: deletedCount },
+    } satisfies ApiResponse<{ sessionsInvalidated: number }>);
+  } catch {
+    return Response.json(
+      { success: false, error: { code: 'SERVER_ERROR', message: 'Failed to logout' } } satisfies ApiResponse<never>,
+      { status: 500 }
+    );
   }
 }
 
