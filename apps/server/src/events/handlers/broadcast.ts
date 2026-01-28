@@ -8,6 +8,23 @@ import type {
 } from '@chess-game/shared';
 
 /**
+ * Normalize unlockedAt to ISO string.
+ * The database driver may return either a Date object or an ISO string
+ * depending on configuration. This ensures consistent output format.
+ */
+function normalizeUnlockedAt(value: Date | string): string {
+  if (typeof value === 'string') {
+    return value;
+  }
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+  // Fallback for unexpected types (should not happen but defensive)
+  console.warn('[broadcast] Unexpected unlockedAt type:', typeof value, value);
+  return new Date().toISOString();
+}
+
+/**
  * Broadcast handler - priority 50
  * Sends WebSocket messages to players and spectators in response to game events.
  */
@@ -131,10 +148,6 @@ export function registerBroadcastHandlers(events: GameEventEmitter, broadcast: B
   events.on(
     'achievement:unlocked',
     (payload) => {
-      // Normalize unlockedAt: could be Date or string depending on database driver
-      const normalizeUnlockedAt = (value: Date | string) =>
-        typeof value === 'string' ? value : value.toISOString();
-
       const achievementPayload: AchievementUnlockedPayload = {
         achievements: payload.achievements.map((a) => ({
           ...a,

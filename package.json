@@ -21,6 +21,8 @@
     "db:generate": "pnpm --filter=@chess-game/server db:generate",
     "db:migrate": "pnpm --filter=@chess-game/server db:migrate",
     "db:studio": "pnpm --filter=@chess-game/server db:studio",
+    "test": "pnpm --filter=@chess-game/server test",
+    "test:coverage": "pnpm --filter=@chess-game/server test --coverage",
     "prepare": "husky"
   },
   "lint-staged": {
