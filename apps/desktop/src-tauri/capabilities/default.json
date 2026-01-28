@@ -19,6 +19,18 @@
     "store:allow-delete",
     "store:allow-clear",
     "deep-link:default",
-    "os:default"
+    "os:default",
+    {
+      "identifier": "shell:allow-spawn",
+      "allow": [
+        {
+          "name": "binaries/stockfish",
+          "sidecar": true,
+          "args": true
+        }
+      ]
+    },
+    "shell:allow-stdin-write",
+    "shell:allow-kill"
   ]
 }

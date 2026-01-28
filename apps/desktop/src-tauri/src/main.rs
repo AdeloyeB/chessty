@@ -18,11 +18,16 @@
 // in release builds. Debug builds still show the console for logging.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-// Pull in our commands module (commands.rs in the same directory).
-// `mod` tells Rust: "there's another file called commands.rs — include it."
+// Pull in our modules (each is a separate .rs file in this directory).
+// `mod` tells Rust: "there's another file called X.rs — include it."
 mod commands;
+mod engine;
 
 use tauri::Emitter;
+
+// Import the EngineState so we can register it with Tauri's state management.
+// This allows our engine commands to access the Stockfish instance.
+use engine::EngineState;
 
 fn main() {
     tauri::Builder::default()
@@ -53,6 +58,19 @@ fn main() {
         // the OS routes it to our app instead of the browser.
         .plugin(tauri_plugin_deep_link::init())
 
+        // Shell plugin: Allows spawning sidecars (external binaries bundled with the app).
+        // We use this to run the Stockfish chess engine binary for move analysis.
+        // The sidecar is configured in tauri.conf.json under bundle.externalBin.
+        .plugin(tauri_plugin_shell::init())
+
+        // =====================================================================
+        // State Management
+        // =====================================================================
+        // Tauri's state management lets us share data between commands.
+        // The EngineState holds our Stockfish instance, wrapped in Arc<Mutex<>>
+        // for thread-safe access. Commands can access it via State<'_, EngineState>.
+        .manage(EngineState::new())
+
         // =====================================================================
         // IPC Command Registration
         // =====================================================================
@@ -63,11 +81,23 @@ fn main() {
         // Without listing a command here, the frontend can't call it — this is
         // a security feature (explicit allowlist).
         .invoke_handler(tauri::generate_handler![
+            // Store commands (persistent key-value storage)
             commands::store_get,
             commands::store_set,
             commands::store_delete,
             commands::store_clear,
+            // Auth commands (OAuth flow)
             commands::auth_open_external,
+            // Engine commands (Stockfish chess analysis)
+            commands::init_engine,
+            commands::analyze_position,
+            commands::analyze_game,
+            commands::stop_analysis,
+            commands::get_engine_info,
+            // Cancellable analysis commands (async with event-based results)
+            commands::analyze_position_async,
+            commands::analyze_game_async,
+            commands::cancel_analysis,
         ])
 
         // =====================================================================

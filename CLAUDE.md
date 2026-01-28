@@ -39,6 +39,22 @@ Always explain new technologies, patterns, and concepts in plain language. The d
 
 ---
 
+## Rust Development
+
+### Cargo Commands
+**Always use the `cargo-rust` skill** when running any Cargo commands (`cargo build`, `cargo check`, `cargo test`, etc.). The Claude Code shell doesn't have direct access to Cargo, so use the skill to execute Rust build commands properly.
+
+### Rust Architecture
+**Always use the `rust-desktop-applications` skill** when:
+- Designing or architecting Rust code for the Tauri desktop app
+- Reviewing Rust performance issues
+- Planning new Rust features or IPC commands
+- Working with async patterns, state management, or platform integration
+
+This skill provides Tauri v2 best practices, async patterns with Tokio, and platform-specific optimizations (M1/M2/M3/M4 Mac, Windows x64, Linux x64).
+
+---
+
 ## Development Workflow
 
 ### Running the App
