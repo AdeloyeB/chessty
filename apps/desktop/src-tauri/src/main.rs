@@ -94,6 +94,10 @@ fn main() {
             commands::analyze_game,
             commands::stop_analysis,
             commands::get_engine_info,
+            // Cancellable analysis commands (async with event-based results)
+            commands::analyze_position_async,
+            commands::analyze_game_async,
+            commands::cancel_analysis,
         ])
 
         // =====================================================================

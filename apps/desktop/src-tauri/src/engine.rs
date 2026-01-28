@@ -38,11 +38,171 @@
 // =============================================================================
 
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::env::consts::{ARCH, OS};
 use std::sync::Arc;
 use tauri::AppHandle;
 use tauri_plugin_shell::process::{CommandChild, CommandEvent};
 use tauri_plugin_shell::ShellExt;
-use tokio::sync::{mpsc, Mutex};
+// =============================================================================
+// Channel Types for Message Passing
+// =============================================================================
+// Channels are like pipes for sending messages between different parts of code:
+//
+// - mpsc (multi-producer, single-consumer): Many senders can push messages into
+//   one receiver. Like a mailbox where multiple people can drop letters but only
+//   one person picks them up. We use this for the command queue.
+//
+// - oneshot: A single-use channel for request/response patterns. The sender sends
+//   exactly one message, the receiver gets exactly one message. Like passing a
+//   note that expects a reply.
+// =============================================================================
+use tokio::sync::{mpsc, oneshot, Mutex};
+use tokio::time::{timeout, Duration};
+// =============================================================================
+// Cancellation Support
+// =============================================================================
+// CancellationToken from tokio-util is a thread-safe way to signal "please stop"
+// to running async tasks. When we call .cancel() on a token, any code that's
+// checking .is_cancelled() or awaiting .cancelled() will know to stop.
+// =============================================================================
+use tokio_util::sync::CancellationToken;
+use uuid::Uuid;
+
+// =============================================================================
+// Timeout Constants
+// =============================================================================
+// These timeouts prevent the application from hanging if Stockfish becomes
+// unresponsive or crashes. Each timeout is tuned for its specific use case:
+// =============================================================================
+
+/// Timeout for UCI handshake (engine loading).
+/// Stockfish typically responds within 1-2 seconds, but we allow 10 seconds
+/// for slower systems or cold starts from disk.
+const UCI_HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(10);
+
+/// Timeout for isready/readyok responses.
+/// The "isready" command should return almost instantly — 5 seconds is generous.
+const READY_TIMEOUT: Duration = Duration::from_secs(5);
+
+/// Timeout between info lines during analysis.
+/// During deep analysis, Stockfish sends periodic "info" updates. If we don't
+/// hear anything for 30 seconds, something is wrong (engine crashed or stuck).
+const ANALYSIS_LINE_TIMEOUT: Duration = Duration::from_secs(30);
+
+/// Timeout for bestmove after stop command.
+/// After "stop", Stockfish should respond with "bestmove" within a few seconds.
+/// This is used when we need to abort analysis early.
+#[allow(dead_code)]
+const STOP_RESPONSE_TIMEOUT: Duration = Duration::from_secs(5);
+
+// =============================================================================
+// Engine Configuration
+// =============================================================================
+// Stockfish performance depends heavily on two UCI options:
+// - Threads: How many CPU cores to use for parallel search
+// - Hash: How much memory (in MB) for the transposition table (position cache)
+//
+// Default Stockfish only uses 1 thread and 16MB hash, which is ~10% of potential
+// speed on modern multi-core machines. We auto-detect the optimal settings based
+// on the user's hardware.
+// =============================================================================
+
+/// Configuration for Stockfish engine performance settings.
+///
+/// These values are auto-detected based on the user's platform and CPU.
+/// Different platforms have different optimal settings:
+/// - Apple Silicon (M1/M2/M3/M4): Use all cores, they're efficient
+/// - Intel Macs: Use all cores, but lower hash for older memory constraints
+/// - Windows: Leave 1 core free for OS/other apps
+/// - Linux: Use all cores (typically servers/power users)
+#[derive(Debug, Clone)]
+pub struct EngineConfig {
+    /// Number of CPU threads for Stockfish to use.
+    /// More threads = faster search, but diminishing returns past physical core count.
+    pub threads: u32,
+
+    /// Hash table size in megabytes.
+    /// Larger hash = less re-calculation of positions, but more RAM usage.
+    /// Rule of thumb: 64MB per thread is a good balance.
+    pub hash_mb: u32,
+}
+
+impl EngineConfig {
+    /// Auto-detect optimal configuration based on the current platform.
+    ///
+    /// This uses compile-time constants (OS, ARCH) to determine the platform,
+    /// and runtime detection (num_cpus) to count available cores.
+    ///
+    /// The tuning is based on:
+    /// - Apple Silicon: Efficient cores, can use all of them
+    /// - x86 Intel/AMD: Leave headroom for OS on Windows
+    /// - Hash sizing: 64MB per thread, clamped to reasonable limits
+    pub fn auto_detect() -> Self {
+        // Get the number of *physical* cores (not hyperthreaded logical cores).
+        // Stockfish benefits from physical cores, not hyperthreads.
+        let physical_cores = num_cpus::get_physical() as u32;
+
+        let (threads, hash_mb) = match (OS, ARCH) {
+            // -----------------------------------------------------------------
+            // macOS Apple Silicon (M1/M2/M3/M4)
+            // -----------------------------------------------------------------
+            // Apple's ARM chips have efficient unified memory and don't have
+            // the thermal issues of Intel chips. We can safely use all cores.
+            // Hash: 64MB per thread, min 256MB, max 2GB (M-series have plenty of RAM)
+            ("macos", "aarch64") => {
+                let threads = physical_cores.max(4); // At least 4 (M1 base has 8)
+                let hash = (threads * 64).clamp(256, 2048);
+                (threads, hash)
+            }
+
+            // -----------------------------------------------------------------
+            // macOS Intel
+            // -----------------------------------------------------------------
+            // Older Intel Macs may have less RAM and thermal constraints.
+            // Still use all cores, but cap hash lower for memory.
+            ("macos", "x86_64") => {
+                let threads = physical_cores.max(2);
+                let hash = (threads * 64).clamp(128, 1024);
+                (threads, hash)
+            }
+
+            // -----------------------------------------------------------------
+            // Windows x64
+            // -----------------------------------------------------------------
+            // Leave 1 core free for Windows background services and other apps.
+            // Windows users often have other programs running.
+            ("windows", "x86_64") => {
+                let threads = (physical_cores.saturating_sub(1)).max(2);
+                let hash = (threads * 64).clamp(256, 1024);
+                (threads, hash)
+            }
+
+            // -----------------------------------------------------------------
+            // Linux x64
+            // -----------------------------------------------------------------
+            // Linux users are typically power users or running on servers.
+            // Use all available cores with generous hash.
+            ("linux", "x86_64") => {
+                let threads = physical_cores.max(2);
+                let hash = (threads * 64).clamp(256, 2048);
+                (threads, hash)
+            }
+
+            // -----------------------------------------------------------------
+            // Fallback for unknown platforms
+            // -----------------------------------------------------------------
+            // Conservative settings that should work anywhere.
+            _ => {
+                let threads = physical_cores.clamp(1, 8);
+                let hash = (threads * 32).clamp(128, 512);
+                (threads, hash)
+            }
+        };
+
+        Self { threads, hash_mb }
+    }
+}
 
 // =============================================================================
 // Data Types
@@ -104,6 +264,12 @@ pub struct EngineInfo {
 
     /// Whether the engine is ready to accept commands
     pub ready: bool,
+
+    /// Number of CPU threads configured for the engine
+    pub threads: u32,
+
+    /// Hash table size in megabytes
+    pub hash_mb: u32,
 }
 
 /// Internal struct to accumulate info from "info" lines during analysis.
@@ -117,6 +283,205 @@ struct PartialEval {
     pv: Vec<String>,
     nodes: u64,
     time_ms: u64,
+}
+
+// =============================================================================
+// Channel-Based Engine Architecture
+// =============================================================================
+// The Problem:
+// ------------
+// Previously, we held a Mutex lock for the entire duration of analysis (2-5
+// seconds). This blocked ALL other engine commands — stop, get info, even new
+// analysis requests had to wait.
+//
+// The Solution:
+// -------------
+// Use channels to decouple command sending from command processing:
+//
+//   Frontend → analyze_position()
+//                    ↓
+//            EngineHandle.analyze()
+//                    ↓
+//            Send command through channel (instant)
+//                    ↓
+//            Wait for response via oneshot channel
+//                    ↓
+//   Background Task (engine_command_loop) processes commands one at a time
+//
+// Benefits:
+// - Mutex is only held briefly to clone the EngineHandle
+// - Analysis runs in a background task without blocking
+// - Multiple requests queue up properly in the channel
+// - Stop commands can be sent while analysis is running
+// =============================================================================
+
+/// Commands that can be sent to the engine background task.
+///
+/// Think of this like a menu of operations the engine can perform.
+/// Each variant carries the data needed for that operation, plus a
+/// oneshot sender to deliver the result back to the caller.
+#[derive(Debug)]
+pub enum EngineCommand {
+    /// Analyze a chess position to a given depth.
+    /// The response_tx channel is used to send the result back.
+    Analyze {
+        fen: String,
+        depth: u8,
+        response_tx: oneshot::Sender<Result<EngineEvaluation, String>>,
+    },
+
+    /// Stop the current analysis immediately.
+    /// Stockfish will return the best move found so far.
+    Stop,
+
+    /// Gracefully shut down the engine process.
+    /// The background task will exit after processing this.
+    Quit,
+}
+
+/// A cloneable handle to interact with the engine.
+///
+/// This is the key to the channel-based architecture. Instead of holding
+/// a reference to the actual StockfishEngine (which would require a lock),
+/// we hold a lightweight handle that can send commands through a channel.
+///
+/// Why Clone?
+/// ----------
+/// Tauri commands run on different threads. By making EngineHandle cloneable,
+/// each command can get its own copy and send commands independently.
+/// The actual engine runs in one background task that receives from all handles.
+///
+/// The pattern is similar to how you might have multiple TV remotes (handles)
+/// that all control one TV (the engine). Each remote can send commands, but
+/// only one command is processed at a time.
+#[derive(Clone)]
+pub struct EngineHandle {
+    /// Channel sender for commands. Cloning the handle clones this sender,
+    /// which is cheap and thread-safe.
+    command_tx: mpsc::Sender<EngineCommand>,
+
+    /// Cached engine info (name, author). This never changes after init,
+    /// so we store a copy to avoid channel round-trips for simple queries.
+    info: EngineInfo,
+}
+
+impl EngineHandle {
+    /// Request position analysis (non-blocking send).
+    ///
+    /// How it works:
+    /// 1. Create a oneshot channel for the response
+    /// 2. Send the Analyze command with the response sender
+    /// 3. Wait for the response to come back
+    ///
+    /// The actual analysis happens in the background task. This method
+    /// just sends the request and waits for the result.
+    pub async fn analyze(&self, fen: String, depth: u8) -> Result<EngineEvaluation, String> {
+        // Create a oneshot channel for the response.
+        // response_tx sends the result, response_rx receives it.
+        let (response_tx, response_rx) = oneshot::channel();
+
+        // Send the command through the channel.
+        // This is almost instant — we're just putting a message in a queue.
+        self.command_tx
+            .send(EngineCommand::Analyze {
+                fen,
+                depth,
+                response_tx,
+            })
+            .await
+            .map_err(|_| "Engine channel closed".to_string())?;
+
+        // Now wait for the response. This is where the actual waiting happens,
+        // but we're NOT holding any mutex while waiting!
+        response_rx
+            .await
+            .map_err(|_| "Engine response dropped".to_string())?
+    }
+
+    /// Request engine to stop current analysis.
+    ///
+    /// This sends a stop command that the background task will process.
+    /// When processed, it tells Stockfish to stop and return immediately.
+    pub async fn stop(&self) -> Result<(), String> {
+        self.command_tx
+            .send(EngineCommand::Stop)
+            .await
+            .map_err(|_| "Engine channel closed".to_string())
+    }
+
+    /// Get cached engine info (name, author, ready status).
+    ///
+    /// This doesn't need to go through the channel because the info
+    /// is immutable after initialization.
+    pub fn info(&self) -> &EngineInfo {
+        &self.info
+    }
+}
+
+/// Spawn a new Stockfish engine and return a handle to it.
+///
+/// This function:
+/// 1. Creates the StockfishEngine (spawns the process, does UCI handshake)
+/// 2. Sets up a command channel for communication
+/// 3. Spawns a background task to process commands
+/// 4. Returns an EngineHandle that can be cloned and used by multiple callers
+///
+/// The background task runs until it receives a Quit command or the channel closes.
+pub async fn spawn_engine(app: &AppHandle) -> Result<EngineHandle, String> {
+    // Create the engine (existing StockfishEngine::new logic)
+    let engine = StockfishEngine::new(app).await?;
+    let info = engine.info();
+
+    // Create command channel with buffer size 32.
+    // This means up to 32 commands can be queued before senders block.
+    // In practice, we rarely have more than 1-2 pending.
+    let (command_tx, command_rx) = mpsc::channel::<EngineCommand>(32);
+
+    // Spawn background task to process commands.
+    // tokio::spawn() starts a new async task that runs concurrently.
+    // The task will run until engine_command_loop() returns (on Quit or error).
+    tokio::spawn(engine_command_loop(command_rx, engine));
+
+    Ok(EngineHandle { command_tx, info })
+}
+
+/// Background task that processes engine commands.
+///
+/// This function runs in a loop, receiving commands from the channel and
+/// executing them on the engine. It's the only place that interacts directly
+/// with the StockfishEngine, which is why we don't need the engine behind a mutex.
+///
+/// The loop exits when:
+/// - A Quit command is received
+/// - The command channel closes (all senders dropped)
+async fn engine_command_loop(
+    mut command_rx: mpsc::Receiver<EngineCommand>,
+    mut engine: StockfishEngine,
+) {
+    // Keep processing commands until the channel closes or we get Quit
+    while let Some(cmd) = command_rx.recv().await {
+        match cmd {
+            EngineCommand::Analyze {
+                fen,
+                depth,
+                response_tx,
+            } => {
+                // Perform the analysis
+                let result = engine.analyze_position(&fen, depth).await;
+                // Send result back (ignore if receiver dropped — caller gave up)
+                let _ = response_tx.send(result);
+            }
+            EngineCommand::Stop => {
+                // Tell Stockfish to stop the current analysis
+                let _ = engine.stop().await;
+            }
+            EngineCommand::Quit => {
+                // Gracefully shut down the engine and exit the loop
+                let _ = engine.quit().await;
+                break;
+            }
+        }
+    }
 }
 
 // =============================================================================
@@ -143,6 +508,9 @@ pub struct StockfishEngine {
 
     /// Engine author from "id author ..." response
     author: String,
+
+    /// Engine configuration (threads, hash size) applied during initialization
+    config: EngineConfig,
 }
 
 impl StockfishEngine {
@@ -177,30 +545,83 @@ impl StockfishEngine {
             .spawn()
             .map_err(|e| format!("Failed to spawn Stockfish: {}", e))?;
 
+        // Auto-detect optimal configuration for this platform
+        let config = EngineConfig::auto_detect();
+        println!(
+            "Configuring Stockfish: {} threads, {} MB hash",
+            config.threads, config.hash_mb
+        );
+
         // Create our engine struct with the process handles
         let mut engine = StockfishEngine {
             child,
             receiver: rx,
             name: String::new(),
             author: String::new(),
+            config,
         };
 
         // Perform the UCI handshake to initialize the engine
         engine.uci_handshake().await?;
 
+        // Configure engine for optimal performance on this platform
+        engine.configure_engine().await?;
+
         Ok(engine)
+    }
+
+    /// Configure Stockfish with optimal settings for this platform.
+    ///
+    /// This sends UCI "setoption" commands to set:
+    /// - Threads: Number of CPU cores to use for parallel search
+    /// - Hash: Size of transposition table in MB
+    ///
+    /// These settings are applied once during initialization and dramatically
+    /// improve analysis speed (10x or more on multi-core systems).
+    async fn configure_engine(&mut self) -> Result<(), String> {
+        // Set number of threads first
+        self.send_command(&format!(
+            "setoption name Threads value {}",
+            self.config.threads
+        ))
+        .await?;
+
+        // Set hash table size (must be after Threads for some Stockfish versions)
+        self.send_command(&format!(
+            "setoption name Hash value {}",
+            self.config.hash_mb
+        ))
+        .await?;
+
+        // Verify the engine is ready after configuration changes
+        self.send_command("isready").await?;
+
+        // Wait for "readyok" to confirm settings were applied
+        loop {
+            let line = self.read_line_with_timeout(READY_TIMEOUT).await?;
+            if line == "readyok" {
+                break;
+            }
+        }
+
+        Ok(())
     }
 
     /// Perform the UCI initialization handshake.
     /// This must be called right after spawning the process.
+    ///
+    /// Uses specific timeouts for each phase:
+    /// - UCI_HANDSHAKE_TIMEOUT (10s) for the initial "uci" → "uciok" exchange
+    /// - READY_TIMEOUT (5s) for the "isready" → "readyok" check
     async fn uci_handshake(&mut self) -> Result<(), String> {
         // Send "uci" command — this tells Stockfish we want UCI mode
         self.send_command("uci").await?;
 
         // Read responses until we see "uciok"
         // Along the way, we'll capture "id name" and "id author" lines
+        // Use handshake timeout since engine is still loading
         loop {
-            let line = self.read_line().await?;
+            let line = self.read_line_with_timeout(UCI_HANDSHAKE_TIMEOUT).await?;
 
             if line.starts_with("id name ") {
                 // Extract engine name: "id name Stockfish 17" → "Stockfish 17"
@@ -218,9 +639,9 @@ impl StockfishEngine {
         // (Stockfish might be loading opening books, etc.)
         self.send_command("isready").await?;
 
-        // Wait for "readyok"
+        // Wait for "readyok" — should be nearly instant, use short timeout
         loop {
-            let line = self.read_line().await?;
+            let line = self.read_line_with_timeout(READY_TIMEOUT).await?;
             if line == "readyok" {
                 break;
             }
@@ -240,7 +661,14 @@ impl StockfishEngine {
     /// - depth: How many half-moves (plies) to search
     ///
     /// Returns an EngineEvaluation with the best move and score.
-    pub async fn analyze_position(&mut self, fen: &str, depth: u8) -> Result<EngineEvaluation, String> {
+    ///
+    /// Uses ANALYSIS_LINE_TIMEOUT (30s) between lines — if Stockfish goes silent
+    /// for 30 seconds during analysis, we assume something went wrong.
+    pub async fn analyze_position(
+        &mut self,
+        fen: &str,
+        depth: u8,
+    ) -> Result<EngineEvaluation, String> {
         // Tell Stockfish which position to analyze
         // "position fen <fen>" sets up the board
         self.send_command(&format!("position fen {}", fen)).await?;
@@ -256,6 +684,7 @@ impl StockfishEngine {
         let mut best_move: Option<String> = None;
 
         // Read output until we see "bestmove"
+        // Uses default 30s timeout via read_line()
         loop {
             let line = self.read_line().await?;
 
@@ -293,19 +722,19 @@ impl StockfishEngine {
         self.send_command("stop").await
     }
 
-    /// Get engine information (name, author, ready status).
+    /// Get engine information (name, author, ready status, configuration).
     pub fn info(&self) -> EngineInfo {
         EngineInfo {
             name: self.name.clone(),
             author: self.author.clone(),
             ready: true, // If we got here, the engine is ready
+            threads: self.config.threads,
+            hash_mb: self.config.hash_mb,
         }
     }
 
     /// Gracefully shut down the engine.
     /// Sends "quit" command which tells Stockfish to exit.
-    /// Currently unused but will be needed for app shutdown handling.
-    #[allow(dead_code)]
     pub async fn quit(&mut self) -> Result<(), String> {
         self.send_command("quit").await?;
         // The process should exit on its own after receiving "quit"
@@ -327,9 +756,36 @@ impl StockfishEngine {
         Ok(())
     }
 
-    /// Read the next line of output from Stockfish.
-    /// Blocks until a line is available or the process exits.
+    /// Read a line with the default analysis timeout (30 seconds).
+    /// This is the standard method used during position analysis.
     async fn read_line(&mut self) -> Result<String, String> {
+        self.read_line_with_timeout(ANALYSIS_LINE_TIMEOUT).await
+    }
+
+    /// Read a line with a custom timeout.
+    ///
+    /// Different operations need different timeouts:
+    /// - UCI handshake: 10s (engine startup can be slow)
+    /// - Ready check: 5s (should be nearly instant)
+    /// - Analysis: 30s (deep searches take time between updates)
+    ///
+    /// If Stockfish sends nothing for the specified duration, we return an error
+    /// instead of blocking forever. This prevents the app from hanging if the
+    /// engine crashes or becomes unresponsive.
+    async fn read_line_with_timeout(&mut self, max_wait: Duration) -> Result<String, String> {
+        match timeout(max_wait, self.read_line_internal()).await {
+            Ok(result) => result,
+            Err(_) => Err(format!(
+                "Engine read timeout after {:?} — Stockfish may have crashed or hung",
+                max_wait
+            )),
+        }
+    }
+
+    /// Internal implementation of read_line without timeout.
+    /// This is wrapped by `read_line_with_timeout` to add timeout handling.
+    /// Never call this directly — always use `read_line` or `read_line_with_timeout`.
+    async fn read_line_internal(&mut self) -> Result<String, String> {
         loop {
             match self.receiver.recv().await {
                 Some(CommandEvent::Stdout(bytes)) => {
@@ -434,7 +890,8 @@ fn parse_info_line(line: &str) -> Option<PartialEval> {
             "pv" => {
                 // PV is a sequence of moves — collect all remaining tokens until end
                 // (or until we hit another keyword, but typically pv is last)
-                let pv_moves: Vec<String> = parts[i + 1..].iter().map(|s| s.to_string()).collect();
+                let pv_moves: Vec<String> =
+                    parts[i + 1..].iter().map(|s| s.to_string()).collect();
                 eval.pv = pv_moves;
                 break; // PV is always at the end, so we're done
             }
@@ -466,28 +923,129 @@ fn parse_bestmove(line: &str) -> Option<String> {
 }
 
 // =============================================================================
-// Thread-Safe Engine State
+// Thread-Safe Engine State (Updated for Channel-Based Architecture)
 // =============================================================================
-// We wrap the engine in Arc<Mutex<>> so multiple Tauri commands can access it
-// safely. This is Rust's way of handling shared mutable state across threads.
+// Now we store an EngineHandle instead of the engine directly.
+// The handle is cheap to clone and doesn't require holding a lock during analysis.
 //
 // - Arc: "Atomically Reference Counted" — allows multiple owners of the same data
 // - Mutex: "Mutual Exclusion" — only one thread can access the data at a time
+//         (but now we only hold it briefly to clone the handle)
 // =============================================================================
 
-/// Thread-safe wrapper for the Stockfish engine.
+// =============================================================================
+// Analysis Tracker — Cancellation Support
+// =============================================================================
+// When the frontend starts a long-running analysis (especially analyze_game
+// which processes many positions), the user needs a way to cancel it mid-way.
+//
+// The AnalysisTracker keeps track of all ongoing analyses and their cancellation
+// tokens. Think of it like a registry:
+// - When analysis starts: we create a unique ID and a "cancel button" (token)
+// - When user wants to cancel: they send the ID, we "press" the cancel button
+// - When analysis finishes: we clean up the registry entry
+//
+// CancellationToken is from tokio-util — it's a thread-safe way to signal
+// "please stop what you're doing" to async tasks. The token can be cloned
+// (so both the tracker and the running task hold a copy) and when we call
+// .cancel() on one copy, all copies see that it was cancelled.
+// =============================================================================
+
+/// Tracks active analyses that can be cancelled by the frontend.
+///
+/// This solves the problem of long-running analysis blocking the UI with
+/// no way to stop it. Each analysis gets a unique ID that the frontend
+/// can use to cancel it.
+pub struct AnalysisTracker {
+    /// Map of analysis_id → CancellationToken
+    /// When we want to cancel, we look up the token and call .cancel() on it
+    active: HashMap<String, CancellationToken>,
+}
+
+impl AnalysisTracker {
+    /// Create a new empty tracker.
+    pub fn new() -> Self {
+        Self {
+            active: HashMap::new(),
+        }
+    }
+
+    /// Register a new analysis and get back its ID and cancellation token.
+    ///
+    /// Returns (analysis_id, token) where:
+    /// - analysis_id: A unique UUID string to identify this analysis
+    /// - token: A CancellationToken that should be checked during analysis
+    ///
+    /// The running analysis should periodically check token.is_cancelled()
+    /// and stop early if true.
+    pub fn register(&mut self) -> (String, CancellationToken) {
+        // Generate a unique ID using UUID v4 (random UUID)
+        let id = Uuid::new_v4().to_string();
+
+        // Create a new cancellation token
+        // CancellationToken is like a shared boolean that can be set to "cancelled"
+        let token = CancellationToken::new();
+
+        // Store a clone in our registry — both we and the caller have a copy
+        self.active.insert(id.clone(), token.clone());
+
+        (id, token)
+    }
+
+    /// Cancel an ongoing analysis by its ID.
+    ///
+    /// Returns true if the analysis was found and cancelled, false if not found.
+    /// After calling this, any code checking that token's is_cancelled() will
+    /// see true, and any code awaiting token.cancelled() will wake up.
+    pub fn cancel(&mut self, id: &str) -> bool {
+        if let Some(token) = self.active.remove(id) {
+            // Signal cancellation — any task waiting on this token will wake up
+            token.cancel();
+            true
+        } else {
+            // Analysis not found — maybe it already finished, or invalid ID
+            false
+        }
+    }
+
+    /// Remove an analysis from tracking (called when analysis completes normally).
+    ///
+    /// This is cleanup — we don't need to track finished analyses.
+    pub fn remove(&mut self, id: &str) {
+        self.active.remove(id);
+    }
+}
+
+impl Default for AnalysisTracker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Thread-safe wrapper for the engine handle and analysis tracker.
 /// This is what gets stored in Tauri's state management.
 pub struct EngineState {
-    /// The engine, wrapped in Arc<Mutex<>> for thread-safe access.
+    /// The engine handle, wrapped in Arc<Mutex<>> for thread-safe access.
     /// Option<> because the engine might not be initialized yet.
-    pub engine: Arc<Mutex<Option<StockfishEngine>>>,
+    ///
+    /// Key difference from before: We store EngineHandle, not StockfishEngine.
+    /// This means:
+    /// - The mutex is only held briefly to clone the handle
+    /// - Analysis runs without holding any locks
+    /// - Multiple commands can queue up properly
+    pub handle: Arc<Mutex<Option<EngineHandle>>>,
+
+    /// Tracks ongoing analyses that can be cancelled.
+    /// The frontend can call cancel_analysis(id) to stop a running analysis.
+    pub tracker: Arc<Mutex<AnalysisTracker>>,
 }
 
 impl EngineState {
     /// Create a new EngineState with no engine initialized.
     pub fn new() -> Self {
         Self {
-            engine: Arc::new(Mutex::new(None)),
+            handle: Arc::new(Mutex::new(None)),
+            tracker: Arc::new(Mutex::new(AnalysisTracker::new())),
         }
     }
 }
