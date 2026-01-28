@@ -98,7 +98,7 @@ export function ToastContainer() {
     <div
       aria-live="polite"
       aria-label="Notifications"
-      className="fixed bottom-4 right-4 z-50 flex flex-col gap-3 max-w-sm w-full pointer-events-none"
+      className="fixed bottom-14 right-4 z-[110] flex flex-col gap-3 max-w-sm w-full pointer-events-none"
     >
       {notifications.map((notification) => (
         <div key={notification.id} className="pointer-events-auto">

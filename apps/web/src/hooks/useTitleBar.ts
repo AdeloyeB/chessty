@@ -13,7 +13,6 @@
  * buttons — we have to build them ourselves and wire them up.
  *
  * HOW IT WORKS:
- * - Detects if we're in Tauri using `__TAURI_INTERNALS__`
  * - Uses `@tauri-apps/plugin-os` to detect macOS vs Windows vs Linux
  * - Uses `@tauri-apps/api/window` to call window control methods
  * - Tracks maximize state via the window resize event
@@ -24,9 +23,7 @@
  *   1. An orphaned event listener (memory leak)
  *   2. setState calls on an unmounted component (React warning)
  *
- * We solve this with an `isMounted` flag — a pattern from the existing
- * `auth.onToken()` implementation in desktop.ts (see the `cancelled`
- * flag there for the same approach).
+ * We solve this with an `isMounted` flag.
  *
  * USAGE:
  *   const { osType, isMaximized, close, minimize, toggleMaximize } = useTitleBar();
@@ -35,7 +32,6 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { isTauri } from '@/lib/desktop';
 
 export type OSType = 'macos' | 'windows' | 'linux' | null;
 
@@ -45,7 +41,8 @@ export function useTitleBar() {
   const [isTauriApp, setIsTauriApp] = useState(false);
 
   useEffect(() => {
-    if (!isTauri()) return;
+    // Only run on client (after hydration)
+    if (typeof window === 'undefined') return;
 
     setIsTauriApp(true);
 
@@ -105,12 +102,7 @@ export function useTitleBar() {
     };
   }, []);
 
-  // Window control callbacks use isTauri() directly (not the state variable)
-  // to avoid a timing issue: isTauriApp state is set asynchronously in the
-  // useEffect, so if the user clicks a button before the effect runs,
-  // the callback would silently fail. isTauri() is synchronous and immediate.
   const close = useCallback(async () => {
-    if (!isTauri()) return;
     try {
       const { getCurrentWindow } = await import('@tauri-apps/api/window');
       await getCurrentWindow().close();
@@ -120,7 +112,6 @@ export function useTitleBar() {
   }, []);
 
   const minimize = useCallback(async () => {
-    if (!isTauri()) return;
     try {
       const { getCurrentWindow } = await import('@tauri-apps/api/window');
       await getCurrentWindow().minimize();
@@ -130,7 +121,6 @@ export function useTitleBar() {
   }, []);
 
   const toggleMaximize = useCallback(async () => {
-    if (!isTauri()) return;
     try {
       const { getCurrentWindow } = await import('@tauri-apps/api/window');
       await getCurrentWindow().toggleMaximize();

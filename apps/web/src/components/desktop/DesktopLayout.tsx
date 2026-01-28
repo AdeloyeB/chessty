@@ -1,38 +1,31 @@
 /**
- * DesktopLayout — Adjusts page layout when running in Tauri
- * ==========================================================
+ * DesktopLayout — Applies desktop-specific CSS classes
+ * =====================================================
  *
- * When the app runs inside Tauri, we need two layout adjustments:
- *   1. Add padding-top (48px) for the custom titlebar
- *   2. Add padding-bottom (40px) for the ticker bar
+ * This is a Tauri-only desktop app. This component adds CSS classes
+ * that enable desktop-specific styling:
+ *   1. padding-top (48px) for the custom titlebar
+ *   2. padding-bottom (40px) for the ticker bar
+ *   3. rounded corners for Discord-like appearance
  *
- * In the browser, neither bar exists, so no padding is needed.
- *
- * This component also injects a CSS class on the body that other
- * components can use to hide browser-only UI (like the default navbar)
- * when running inside Tauri.
- *
- * WHY A SEPARATE COMPONENT?
- * We can't detect Tauri at build time (the same Next.js build runs
- * in both browser and Tauri). Detection must happen at runtime in
- * the browser via `window.__TAURI_INTERNALS__`. This component
- * runs that check on mount and applies CSS classes accordingly.
+ * The classes are applied on client mount (after hydration) to avoid
+ * SSR mismatches.
  */
 
 'use client';
 
 import { useEffect } from 'react';
-import { isTauri } from '@/lib/desktop';
 
 export function DesktopLayout() {
   useEffect(() => {
-    if (isTauri()) {
-      // Add class to body so CSS can adapt layout for desktop
-      // (e.g., hide browser navbar, add padding for titlebar/ticker)
-      document.body.classList.add('tauri-app');
-    }
+    // Add class to body and html so CSS can adapt layout for desktop
+    // (e.g., hide browser navbar, add padding for titlebar/ticker,
+    // rounded corners for modern Discord-like appearance)
+    document.documentElement.classList.add('tauri-app');
+    document.body.classList.add('tauri-app');
 
     return () => {
+      document.documentElement.classList.remove('tauri-app');
       document.body.classList.remove('tauri-app');
     };
   }, []);

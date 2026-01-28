@@ -29,8 +29,7 @@
 
 'use client';
 
-import { isTauri } from '@/lib/desktop';
-import { useState, useEffect } from 'react';
+import { useSyncExternalStore } from 'react';
 
 interface TickerBarProps {
   /** User's wallet balance in USDC */
@@ -47,14 +46,15 @@ interface TickerBarProps {
 }
 
 export function TickerBar({ balance = 0, isConnected = false, activeBet = null }: TickerBarProps) {
-  const [isTauriApp, setIsTauriApp] = useState(false);
+  // useSyncExternalStore pattern for SSR-safe client detection
+  const isMounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  );
 
-  useEffect(() => {
-    setIsTauriApp(isTauri());
-  }, []);
-
-  // Only render in desktop app
-  if (!isTauriApp) return null;
+  // Wait for client mount to avoid SSR hydration mismatch
+  if (!isMounted) return null;
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-[100] select-none">

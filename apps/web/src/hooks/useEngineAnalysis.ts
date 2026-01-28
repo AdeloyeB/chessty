@@ -7,15 +7,16 @@
  * React hook for interacting with the Stockfish chess engine via Tauri IPC.
  *
  * HOW IT WORKS:
- * 1. The hook checks if we're running in Tauri (desktop app)
- * 2. If yes, it uses Tauri's invoke() to call Rust commands
- * 3. The Rust backend runs Stockfish and returns results
- * 4. Results are returned to React for display
+ * 1. Uses Tauri's invoke() to call Rust commands
+ * 2. The Rust backend runs Stockfish and returns results
+ * 3. Results are returned to React for display
  *
  * WHY TAURI IPC?
  * Stockfish is a native binary (compiled C++ code). It can't run directly
  * in JavaScript. The Rust backend spawns the Stockfish process and
  * communicates with it, then sends results to the web frontend via IPC.
+ *
+ * NOTE: This is a Tauri-only desktop app. No browser fallbacks exist.
  *
  * USAGE:
  * ```tsx
@@ -33,7 +34,12 @@ import type {
   EngineInfo,
   AnalysisProgress,
 } from '@chess-game/shared';
-import { isTauri } from '@/lib/desktop';
+
+// Dynamic imports for Tauri APIs - required for SSR compatibility.
+// Next.js renders on the server first where Tauri APIs don't exist.
+// Dynamic imports ensure the code only loads on the client.
+const getTauriCore = () => import('@tauri-apps/api/core');
+const getTauriEvent = () => import('@tauri-apps/api/event');
 
 // ---------------------------------------------------------------------------
 // Hook Return Type
@@ -105,19 +111,12 @@ export function useEngineAnalysis(): UseEngineAnalysisReturn {
   // ---------------------------------------------------------------------------
 
   useEffect(() => {
-    if (!isTauri()) {
-      // In browser mode, engine is not available
-      setError('Engine analysis is only available in the desktop app');
-      return;
-    }
-
     // Initialize the engine when component mounts
     const initEngine = async () => {
       try {
-        const { invoke } = await import('@tauri-apps/api/core');
-
+        const { invoke } = await getTauriCore();
         // Call Rust to start the engine
-        const info = await invoke<EngineInfo>('engine_init');
+        const info = await invoke<EngineInfo>('init_engine');
         setEngineInfo(info);
         setError(null);
       } catch (err) {
@@ -131,11 +130,9 @@ export function useEngineAnalysis(): UseEngineAnalysisReturn {
 
     // Cleanup: stop engine on unmount
     return () => {
-      if (isTauri()) {
-        import('@tauri-apps/api/core').then(({ invoke }) => {
-          invoke('engine_stop').catch(console.error);
-        });
-      }
+      getTauriCore().then(({ invoke }) => {
+        invoke('stop_analysis').catch(console.error);
+      });
 
       // Cleanup progress listener
       if (unlistenRef.current) {
@@ -153,17 +150,12 @@ export function useEngineAnalysis(): UseEngineAnalysisReturn {
     fen: string,
     depth: number = DEFAULT_DEPTH
   ): Promise<EngineEvaluation> => {
-    if (!isTauri()) {
-      throw new Error('Engine analysis is only available in the desktop app');
-    }
-
     setIsAnalyzing(true);
     setError(null);
     cancelledRef.current = false;
 
     try {
-      const { invoke } = await import('@tauri-apps/api/core');
-
+      const { invoke } = await getTauriCore();
       // Call the Rust backend to analyze the position
       // The Rust side will:
       // 1. Send the position to Stockfish
@@ -196,10 +188,6 @@ export function useEngineAnalysis(): UseEngineAnalysisReturn {
     fens: string[],
     depth: number = DEFAULT_DEPTH
   ): Promise<EngineEvaluation[]> => {
-    if (!isTauri()) {
-      throw new Error('Engine analysis is only available in the desktop app');
-    }
-
     if (fens.length === 0) {
       return [];
     }
@@ -210,8 +198,8 @@ export function useEngineAnalysis(): UseEngineAnalysisReturn {
     cancelledRef.current = false;
 
     try {
-      const { invoke } = await import('@tauri-apps/api/core');
-      const { listen } = await import('@tauri-apps/api/event');
+      const { invoke } = await getTauriCore();
+      const { listen } = await getTauriEvent();
 
       // Set up listener for progress updates from Rust
       // The Rust backend emits 'analysis:progress' events as it processes
@@ -256,13 +244,9 @@ export function useEngineAnalysis(): UseEngineAnalysisReturn {
   const stopAnalysis = useCallback(async (): Promise<void> => {
     cancelledRef.current = true;
 
-    if (!isTauri()) {
-      return;
-    }
-
     try {
-      const { invoke } = await import('@tauri-apps/api/core');
-      await invoke('engine_stop_analysis');
+      const { invoke } = await getTauriCore();
+      await invoke('stop_analysis');
     } catch (err) {
       console.error('Failed to stop analysis:', err);
     } finally {
