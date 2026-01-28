@@ -256,6 +256,7 @@ export async function exchangeGoogleCode(code: string): Promise<string> {
         grant_type: 'authorization_code',
         redirect_uri: `${API_BASE_URL}/api/auth/google/callback`,
       }),
+      signal: AbortSignal.timeout(10_000),
     });
 
     if (!response.ok) {
@@ -291,6 +292,7 @@ export async function fetchGoogleProfile(accessToken: string): Promise<OAuthProf
       headers: {
         Authorization: `Bearer ${accessToken}`,
       },
+      signal: AbortSignal.timeout(10_000),
     });
 
     if (!response.ok) {
@@ -383,6 +385,7 @@ export async function exchangeGithubCode(code: string): Promise<string> {
         code,
         redirect_uri: `${API_BASE_URL}/api/auth/github/callback`,
       }),
+      signal: AbortSignal.timeout(10_000),
     });
 
     if (!response.ok) {
@@ -423,6 +426,7 @@ export async function fetchGithubProfile(accessToken: string): Promise<OAuthProf
         Accept: 'application/vnd.github.v3+json', // Use GitHub API v3
         'User-Agent': 'Chess-Game-App', // GitHub requires User-Agent header
       },
+      signal: AbortSignal.timeout(10_000),
     });
 
     if (!response.ok) {
@@ -484,6 +488,7 @@ export async function fetchGithubEmail(accessToken: string): Promise<string | nu
         Accept: 'application/vnd.github.v3+json',
         'User-Agent': 'Chess-Game-App',
       },
+      signal: AbortSignal.timeout(10_000),
     });
 
     if (!response.ok) {
@@ -678,6 +683,7 @@ export async function exchangeTwitterCode(code: string, codeVerifier: string): P
         redirect_uri: `${API_BASE_URL}/api/auth/twitter/callback`,
         code_verifier: codeVerifier, // The original verifier, not the hash
       }),
+      signal: AbortSignal.timeout(10_000),
     });
 
     if (!response.ok) {
@@ -716,6 +722,7 @@ export async function fetchTwitterProfile(accessToken: string): Promise<OAuthPro
       headers: {
         Authorization: `Bearer ${accessToken}`,
       },
+      signal: AbortSignal.timeout(10_000),
     });
 
     if (!response.ok) {
@@ -966,6 +973,7 @@ export async function exchangeAppleCode(code: string): Promise<{ accessToken: st
         grant_type: 'authorization_code',
         redirect_uri: `${API_BASE_URL}/api/auth/apple/callback`,
       }),
+      signal: AbortSignal.timeout(10_000),
     });
 
     if (!response.ok) {

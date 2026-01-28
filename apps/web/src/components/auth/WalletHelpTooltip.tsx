@@ -8,9 +8,17 @@ import { useState, useRef, useEffect } from 'react';
  */
 export function WalletHelpTooltip() {
   const [isOpen, setIsOpen] = useState(false);
-  const tooltipRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Clean up timeout on unmount to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, []);
 
   // Show tooltip on hover with slight delay
   const handleMouseEnter = () => {
@@ -72,7 +80,6 @@ export function WalletHelpTooltip() {
       {/* Tooltip - positioned to the right */}
       {isOpen && (
         <div
-          ref={tooltipRef}
           role="tooltip"
           className="
             absolute z-50

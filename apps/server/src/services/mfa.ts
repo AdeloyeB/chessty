@@ -637,6 +637,29 @@ export async function verifyMFA(userId: string, code: string): Promise<MFAVerifi
 }
 
 /**
+ * Verify TOTP code only (no backup codes).
+ *
+ * Use this for sensitive operations like disabling MFA, where we need proof
+ * the user has access to their authenticator device — not just a backup code.
+ *
+ * @param userId - The user's ID
+ * @param code - The 6-digit TOTP code from the authenticator app
+ * @returns true if the TOTP code is valid
+ */
+export async function verifyTOTPOnly(userId: string, code: string): Promise<boolean> {
+  const enrollment = await db.query.mfaEnrollments.findFirst({
+    where: eq(mfaEnrollments.userId, userId),
+  });
+
+  if (!enrollment || !enrollment.enabled) {
+    return false;
+  }
+
+  const secret = await decryptSecret(enrollment.totpSecret);
+  return verifyTOTPCode(secret, code);
+}
+
+/**
  * Check if a user has MFA enabled
  *
  * @param userId - The user's ID

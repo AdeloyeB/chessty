@@ -345,7 +345,9 @@ export class ClockManager {
 
         // Try to sync back to Redis if it becomes available
         if (this.circuitBreaker.getState() === 'closed') {
-          this.syncToRedis(gameId);
+          this.syncToRedis(gameId).catch((err) => {
+            console.warn(`[ClockManager] Background sync to Redis failed for game ${gameId}:`, err);
+          });
         }
       }
 
@@ -426,7 +428,9 @@ export class ClockManager {
 
       // Try to sync to Redis
       if (this.circuitBreaker.getState() === 'closed') {
-        this.syncToRedis(gameId);
+        this.syncToRedis(gameId).catch((err) => {
+          console.warn(`[ClockManager] Background sync to Redis failed for game ${gameId}:`, err);
+        });
       }
     }
   }

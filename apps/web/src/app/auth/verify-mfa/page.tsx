@@ -137,16 +137,17 @@ function VerifyMFAContent() {
 
   // Format backup code input (XXXX-XXXX)
   const handleBackupCodeChange = (value: string) => {
-    // Remove non-alphanumeric characters except hyphen
-    let cleaned = value.replace(/[^A-Za-z0-9-]/g, '').toUpperCase();
+    // Strip all non-alphanumeric characters (including hyphens) to get raw input
+    const raw = value.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
 
-    // Auto-insert hyphen after 4 characters
-    if (cleaned.length > 4 && !cleaned.includes('-')) {
-      cleaned = cleaned.slice(0, 4) + '-' + cleaned.slice(4);
+    // Auto-insert hyphen at position 4 (format: XXXX-XXXX)
+    let formatted = raw;
+    if (raw.length > 4) {
+      formatted = raw.slice(0, 4) + '-' + raw.slice(4);
     }
 
     // Limit to 9 characters (XXXX-XXXX)
-    setBackupCode(cleaned.slice(0, 9));
+    setBackupCode(formatted.slice(0, 9));
   };
 
   if (!tempToken) {

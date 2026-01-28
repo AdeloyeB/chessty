@@ -89,7 +89,8 @@ export function areScriptsLoaded(): boolean {
  */
 export async function executeClockTick(
   gameId: string,
-  currentTimeMs: number
+  currentTimeMs: number,
+  _isRetry = false
 ): Promise<{
   whiteTime: number;
   blackTime: number;
@@ -143,16 +144,17 @@ export async function executeClockTick(
     return { whiteTime, blackTime, timedOut, timedOutColor };
   } catch (error) {
     // Check if it's a "NOSCRIPT" error (script was flushed from Redis cache)
+    // Only retry once to prevent unbounded recursion if loadClockScripts keeps failing
     if (
       error instanceof Error &&
-      error.message.includes('NOSCRIPT')
+      error.message.includes('NOSCRIPT') &&
+      !(_isRetry)
     ) {
       console.warn(
-        '[ScriptLoader] Script cache miss - reloading scripts'
+        '[ScriptLoader] Script cache miss - reloading scripts (retry 1/1)'
       );
       await loadClockScripts();
-      // Retry once after reloading
-      return executeClockTick(gameId, currentTimeMs);
+      return executeClockTick(gameId, currentTimeMs, true);
     }
     throw error;
   }
@@ -177,7 +179,8 @@ export async function executeClockTick(
 export async function executeClockMove(
   gameId: string,
   incrementSeconds: number,
-  currentTimeMs: number
+  currentTimeMs: number,
+  _isRetry = false
 ): Promise<{ whiteTime: number; blackTime: number }> {
   const redis = getRedis();
 
@@ -212,16 +215,17 @@ export async function executeClockMove(
     return { whiteTime, blackTime };
   } catch (error) {
     // Check if it's a "NOSCRIPT" error (script was flushed from Redis cache)
+    // Only retry once to prevent unbounded recursion if loadClockScripts keeps failing
     if (
       error instanceof Error &&
-      error.message.includes('NOSCRIPT')
+      error.message.includes('NOSCRIPT') &&
+      !_isRetry
     ) {
       console.warn(
-        '[ScriptLoader] Script cache miss - reloading scripts'
+        '[ScriptLoader] Script cache miss - reloading scripts (retry 1/1)'
       );
       await loadClockScripts();
-      // Retry once after reloading
-      return executeClockMove(gameId, incrementSeconds, currentTimeMs);
+      return executeClockMove(gameId, incrementSeconds, currentTimeMs, true);
     }
     throw error;
   }
