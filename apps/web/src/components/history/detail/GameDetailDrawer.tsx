@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { ChessBoard } from '@/components/chess/ChessBoard';
 import type { HistoryGame } from '@chess-game/shared';
 import { useMoveViewer } from '@/hooks/useMoveViewer';
@@ -8,6 +8,8 @@ import { MoveNavigator } from './MoveNavigator';
 import { MoveList } from './MoveList';
 import { GameInfo } from './GameInfo';
 import { USDCAmount } from '@/components/wallet/USDCAmount';
+import { AnalysisBoard } from '@/components/analysis/AnalysisBoard';
+import { isTauri } from '@/lib/desktop';
 
 interface GameDetailDrawerProps {
   game: HistoryGame | null;
@@ -15,6 +17,8 @@ interface GameDetailDrawerProps {
 }
 
 export function GameDetailDrawer({ game, onClose }: GameDetailDrawerProps) {
+  const [showAnalysis, setShowAnalysis] = useState(false);
+
   const moveViewer = useMoveViewer({
     moves: game?.moves ?? [],
     startingFen: game?.startingFen,
@@ -61,12 +65,23 @@ export function GameDetailDrawer({ game, onClose }: GameDetailDrawerProps) {
               vs {game.opponent.username}
             </p>
           </div>
-          <button
-            onClick={onClose}
-            className="w-10 h-10 flex items-center justify-center text-mid-light hover:text-pure-white transition-colors"
-          >
-            <span className="text-2xl">&times;</span>
-          </button>
+          <div className="flex items-center gap-2">
+            {/* Analyze button - desktop only */}
+            {isTauri() && (
+              <button
+                onClick={() => setShowAnalysis(true)}
+                className="px-4 py-2 bg-pure-white text-pure-black border border-pure-white font-mono text-xs hover:bg-off-black hover:text-pure-white transition-colors"
+              >
+                analyze_game
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="w-10 h-10 flex items-center justify-center text-mid-light hover:text-pure-white transition-colors"
+            >
+              <span className="text-2xl">&times;</span>
+            </button>
+          </div>
         </div>
 
         {/* Content */}
@@ -133,6 +148,14 @@ export function GameDetailDrawer({ game, onClose }: GameDetailDrawerProps) {
           </div>
         </div>
       </div>
+
+      {/* Analysis Board Modal */}
+      {showAnalysis && (
+        <AnalysisBoard
+          game={game}
+          onClose={() => setShowAnalysis(false)}
+        />
+      )}
     </div>
   );
 }
