@@ -196,18 +196,19 @@ export async function acceptChallenge(
 }
 
 /**
- * FIX #4: Confirm a challenge with transaction to prevent race conditions.
+ * Confirm a challenge with transaction and row-level locking.
  *
  * When both players confirm simultaneously, there's a race condition:
  * 1. Player A reads challenge (both confirmed = false)
  * 2. Player B reads challenge (both confirmed = false)
- * 3. Player A updates their confirmed flag, checks, sees only their flag is true → bothConfirmed = false
- * 4. Player B updates their confirmed flag, checks, sees only their flag is true → bothConfirmed = false
+ * 3. Player A updates their confirmed flag, checks, sees only their flag is true -> bothConfirmed = false
+ * 4. Player B updates their confirmed flag, checks, sees only their flag is true -> bothConfirmed = false
  *
  * Neither player triggers game creation!
  *
  * The fix: Use a database transaction with row-level locking (SELECT FOR UPDATE)
- * to ensure atomic read-modify-write.
+ * to ensure atomic read-modify-write. The second transaction will block until the
+ * first one commits, then see the updated state.
  */
 export async function confirmChallenge(
   challengeId: string,
@@ -215,30 +216,42 @@ export async function confirmChallenge(
 ): Promise<{ confirmed: boolean; challenge: ChallengeWithCreator }> {
   // Use a transaction to prevent race conditions when both players confirm simultaneously
   return await db.transaction(async (tx) => {
-    // Read the challenge within the transaction
-    const challenge = await tx.query.challenges.findFirst({
-      where: eq(challenges.id, challengeId),
-      with: { creator: true, acceptedBy: true },
-    });
+    // FIX #4: Use SELECT FOR UPDATE to acquire row-level lock
+    // This ensures only one transaction can read-modify-write at a time
+    const [challengeRow] = await tx
+      .select()
+      .from(challenges)
+      .where(eq(challenges.id, challengeId))
+      .for('update');
 
-    if (!challenge) throw new Error('Challenge not found');
-    if (challenge.status !== 'accepted') throw new Error('Challenge is not in accepted state');
-    if (challenge.creatorId !== userId && challenge.acceptedById !== userId) {
+    if (!challengeRow) throw new Error('Challenge not found');
+    if (challengeRow.status !== 'accepted') throw new Error('Challenge is not in accepted state');
+    if (challengeRow.creatorId !== userId && challengeRow.acceptedById !== userId) {
       throw new Error('Not authorized');
     }
 
-    const isCreator = challenge.creatorId === userId;
+    // Fetch related user data (not locked, just for response formatting)
+    const creator = await tx.query.users.findFirst({
+      where: eq(users.id, challengeRow.creatorId),
+    });
+    const acceptedBy = challengeRow.acceptedById
+      ? await tx.query.users.findFirst({ where: eq(users.id, challengeRow.acceptedById) })
+      : null;
+
+    if (!creator) throw new Error('Creator not found');
+
+    const isCreator = challengeRow.creatorId === userId;
     const updateField = isCreator ? 'creatorConfirmed' : 'acceptorConfirmed';
 
     // Check if this user has already confirmed (idempotency check)
-    const alreadyConfirmed = isCreator ? challenge.creatorConfirmed : challenge.acceptorConfirmed;
+    const alreadyConfirmed = isCreator ? challengeRow.creatorConfirmed : challengeRow.acceptorConfirmed;
     if (alreadyConfirmed) {
       console.log(`[confirmChallenge] User ${userId} already confirmed challenge ${challengeId}`);
       // Re-check if both are now confirmed
-      const bothConfirmed = challenge.creatorConfirmed === true && challenge.acceptorConfirmed === true;
+      const bothConfirmed = challengeRow.creatorConfirmed === true && challengeRow.acceptorConfirmed === true;
       return {
         confirmed: bothConfirmed,
-        challenge: toChallengeWithCreator(challenge, challenge.creator, challenge.acceptedBy!),
+        challenge: toChallengeWithCreator(challengeRow, creator, acceptedBy ?? undefined),
       };
     }
 
@@ -249,17 +262,16 @@ export async function confirmChallenge(
       .where(eq(challenges.id, challengeId))
       .returning();
 
-    // Check if both have confirmed - we read the OTHER user's flag from the challenge we read
-    // and we know OUR flag is now true because we just set it
-    const otherConfirmed = isCreator ? challenge.acceptorConfirmed : challenge.creatorConfirmed;
-    const bothConfirmed = otherConfirmed === true;
+    // FIX #5: Use the updated row data to check if both confirmed
+    // This uses the fresh data from the RETURNING clause
+    const bothConfirmed = updated.creatorConfirmed === true && updated.acceptorConfirmed === true;
 
-    console.log(`[confirmChallenge] User ${userId} confirmed challenge ${challengeId}. isCreator=${isCreator}, otherConfirmed=${otherConfirmed}, bothConfirmed=${bothConfirmed}`);
+    console.log(`[confirmChallenge] User ${userId} confirmed challenge ${challengeId}. isCreator=${isCreator}, bothConfirmed=${bothConfirmed}`);
 
     const result = toChallengeWithCreator(
       updated,
-      challenge.creator,
-      challenge.acceptedBy!
+      creator,
+      acceptedBy ?? undefined
     );
 
     return { confirmed: bothConfirmed, challenge: result };

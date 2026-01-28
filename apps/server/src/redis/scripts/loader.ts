@@ -89,7 +89,8 @@ export function areScriptsLoaded(): boolean {
  */
 export async function executeClockTick(
   gameId: string,
-  currentTimeMs: number
+  currentTimeMs: number,
+  _retried: boolean = false
 ): Promise<{
   whiteTime: number;
   blackTime: number;
@@ -143,16 +144,18 @@ export async function executeClockTick(
     return { whiteTime, blackTime, timedOut, timedOutColor };
   } catch (error) {
     // Check if it's a "NOSCRIPT" error (script was flushed from Redis cache)
+    // Only retry once to prevent infinite recursion
     if (
       error instanceof Error &&
-      error.message.includes('NOSCRIPT')
+      error.message.includes('NOSCRIPT') &&
+      !_retried
     ) {
       console.warn(
-        '[ScriptLoader] Script cache miss - reloading scripts'
+        '[ScriptLoader] Script cache miss - reloading scripts (retry 1/1)'
       );
       await loadClockScripts();
-      // Retry once after reloading
-      return executeClockTick(gameId, currentTimeMs);
+      // Retry once after reloading, passing true to prevent further retries
+      return executeClockTick(gameId, currentTimeMs, true);
     }
     throw error;
   }
@@ -177,7 +180,8 @@ export async function executeClockTick(
 export async function executeClockMove(
   gameId: string,
   incrementSeconds: number,
-  currentTimeMs: number
+  currentTimeMs: number,
+  _retried: boolean = false
 ): Promise<{ whiteTime: number; blackTime: number }> {
   const redis = getRedis();
 
@@ -212,16 +216,18 @@ export async function executeClockMove(
     return { whiteTime, blackTime };
   } catch (error) {
     // Check if it's a "NOSCRIPT" error (script was flushed from Redis cache)
+    // Only retry once to prevent infinite recursion
     if (
       error instanceof Error &&
-      error.message.includes('NOSCRIPT')
+      error.message.includes('NOSCRIPT') &&
+      !_retried
     ) {
       console.warn(
-        '[ScriptLoader] Script cache miss - reloading scripts'
+        '[ScriptLoader] Script cache miss - reloading scripts (retry 1/1)'
       );
       await loadClockScripts();
-      // Retry once after reloading
-      return executeClockMove(gameId, incrementSeconds, currentTimeMs);
+      // Retry once after reloading, passing true to prevent further retries
+      return executeClockMove(gameId, incrementSeconds, currentTimeMs, true);
     }
     throw error;
   }
@@ -254,6 +260,10 @@ export async function initializeGameClock(
 
   const clockKey = `clock:${gameId}`;
 
+  // TTL for clock keys: 24 hours (games should not last this long)
+  // This prevents orphaned keys from persisting forever
+  const CLOCK_TTL_SECONDS = 86400;
+
   // Set all clock fields atomically using HSET with multiple field-value pairs
   await redis.hset(clockKey, {
     whiteTime: whiteTimeSeconds.toString(),
@@ -262,8 +272,11 @@ export async function initializeGameClock(
     isWhiteTurn: '1', // White moves first in chess
   });
 
+  // Set TTL to prevent orphaned keys from persisting forever
+  await redis.expire(clockKey, CLOCK_TTL_SECONDS);
+
   console.log(
-    `[ScriptLoader] Initialized clock for game ${gameId}: ${whiteTimeSeconds}s each`
+    `[ScriptLoader] Initialized clock for game ${gameId}: ${whiteTimeSeconds}s each (TTL: ${CLOCK_TTL_SECONDS}s)`
   );
 }
 

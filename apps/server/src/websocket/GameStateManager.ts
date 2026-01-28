@@ -76,17 +76,19 @@ export class GameStateManager {
             throw new Error('Redis not available');
           }
 
-          // Check if state already exists
-          const existingFen = await redis.hget(key, 'fen');
-          if (existingFen) {
+          // Create new game state atomically using HSETNX to prevent race conditions
+          // HSETNX returns 1 if field was set (didn't exist), 0 if field already existed
+          const chess = new Chess(fen);
+          const wasSet = await redis.hsetnx(key, 'fen', chess.fen());
+
+          if (wasSet === 0) {
+            // State already exists, another player initialized it first
             console.log(`[GameStateManager] State already exists for game ${gameId}`);
             return;
           }
 
-          // Create new game state
-          const chess = new Chess(fen);
+          // Initialize remaining fields (fen was just set atomically)
           await redis.hset(key, {
-            fen: chess.fen(),
             pgn: '',
             moveHistory: JSON.stringify([]),
             drawOffer: '',

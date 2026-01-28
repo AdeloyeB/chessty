@@ -1,9 +1,8 @@
 import { CLOCK_SYNC_INTERVAL } from '@chess-game/shared';
-import { readFileSync } from 'fs';
-import { join } from 'path';
 import type { GameEventEmitter } from '../events/GameEventEmitter';
 import { getRedis, isRedisAvailable } from '../redis/client';
 import { CircuitBreaker } from '../redis/circuitBreaker';
+import { loadClockScripts, areScriptsLoaded, executeClockTick, executeClockMove } from '../redis/scripts/loader';
 
 // Redis key TTL: 24 hours (games should not last this long)
 const CLOCK_KEY_TTL = 86400;
@@ -60,35 +59,24 @@ export class ClockManager {
     failureThreshold: 3,
     resetTimeout: 15000, // 15 seconds
   });
-  // Lua script SHAs (loaded once at first use)
-  private clockTickSha: string | null = null;
-  private clockMoveSha: string | null = null;
-  private scriptsLoaded = false;
 
   constructor(private events: GameEventEmitter) {}
 
   /**
    * Load Lua scripts into Redis.
    * Called lazily on first Redis operation.
+   * Uses the centralized loader module which handles path resolution correctly
+   * for both development and compiled builds.
    */
   private async loadScripts(): Promise<void> {
-    if (this.scriptsLoaded) return;
+    if (areScriptsLoaded()) return;
 
     const redis = getRedis();
     if (!redis) return;
 
     try {
-      // Read script files from the redis/scripts directory
-      const scriptsDir = join(__dirname, '..', 'redis', 'scripts');
-      const clockTickScript = readFileSync(join(scriptsDir, 'clock_tick.lua'), 'utf-8');
-      const clockMoveScript = readFileSync(join(scriptsDir, 'clock_move.lua'), 'utf-8');
-
-      // Load scripts into Redis (returns SHA hash for EVALSHA)
-      this.clockTickSha = await redis.script('LOAD', clockTickScript) as string;
-      this.clockMoveSha = await redis.script('LOAD', clockMoveScript) as string;
-
-      this.scriptsLoaded = true;
-      console.log('[ClockManager] Lua scripts loaded');
+      await loadClockScripts();
+      console.log('[ClockManager] Lua scripts loaded via loader module');
     } catch (error) {
       console.error('[ClockManager] Failed to load Lua scripts:', error);
       // Don't throw - we'll fall back to in-memory
@@ -178,26 +166,25 @@ export class ClockManager {
   /**
    * Execute clock tick via Lua script (atomic operation).
    * Falls back to in-memory calculation if Redis unavailable.
+   * Uses the centralized loader module for script execution.
    */
   private async executeRedisClockTick(gameId: string, now: number): Promise<ClockTickResult | null> {
-    if (!isRedisAvailable() || !this.clockTickSha) return null;
-
-    const redis = getRedis()!;
-    const key = this.getClockKey(gameId);
+    if (!isRedisAvailable() || !areScriptsLoaded()) return null;
 
     return this.circuitBreaker.execute(
       async () => {
-        const result = await redis.evalsha(
-          this.clockTickSha!,
-          1,
-          key,
-          now.toString()
-        ) as string[];
+        const result = await executeClockTick(gameId, now);
+
+        // Convert from loader format to ClockTickResult format
+        let timedOut: 0 | 1 | 2 = 0;
+        if (result.timedOut) {
+          timedOut = result.timedOutColor === 'white' ? 1 : 2;
+        }
 
         return {
-          whiteTime: parseFloat(result[0]),
-          blackTime: parseFloat(result[1]),
-          timedOut: parseInt(result[2], 10) as 0 | 1 | 2,
+          whiteTime: result.whiteTime,
+          blackTime: result.blackTime,
+          timedOut,
         };
       },
       () => {
@@ -210,30 +197,21 @@ export class ClockManager {
   /**
    * Execute clock move (switch turn + increment) via Lua script.
    * Falls back to in-memory calculation if Redis unavailable.
+   * Uses the centralized loader module for script execution.
    */
   private async executeRedisClockMove(
     gameId: string,
     now: number,
     increment: number
   ): Promise<ClockMoveResult | null> {
-    if (!isRedisAvailable() || !this.clockMoveSha) return null;
-
-    const redis = getRedis()!;
-    const key = this.getClockKey(gameId);
+    if (!isRedisAvailable() || !areScriptsLoaded()) return null;
 
     return this.circuitBreaker.execute(
       async () => {
-        const result = await redis.evalsha(
-          this.clockMoveSha!,
-          1,
-          key,
-          now.toString(),
-          increment.toString()
-        ) as string[];
-
+        const result = await executeClockMove(gameId, increment, now);
         return {
-          whiteTime: parseFloat(result[0]),
-          blackTime: parseFloat(result[1]),
+          whiteTime: result.whiteTime,
+          blackTime: result.blackTime,
         };
       },
       () => {
@@ -345,7 +323,9 @@ export class ClockManager {
 
         // Try to sync back to Redis if it becomes available
         if (this.circuitBreaker.getState() === 'closed') {
-          this.syncToRedis(gameId);
+          this.syncToRedis(gameId).catch((err) => {
+            console.warn(`[ClockManager] Background sync failed for ${gameId}:`, err);
+          });
         }
       }
 
@@ -426,7 +406,9 @@ export class ClockManager {
 
       // Try to sync to Redis
       if (this.circuitBreaker.getState() === 'closed') {
-        this.syncToRedis(gameId);
+        this.syncToRedis(gameId).catch((err) => {
+          console.warn(`[ClockManager] Background sync failed for ${gameId}:`, err);
+        });
       }
     }
   }

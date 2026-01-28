@@ -4,6 +4,35 @@ This document tracks all mock/placeholder data used in the codebase. These shoul
 
 ---
 
+## Login Screen
+
+### `apps/web/src/components/auth/LoginScreen.tsx`
+
+| Constant | Line | Description | Status |
+|----------|------|-------------|--------|
+| `DEV_USER` | ~224 | Mock user for development mode login bypass | Dev only |
+| Platform stats | ~438-454 | Hardcoded stats (2.4k players, 847 live, 12.5k games) | Pending API |
+
+**Data Structure:**
+```typescript
+// DEV_USER - dev-only mock user for testing without auth
+const DEV_USER = {
+  id: 'dev-user-1',
+  username: 'DevPlayer',
+  email: 'dev@example.com',
+  eloRating: 1200,
+  // ... stats
+};
+
+// Platform stats - hardcoded in JSX
+// players: 2.4k, live: 847, games: 12.5k
+```
+
+**Replace with:**
+- `GET /api/platform/stats` for player count, live games, and total games
+
+---
+
 ## Dashboard
 
 ### `apps/web/src/components/dashboard/HomeDashboard.tsx`
@@ -94,6 +123,7 @@ To replace all remaining mock data, implement these endpoints:
 | `/api/profile` | GET | Full user profile with stats | Pending |
 | `/api/profile/achievements` | GET | Achievement progress array | Pending |
 | `/api/daily-challenge` | GET | Daily challenge data | Pending |
+| `/api/platform/stats` | GET | Platform stats (player count, live games, total games) | Pending |
 
 ---
 
@@ -122,3 +152,4 @@ grep -rn "TODO.*data\|TODO.*API" apps/
 - [ ] Dashboard: Replace profileStats with user profile API
 - [ ] ProfilePage: Connect to /api/profile endpoint
 - [ ] ProfilePage: Connect to /api/profile/achievements endpoint
+- [ ] LoginScreen: Replace platform stats with /api/platform/stats endpoint
