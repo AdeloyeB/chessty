@@ -10,9 +10,9 @@
  * CRITICAL: These tests verify that balance operations are atomic
  * to prevent the TOCTOU (Time-of-Check to Time-of-Use) race condition.
  */
-import { describe, test, expect, mock, beforeEach, spyOn } from 'bun:test';
+import { describe, test, expect, mock } from 'bun:test';
 import * as walletService from './wallet';
-import { db, users, transactions } from '../drizzle';
+import { db } from '../drizzle';
 
 // Mock the drizzle database
 mock.module('../drizzle', () => ({
