@@ -94,15 +94,18 @@ export function handleWebSocketClose(ws: ServerWebSocket<WebSocketData>) {
   if (ws.data.gameId) {
     gameCoordinator.leaveGame(userId, ws.data.gameId);
   }
-  // Leave spectating if spectating
-  if (ws.data.spectatingGameId) {
+  // Leave all spectated games on disconnect
+  if (ws.data.spectatingGameIds && ws.data.spectatingGameIds.size > 0) {
+    gameCoordinator.leaveAllSpectating(userId);
+  } else if (ws.data.spectatingGameId) {
+    // Backward compat: legacy single-game field
     gameCoordinator.leaveSpectate(userId, ws.data.spectatingGameId);
   }
 
   gameEvents.emit('player:disconnected', {
     userId,
     gameId: ws.data.gameId,
-    spectatingGameId: ws.data.spectatingGameId,
+    spectatingGameIds: ws.data.spectatingGameIds ? [...ws.data.spectatingGameIds] : [],
   });
 
   connectionManager.remove(userId);
@@ -169,10 +172,18 @@ export async function handleWebSocketMessage(ws: ServerWebSocket<WebSocketData>,
         await gameCoordinator.joinSpectate(userId, (payload as any).gameId);
         break;
 
-      case 'spectate:leave':
-        if (ws.data.spectatingGameId) {
-          gameCoordinator.leaveSpectate(userId, ws.data.spectatingGameId);
+      case 'spectate:leave': {
+        // Multi-game: leave a specific game by gameId in payload
+        // Backward compat: if no gameId in payload, leave the legacy single game
+        const leaveGameId = (payload as any)?.gameId || ws.data.spectatingGameId;
+        if (leaveGameId) {
+          gameCoordinator.leaveSpectate(userId, leaveGameId);
         }
+        break;
+      }
+
+      case 'spectate:leave_all':
+        gameCoordinator.leaveAllSpectating(userId);
         break;
 
       // Challenge actions

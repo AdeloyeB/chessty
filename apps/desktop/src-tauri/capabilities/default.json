@@ -5,11 +5,20 @@
   "windows": ["main"],
   "permissions": [
     "core:default",
+    "core:window:allow-close",
+    "core:window:allow-minimize",
+    "core:window:allow-maximize",
+    "core:window:allow-unmaximize",
+    "core:window:allow-toggle-maximize",
+    "core:window:allow-is-maximized",
+    "core:window:allow-start-dragging",
+    "core:window:allow-set-fullscreen",
     "opener:allow-open-url",
     "store:allow-get",
     "store:allow-set",
     "store:allow-delete",
     "store:allow-clear",
-    "deep-link:default"
+    "deep-link:default",
+    "os:default"
   ]
 }

@@ -220,10 +220,11 @@ function AnimatedBackground() {
   );
 }
 
-// Mock user for development
-const DEV_USER = {
+// MOCK: Dev-only user for testing without backend (see MOCK_DATA.md)
+const MOCK_DEV_USER = {
   id: 'dev-user-1',
-  username: 'DevPlayer',
+  username: 'dev_player',
+  displayName: 'DevPlayer',
   email: 'dev@example.com',
   eloRating: 1200,
   peakEloRating: 1350,
@@ -244,11 +245,11 @@ export function LoginScreen() {
 
   const router = useRouter();
   const { login, register } = useApi();
-  const { setUser, setToken, setMfaRequired } = useAuthStore();
+  const { setUser, setToken } = useAuthStore();
 
   // Dev login for testing without backend
   const handleDevLogin = () => {
-    setUser(DEV_USER);
+    setUser(MOCK_DEV_USER);
     setToken('dev-token');
   };
 

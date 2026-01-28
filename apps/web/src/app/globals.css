@@ -128,6 +128,15 @@ body {
   animation: blink 1s step-end infinite;
 }
 
+@keyframes subtle-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.animate-subtle-blink {
+  animation: subtle-blink 2s ease-in-out infinite;
+}
+
 @keyframes float {
   0%, 100% { transform: translate(0, 0) rotate(0deg); }
   25% { transform: translate(10px, -20px) rotate(5deg); }
@@ -154,3 +163,46 @@ body {
 .stagger-3 { animation-delay: 0.3s; }
 .stagger-4 { animation-delay: 0.4s; }
 .stagger-5 { animation-delay: 0.5s; }
+
+/* Ticker scroll animation — horizontal marquee for the bottom status bar.
+   Slides the ticker content from right to left continuously, like a stock
+   market ticker tape or a news crawl at the bottom of a TV screen. */
+@keyframes ticker-scroll {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.ticker-scroll {
+  animation: ticker-scroll 30s linear infinite;
+}
+
+/* Desktop titlebar — ensure drag region works properly.
+   This CSS property tells WebKit-based browsers (Safari on macOS,
+   which Tauri uses) that this element should act as a window drag handle.
+   Without this, the data-tauri-drag-region attribute alone may not work
+   reliably on all platforms. */
+[data-tauri-drag-region] {
+  -webkit-app-region: drag;
+}
+
+/* Interactive elements inside the drag region must NOT be draggable.
+   Without this, clicking a button in the titlebar would start a window
+   drag instead of triggering the button's click handler. */
+[data-tauri-drag-region] button,
+[data-tauri-drag-region] a,
+[data-tauri-drag-region] input {
+  -webkit-app-region: no-drag;
+}
+
+/* Desktop-only layout adjustments.
+   When running inside Tauri, the body gets the `tauri-app` class.
+   This adds space for the custom titlebar (top) and ticker bar (bottom),
+   and hides the browser-only navbar since navigation moves to the titlebar. */
+body.tauri-app {
+  padding-top: 48px;   /* Height of TitleBar (h-12 = 3rem = 48px) */
+  padding-bottom: 40px; /* Height of TickerBar (h-10 = 2.5rem = 40px) */
+}
+
+body.tauri-app .tauri-hidden {
+  display: none;
+}

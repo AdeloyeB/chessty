@@ -3,7 +3,8 @@ import type { ServerWebSocket } from 'bun';
 export interface WebSocketData {
   userId: string;
   gameId?: string;
-  spectatingGameId?: string;
+  spectatingGameId?: string;           // Legacy single-game field (kept for backward compatibility)
+  spectatingGameIds?: Set<string>;     // Multi-game spectating (max 5 concurrent games)
 }
 
 export type ChessGameWS = ServerWebSocket<WebSocketData>;

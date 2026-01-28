@@ -19,7 +19,7 @@
 | Betting System | ✅ Complete | Spectator bets (database-backed) |
 | Wallet Balances | ✅ Complete | Atomic updates, race condition fixed |
 | Game Clocks | ✅ Complete | Fischer increment support |
-| Desktop App | ✅ Complete | Electron wrapper |
+| Desktop App | ✅ Complete | Tauri desktop app |
 
 ### What's Missing for Production
 

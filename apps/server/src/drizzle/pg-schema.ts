@@ -4,9 +4,11 @@ import { relations } from 'drizzle-orm';
 // Users table
 export const users = pgTable('users', {
   id: text('id').primaryKey(),
-  email: text('email').notNull().unique(),
-  username: text('username').notNull().unique(),
+  email: text('email').unique(), // Nullable for wallet-only users
+  username: text('username').notNull().unique(), // Internal ID, auto-generated for wallet users
+  displayName: text('display_name').unique(), // Public display name, required for gameplay
   passwordHash: text('password_hash'),
+  walletAddress: text('wallet_address').unique(), // Ethereum address for SIWE auth
   googleId: text('google_id').unique(),
   githubId: text('github_id').unique(),
   twitterId: text('twitter_id').unique(),
