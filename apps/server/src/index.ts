@@ -2,6 +2,7 @@ import {
   handleRegister,
   handleLogin,
   handleLogout,
+  handleLogoutAll,
   handleMe,
 } from './routes/auth';
 import {
@@ -14,6 +15,13 @@ import {
   handleAppleAuth,
   handleAppleCallback,
 } from './routes/oauth';
+import {
+  handleWalletNonce,
+  handleWalletVerify,
+  handleWalletLink,
+  handleSetDisplayName,
+  handleCheckDisplayName,
+} from './routes/walletAuth';
 import {
   handleStartEnrollment,
   handleCompleteEnrollment,
@@ -129,7 +137,7 @@ function jsonResponse(response: Response): Response {
   });
 }
 
-const server = Bun.serve<WebSocketData>({
+Bun.serve<WebSocketData>({
   port: PORT,
   hostname: '0.0.0.0', // Listen on all interfaces (required for Docker)
 
@@ -171,6 +179,8 @@ const server = Bun.serve<WebSocketData>({
       '/api/auth/twitter/callback',
       '/api/auth/apple',
       '/api/auth/apple/callback',
+      '/api/auth/wallet/nonce',
+      '/api/auth/wallet/verify',
       '/api/auth/mfa/verify',
       '/api/mfa/enroll/start',
       '/api/mfa/enroll/complete',
@@ -210,6 +220,8 @@ const server = Bun.serve<WebSocketData>({
         response = await handleLogin(req);
       } else if (path === '/api/auth/logout' && method === 'POST') {
         response = await handleLogout(req);
+      } else if (path === '/api/auth/logout-all' && method === 'POST') {
+        response = await handleLogoutAll(req);
       } else if (path === '/api/auth/me' && method === 'GET') {
         response = await handleMe(req);
       }
@@ -231,6 +243,18 @@ const server = Bun.serve<WebSocketData>({
       } else if (path === '/api/auth/apple/callback' && method === 'POST') {
         // Note: Apple uses form_post response mode, so callback is POST not GET
         response = await handleAppleCallback(req);
+      }
+      // Wallet auth routes (SIWE - Sign-In with Ethereum)
+      else if (path === '/api/auth/wallet/nonce' && method === 'POST') {
+        response = await handleWalletNonce(req);
+      } else if (path === '/api/auth/wallet/verify' && method === 'POST') {
+        response = await handleWalletVerify(req);
+      } else if (path === '/api/auth/wallet/link' && method === 'POST') {
+        response = await handleWalletLink(req);
+      } else if (path === '/api/auth/wallet/display-name' && method === 'POST') {
+        response = await handleSetDisplayName(req);
+      } else if (path === '/api/auth/wallet/display-name/check' && method === 'GET') {
+        response = await handleCheckDisplayName(req);
       }
       // MFA routes
       else if (path === '/api/mfa/enroll/start' && method === 'POST') {
@@ -428,6 +452,19 @@ initRedis()
 initializeFeatureFlags().catch((error) => {
   console.error('[FeatureFlags] Failed to initialize:', error);
 });
+
+// C8 FIX: Periodic cleanup of expired TOTP usage records (every 5 minutes)
+import { cleanupExpiredTOTPUsage } from './services/mfa';
+setInterval(async () => {
+  try {
+    const cleaned = await cleanupExpiredTOTPUsage();
+    if (cleaned > 0) {
+      console.log(`[TOTP Cleanup] Removed ${cleaned} expired usage records`);
+    }
+  } catch (error) {
+    console.error('[TOTP Cleanup] Error:', error);
+  }
+}, 5 * 60 * 1000);
 
 console.log(`🚀 Chess Game Server running on http://localhost:${PORT}`);
 console.log(`📡 WebSocket available at ws://localhost:${PORT}/ws`);

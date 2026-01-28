@@ -43,6 +43,11 @@ fn main() {
         // (Replaces the deprecated tauri-plugin-shell for URL opening.)
         .plugin(tauri_plugin_opener::init())
 
+        // OS plugin: Lets the frontend detect which operating system we're on.
+        // The custom titlebar uses this to render macOS-style traffic lights
+        // (left-aligned) or Windows/Linux-style controls (right-aligned).
+        .plugin(tauri_plugin_os::init())
+
         // Deep Link plugin: Registers our app to handle "chessgamble://" URLs.
         // When a user clicks a chessgamble:// link (e.g., after OAuth login),
         // the OS routes it to our app instead of the browser.

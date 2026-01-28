@@ -12,21 +12,21 @@ import { detectOpening } from '@/lib/history/openingDetector';
 // ============================================================================
 
 const MOCK_OPPONENTS = [
-  { id: 'opp1', username: 'GrandMaster_X', eloRating: 2450, peakEloRating: 2520, gamesPlayed: 1247, gamesWon: 892, gamesLost: 298, gamesDraw: 57 },
-  { id: 'opp2', username: 'KnightRider99', eloRating: 2280, peakEloRating: 2340, gamesPlayed: 856, gamesWon: 512, gamesLost: 301, gamesDraw: 43 },
-  { id: 'opp3', username: 'QueenGambit', eloRating: 2190, peakEloRating: 2250, gamesPlayed: 634, gamesWon: 378, gamesLost: 224, gamesDraw: 32 },
-  { id: 'opp4', username: 'BishopSlayer', eloRating: 2150, peakEloRating: 2180, gamesPlayed: 423, gamesWon: 245, gamesLost: 156, gamesDraw: 22 },
-  { id: 'opp5', username: 'PawnStorm', eloRating: 2080, peakEloRating: 2120, gamesPlayed: 312, gamesWon: 167, gamesLost: 128, gamesDraw: 17 },
-  { id: 'opp6', username: 'RookieKing', eloRating: 1950, peakEloRating: 2010, gamesPlayed: 198, gamesWon: 98, gamesLost: 89, gamesDraw: 11 },
-  { id: 'opp7', username: 'CastleMaster', eloRating: 1870, peakEloRating: 1920, gamesPlayed: 156, gamesWon: 72, gamesLost: 76, gamesDraw: 8 },
-  { id: 'opp8', username: 'EnPassant_Pro', eloRating: 2320, peakEloRating: 2380, gamesPlayed: 987, gamesWon: 623, gamesLost: 312, gamesDraw: 52 },
-  { id: 'opp9', username: 'CheckmateChamp', eloRating: 2410, peakEloRating: 2450, gamesPlayed: 1123, gamesWon: 756, gamesLost: 312, gamesDraw: 55 },
-  { id: 'opp10', username: 'SicilianDefender', eloRating: 2050, peakEloRating: 2100, gamesPlayed: 267, gamesWon: 134, gamesLost: 118, gamesDraw: 15 },
-  { id: 'opp11', username: 'FrenchAttack', eloRating: 1980, peakEloRating: 2040, gamesPlayed: 189, gamesWon: 92, gamesLost: 87, gamesDraw: 10 },
-  { id: 'opp12', username: 'LondonSystem', eloRating: 2220, peakEloRating: 2270, gamesPlayed: 567, gamesWon: 334, gamesLost: 198, gamesDraw: 35 },
-  { id: 'opp13', username: 'CaroKann_King', eloRating: 2100, peakEloRating: 2140, gamesPlayed: 345, gamesWon: 178, gamesLost: 145, gamesDraw: 22 },
-  { id: 'opp14', username: 'IndianDefense', eloRating: 2340, peakEloRating: 2390, gamesPlayed: 892, gamesWon: 534, gamesLost: 312, gamesDraw: 46 },
-  { id: 'opp15', username: 'ScandinavianPro', eloRating: 1920, peakEloRating: 1980, gamesPlayed: 234, gamesWon: 112, gamesLost: 108, gamesDraw: 14 },
+  { id: 'opp1', username: 'grandmaster_x', displayName: 'GrandMaster_X', eloRating: 2450, peakEloRating: 2520, gamesPlayed: 1247, gamesWon: 892, gamesLost: 298, gamesDraw: 57 },
+  { id: 'opp2', username: 'knightrider99', displayName: 'KnightRider99', eloRating: 2280, peakEloRating: 2340, gamesPlayed: 856, gamesWon: 512, gamesLost: 301, gamesDraw: 43 },
+  { id: 'opp3', username: 'queengambit', displayName: 'QueenGambit', eloRating: 2190, peakEloRating: 2250, gamesPlayed: 634, gamesWon: 378, gamesLost: 224, gamesDraw: 32 },
+  { id: 'opp4', username: 'bishopslayer', displayName: 'BishopSlayer', eloRating: 2150, peakEloRating: 2180, gamesPlayed: 423, gamesWon: 245, gamesLost: 156, gamesDraw: 22 },
+  { id: 'opp5', username: 'pawnstorm', displayName: 'PawnStorm', eloRating: 2080, peakEloRating: 2120, gamesPlayed: 312, gamesWon: 167, gamesLost: 128, gamesDraw: 17 },
+  { id: 'opp6', username: 'rookieking', displayName: 'RookieKing', eloRating: 1950, peakEloRating: 2010, gamesPlayed: 198, gamesWon: 98, gamesLost: 89, gamesDraw: 11 },
+  { id: 'opp7', username: 'castlemaster', displayName: 'CastleMaster', eloRating: 1870, peakEloRating: 1920, gamesPlayed: 156, gamesWon: 72, gamesLost: 76, gamesDraw: 8 },
+  { id: 'opp8', username: 'enpassant_pro', displayName: 'EnPassant_Pro', eloRating: 2320, peakEloRating: 2380, gamesPlayed: 987, gamesWon: 623, gamesLost: 312, gamesDraw: 52 },
+  { id: 'opp9', username: 'checkmatechamp', displayName: 'CheckmateChamp', eloRating: 2410, peakEloRating: 2450, gamesPlayed: 1123, gamesWon: 756, gamesLost: 312, gamesDraw: 55 },
+  { id: 'opp10', username: 'siciliandefender', displayName: 'SicilianDefender', eloRating: 2050, peakEloRating: 2100, gamesPlayed: 267, gamesWon: 134, gamesLost: 118, gamesDraw: 15 },
+  { id: 'opp11', username: 'frenchattack', displayName: 'FrenchAttack', eloRating: 1980, peakEloRating: 2040, gamesPlayed: 189, gamesWon: 92, gamesLost: 87, gamesDraw: 10 },
+  { id: 'opp12', username: 'londonsystem', displayName: 'LondonSystem', eloRating: 2220, peakEloRating: 2270, gamesPlayed: 567, gamesWon: 334, gamesLost: 198, gamesDraw: 35 },
+  { id: 'opp13', username: 'carokann_king', displayName: 'CaroKann_King', eloRating: 2100, peakEloRating: 2140, gamesPlayed: 345, gamesWon: 178, gamesLost: 145, gamesDraw: 22 },
+  { id: 'opp14', username: 'indiandefense', displayName: 'IndianDefense', eloRating: 2340, peakEloRating: 2390, gamesPlayed: 892, gamesWon: 534, gamesLost: 312, gamesDraw: 46 },
+  { id: 'opp15', username: 'scandinavianpro', displayName: 'ScandinavianPro', eloRating: 1920, peakEloRating: 1980, gamesPlayed: 234, gamesWon: 112, gamesLost: 108, gamesDraw: 14 },
 ];
 
 const OPENINGS = [

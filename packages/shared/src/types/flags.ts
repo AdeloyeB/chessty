@@ -65,14 +65,17 @@ export interface FeatureFlagsResponse {
 export type KnownFeatureFlag =
   | 'betting_enabled'
   | 'matchmaking_v2'
-  | 'spectator_predictions'
   | 'chess960_mode'
   | 'wallet_deposits'
   | 'wallet_withdrawals'
   | 'leaderboard_public'
   | 'achievements_enabled'
   | 'practice_mode'
-  | 'challenge_marketplace';
+  | 'challenge_marketplace'
+  | 'spectator_mode'
+  | 'spectator_predictions'
+  | 'spectator_chat'
+  | 'spectator_multi_game';
 
 /**
  * Type-safe flag check helper type

@@ -3,8 +3,10 @@ import { z } from 'zod';
 // User types
 export const UserSchema = z.object({
   id: z.string(),
-  email: z.string().email(),
-  username: z.string().min(3).max(20),
+  email: z.string().email().nullable(), // Nullable for wallet-only users
+  username: z.string().min(3).max(20), // Internal ID, auto-generated for wallet users
+  displayName: z.string().min(3).max(20).nullable(), // Public display name for gameplay
+  walletAddress: z.string().nullable(), // Ethereum address for SIWE auth
   eloRating: z.number().default(1200),
   peakEloRating: z.number().default(1200),
   gamesPlayed: z.number().default(0),
@@ -22,7 +24,7 @@ export type User = z.infer<typeof UserSchema>;
 
 export type PublicUser = Pick<
   User,
-  'id' | 'username' | 'eloRating' | 'peakEloRating' | 'gamesPlayed' | 'gamesWon' | 'gamesLost' | 'gamesDraw'
+  'id' | 'username' | 'displayName' | 'eloRating' | 'peakEloRating' | 'gamesPlayed' | 'gamesWon' | 'gamesLost' | 'gamesDraw'
 >;
 
 // Game types
@@ -153,6 +155,7 @@ export const WSMessageTypeSchema = z.enum([
   'queue:leave',
   'spectate:join',
   'spectate:leave',
+  'spectate:leave_all',
   'bet:place',
   // Challenge messages (Client -> Server)
   'challenge:create',
@@ -226,6 +229,10 @@ export interface QueueJoinPayload {
 
 export interface SpectateJoinPayload {
   gameId: string;
+}
+
+export interface SpectateLeavePayload {
+  gameId?: string; // Optional for backward compatibility — omit to leave current game (old behavior)
 }
 
 export interface BetPlacePayload {
@@ -398,8 +405,9 @@ export const RegisterSchema = z.object({
 export type RegisterInput = z.infer<typeof RegisterSchema>;
 
 export interface AuthResponse {
-  user: PublicUser & { email: string; balance: number };
+  user: PublicUser & { email: string | null; balance: number; walletAddress?: string | null };
   token: string;
+  needsDisplayName?: boolean; // True if user needs to set a display name (new wallet users)
 }
 
 // API response types

@@ -2,53 +2,24 @@
  * Desktop Abstraction Layer
  * =========================
  *
- * This file is the single place in the web app that knows about Tauri and Electron.
+ * This file is the single place in the web app that knows about Tauri.
  * Every other file imports from here instead of touching platform APIs directly.
  *
  * WHY THIS EXISTS:
- * Our app runs in three environments:
- *   1. Tauri  - the new desktop shell (Rust-based, lightweight)
- *   2. Electron - the legacy desktop shell (Node.js-based, being phased out)
- *   3. Browser - plain web browser (dev mode / future web release)
+ * Our app runs in two environments:
+ *   1. Tauri  - the desktop shell (Rust-based, lightweight)
+ *   2. Browser - plain web browser (dev mode / future web release)
  *
  * Each environment provides different APIs for things like secure storage
  * and opening external links. This module detects which environment we're
  * in and routes calls to the right implementation.
  *
  * HOW IT WORKS:
- * - Environment detection checks for global objects that each runtime injects.
+ * - Environment detection checks for global objects that the runtime injects.
  * - Tauri APIs are loaded with dynamic `import()` so the Tauri package is
  *   never bundled into a plain browser build (tree-shaken away if unused).
- * - Electron APIs come from `window.electronAPI`, which the Electron preload
- *   script sets up before the page loads.
  * - Browser fallbacks use standard web APIs (localStorage, window.open).
  */
-
-// ---------------------------------------------------------------------------
-// Type Declarations
-// ---------------------------------------------------------------------------
-// Tell TypeScript about the `electronAPI` object that Electron's preload
-// script attaches to the window. The `?` makes it optional because this
-// object only exists when running inside Electron.
-
-declare global {
-  interface Window {
-    electronAPI?: {
-      store: {
-        get: (key: string) => Promise<any>;
-        set: (key: string, value: any) => Promise<void>;
-        delete: (key: string) => Promise<void>;
-        clear: () => Promise<void>;
-      };
-      auth: {
-        openExternal: (url: string) => Promise<void>;
-        onToken: (callback: (token: string) => void) => void;
-      };
-      platform: string;
-      isElectron: boolean;
-    };
-  }
-}
 
 // ---------------------------------------------------------------------------
 // Environment Detection
@@ -70,43 +41,27 @@ export function isTauri(): boolean {
 }
 
 /**
- * Are we running inside the legacy Electron desktop app?
+ * Are we in a desktop environment?
  *
- * Electron's preload script sets `window.electronAPI` before any page
- * code runs. If that object exists, we're in Electron.
- */
-export function isElectron(): boolean {
-  return typeof window !== 'undefined' && 'electronAPI' in window;
-}
-
-/**
- * Are we in ANY desktop environment (Tauri or Electron)?
- *
- * Useful when you need to know "is this a desktop app?" without caring
- * which one. For example, showing a desktop-only settings panel.
+ * Currently this means Tauri. Useful when you need to know "is this a
+ * desktop app?" For example, showing a desktop-only settings panel.
  */
 export function isDesktop(): boolean {
-  return isTauri() || isElectron();
+  return isTauri();
 }
 
 /**
- * The three possible runtime environments.
- * - 'tauri'    = new Tauri desktop shell
- * - 'electron' = legacy Electron desktop shell
- * - 'browser'  = plain web browser (no desktop shell)
+ * The two possible runtime environments.
+ * - 'tauri'   = Tauri desktop shell
+ * - 'browser' = plain web browser (no desktop shell)
  */
-export type Platform = 'tauri' | 'electron' | 'browser';
+export type Platform = 'tauri' | 'browser';
 
 /**
  * Returns which platform we're running on.
- *
- * Tauri is checked first because in the future we might have both Tauri
- * internals AND an electronAPI shim during the migration period. Tauri
- * takes priority since it's the target platform.
  */
 export function getPlatform(): Platform {
   if (isTauri()) return 'tauri';
-  if (isElectron()) return 'electron';
   return 'browser';
 }
 
@@ -117,7 +72,6 @@ export function getPlatform(): Platform {
 //
 // WHAT EACH BACKEND ACTUALLY DOES:
 //   Tauri    -> tauri-plugin-store: saves an encrypted JSON file on disk
-//   Electron -> electron-store: saves an encrypted JSON file on disk
 //   Browser  -> localStorage: plain text in the browser (NOT encrypted)
 //
 // The browser fallback is fine for development but should never hold
@@ -144,12 +98,6 @@ export const store = {
       return invoke('store_get', { key });
     }
 
-    if (isElectron()) {
-      // The non-null assertion (!) is safe here because isElectron()
-      // already confirmed electronAPI exists on window.
-      return window.electronAPI!.store.get(key);
-    }
-
     // Browser fallback: read from localStorage and parse JSON.
     // localStorage only stores strings, so we JSON.stringify on write
     // and JSON.parse on read to support objects, arrays, numbers, etc.
@@ -169,10 +117,6 @@ export const store = {
       return invoke('store_set', { key, value });
     }
 
-    if (isElectron()) {
-      return window.electronAPI!.store.set(key, value);
-    }
-
     // Browser fallback: serialize to JSON string for localStorage.
     localStorage.setItem(key, JSON.stringify(value));
   },
@@ -186,10 +130,6 @@ export const store = {
     if (isTauri()) {
       const { invoke } = await import('@tauri-apps/api/core');
       return invoke('store_delete', { key });
-    }
-
-    if (isElectron()) {
-      return window.electronAPI!.store.delete(key);
     }
 
     localStorage.removeItem(key);
@@ -206,10 +146,6 @@ export const store = {
     if (isTauri()) {
       const { invoke } = await import('@tauri-apps/api/core');
       return invoke('store_clear');
-    }
-
-    if (isElectron()) {
-      return window.electronAPI!.store.clear();
     }
 
     localStorage.clear();
@@ -245,10 +181,6 @@ export const auth = {
       return invoke('auth_open_external', { url });
     }
 
-    if (isElectron()) {
-      return window.electronAPI!.auth.openExternal(url);
-    }
-
     // Browser fallback: open in a new tab.
     // 'noopener,noreferrer' is a security best practice — it prevents
     // the new tab from accessing our window object or knowing our URL.
@@ -264,12 +196,11 @@ export const auth = {
    * The desktop shell intercepts this and passes the token to the web app
    * via IPC (inter-process communication).
    *
-   * In Tauri, this comes as an event. In Electron, it comes via the
-   * preload bridge. In the browser, OAuth is handled via normal redirects,
-   * so this is a no-op.
+   * In Tauri, this comes as an event. In the browser, OAuth is handled
+   * via normal redirects, so this is a no-op.
    *
    * @param callback - Called with the token string when it arrives
-   * @returns An unsubscribe function in Tauri (or void in other envs).
+   * @returns An unsubscribe function in Tauri (or void in browser).
    *          The Tauri return is async because the event listener setup
    *          itself is async (dynamic import).
    */
@@ -309,13 +240,6 @@ export const auth = {
         cancelled = true;
         if (unlistenFn) unlistenFn();
       };
-    }
-
-    if (isElectron()) {
-      // Electron's preload bridge doesn't provide an unsubscribe
-      // mechanism in the current API shape, so we just register.
-      window.electronAPI!.auth.onToken(callback);
-      return;
     }
 
     // Browser: OAuth tokens arrive via URL redirects, not events.

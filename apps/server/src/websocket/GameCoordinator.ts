@@ -24,6 +24,7 @@ import * as authService from '../services/auth';
 import * as spectatorChatService from '../services/spectatorChat';
 import * as spectatorPredictionService from '../services/spectatorPrediction';
 import * as walletService from '../services/wallet';
+import { isFeatureEnabled } from '../services/featureFlags';
 
 // FIX #2: Timeout for pending games (2 minutes)
 const PENDING_GAME_TIMEOUT = 2 * 60 * 1000;
@@ -437,18 +438,41 @@ export class GameCoordinator {
 
   // --- Spectator Management ---
 
+  /** Max number of games a user can spectate concurrently */
+  private static readonly MAX_SPECTATED_GAMES = 5;
+
   async joinSpectate(userId: string, gameId: string): Promise<boolean> {
     const game = await gameService.getGame(gameId);
     if (!game || game.status !== 'active') {
       return false;
     }
 
-    this.rooms.addSpectator(gameId, userId);
-
     const ws = this.connections.get(userId);
     if (ws) {
+      // Initialize the Set if it doesn't exist yet
+      if (!ws.data.spectatingGameIds) {
+        ws.data.spectatingGameIds = new Set();
+      }
+
+      // Enforce multi-game feature flag: if disabled, only allow one game at a time
+      const multiGameEnabled = isFeatureEnabled('spectator_multi_game');
+      if (!multiGameEnabled && ws.data.spectatingGameIds.size >= 1 && !ws.data.spectatingGameIds.has(gameId)) {
+        // Single-game mode: leave current game first
+        this.leaveAllSpectating(userId);
+      }
+
+      // Enforce max concurrent spectated games
+      if (ws.data.spectatingGameIds.size >= GameCoordinator.MAX_SPECTATED_GAMES && !ws.data.spectatingGameIds.has(gameId)) {
+        this.broadcast.sendError(userId, 'MAX_SPECTATING', `Cannot spectate more than ${GameCoordinator.MAX_SPECTATED_GAMES} games at once`);
+        return false;
+      }
+
+      ws.data.spectatingGameIds.add(gameId);
+      // Keep legacy field pointing to the most recently joined game
       ws.data.spectatingGameId = gameId;
     }
+
+    this.rooms.addSpectator(gameId, userId);
 
     // Send current game state
     const gameData = await gameService.getGameWithPlayers(gameId);
@@ -492,10 +516,36 @@ export class GameCoordinator {
 
     const ws = this.connections.get(userId);
     if (ws) {
-      ws.data.spectatingGameId = undefined;
+      ws.data.spectatingGameIds?.delete(gameId);
+      // Update legacy field: point to another game or clear it
+      if (ws.data.spectatingGameId === gameId) {
+        const remaining = ws.data.spectatingGameIds;
+        ws.data.spectatingGameId = remaining && remaining.size > 0
+          ? remaining.values().next().value
+          : undefined;
+      }
     }
 
     this.events.emit('spectator:left', { userId, gameId });
+  }
+
+  /**
+   * Leave all spectated games at once (used on disconnect or explicit leave_all).
+   */
+  leaveAllSpectating(userId: string): void {
+    const ws = this.connections.get(userId);
+    const gameIds = ws?.data.spectatingGameIds;
+    if (!gameIds || gameIds.size === 0) return;
+
+    for (const gameId of gameIds) {
+      this.rooms.removeSpectator(gameId, userId);
+      this.events.emit('spectator:left', { userId, gameId });
+    }
+
+    if (ws) {
+      ws.data.spectatingGameIds = new Set();
+      ws.data.spectatingGameId = undefined;
+    }
   }
 
   // --- Queue Management ---
@@ -556,6 +606,11 @@ export class GameCoordinator {
   // --- Spectator Chat ---
 
   async handleSpectatorChatSend(userId: string, payload: SpectatorChatSendPayload): Promise<void> {
+    if (!isFeatureEnabled('spectator_chat')) {
+      this.broadcast.sendError(userId, 'FEATURE_DISABLED', 'Spectator chat is currently disabled');
+      return;
+    }
+
     try {
       const message = await spectatorChatService.sendMessage(
         payload.gameId,
@@ -574,6 +629,11 @@ export class GameCoordinator {
   // --- Spectator Predictions ---
 
   async handleSpectatorPredictionCreate(userId: string, payload: SpectatorPredictionCreatePayload): Promise<void> {
+    if (!isFeatureEnabled('spectator_predictions')) {
+      this.broadcast.sendError(userId, 'FEATURE_DISABLED', 'Spectator predictions are currently disabled');
+      return;
+    }
+
     try {
       const prediction = await spectatorPredictionService.createPrediction(
         payload.gameId,
@@ -594,6 +654,11 @@ export class GameCoordinator {
   }
 
   async handleSpectatorPredictionAccept(userId: string, predictionId: string): Promise<void> {
+    if (!isFeatureEnabled('spectator_predictions')) {
+      this.broadcast.sendError(userId, 'FEATURE_DISABLED', 'Spectator predictions are currently disabled');
+      return;
+    }
+
     try {
       const prediction = await spectatorPredictionService.acceptPrediction(predictionId, userId);
 

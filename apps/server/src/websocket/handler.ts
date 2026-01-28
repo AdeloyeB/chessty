@@ -7,10 +7,16 @@ import { ClockManager } from './ClockManager';
 import { GameStateManager } from './GameStateManager';
 import { ChallengeCoordinator } from './ChallengeCoordinator';
 import { GameCoordinator } from './GameCoordinator';
+import { validatePayload } from './validation';
 import { gameEvents } from '../events/GameEventEmitter';
 import { registerAllHandlers } from '../events/handlers';
 import * as authService from '../services/auth';
 import * as challengeService from '../services/challenge';
+import { wsMessageLimiter } from '../services/rateLimit';
+
+// C6 FIX: Track rate limit violations per user for auto-disconnect
+const rateLimitViolations = new Map<string, number>();
+const MAX_VIOLATIONS_BEFORE_DISCONNECT = 3;
 
 // --- Module Instances ---
 const connectionManager = new ConnectionManager();
@@ -94,15 +100,18 @@ export function handleWebSocketClose(ws: ServerWebSocket<WebSocketData>) {
   if (ws.data.gameId) {
     gameCoordinator.leaveGame(userId, ws.data.gameId);
   }
-  // Leave spectating if spectating
-  if (ws.data.spectatingGameId) {
+  // Leave all spectated games on disconnect
+  if (ws.data.spectatingGameIds && ws.data.spectatingGameIds.size > 0) {
+    gameCoordinator.leaveAllSpectating(userId);
+  } else if (ws.data.spectatingGameId) {
+    // Backward compat: legacy single-game field
     gameCoordinator.leaveSpectate(userId, ws.data.spectatingGameId);
   }
 
   gameEvents.emit('player:disconnected', {
     userId,
     gameId: ws.data.gameId,
-    spectatingGameId: ws.data.spectatingGameId,
+    spectatingGameIds: ws.data.spectatingGameIds ? [...ws.data.spectatingGameIds] : [],
   });
 
   connectionManager.remove(userId);
@@ -111,14 +120,64 @@ export function handleWebSocketClose(ws: ServerWebSocket<WebSocketData>) {
 export async function handleWebSocketMessage(ws: ServerWebSocket<WebSocketData>, message: string | Buffer) {
   const { userId } = ws.data;
 
+  // C6 FIX: Rate limit WebSocket messages
+  const rateLimitResult = wsMessageLimiter.consume(userId);
+  if (!rateLimitResult.allowed) {
+    // Track violations — disconnect after repeated offenses
+    const violations = (rateLimitViolations.get(userId) || 0) + 1;
+    rateLimitViolations.set(userId, violations);
+
+    broadcastService.sendError(userId, 'RATE_LIMITED', 'Too many messages. Slow down.');
+
+    if (violations >= MAX_VIOLATIONS_BEFORE_DISCONNECT) {
+      console.warn(`[handler] Disconnecting user ${userId} after ${violations} rate limit violations`);
+      rateLimitViolations.delete(userId);
+      ws.close(1008, 'Rate limit exceeded');
+    }
+    return;
+  }
+
+  // Reset violations on successful message
+  rateLimitViolations.delete(userId);
+
   try {
-    const data = JSON.parse(message.toString()) as WSMessage;
+    // Parse the raw message
+    const raw = message.toString();
+    if (raw.length > 16384) {
+      // 16KB max message size — reject oversized messages
+      broadcastService.sendError(userId, 'MESSAGE_TOO_LARGE', 'Message exceeds maximum size');
+      return;
+    }
+
+    let data: WSMessage;
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      broadcastService.sendError(userId, 'INVALID_JSON', 'Malformed message');
+      return;
+    }
+
     const { type, payload } = data;
+
+    if (typeof type !== 'string') {
+      broadcastService.sendError(userId, 'INVALID_TYPE', 'Missing or invalid message type');
+      return;
+    }
+
+    // C5 FIX: Validate payload against Zod schema before processing
+    const validation = validatePayload(type, payload);
+    if (!validation.valid) {
+      broadcastService.sendError(userId, 'VALIDATION_ERROR', validation.error);
+      return;
+    }
+
+    // Use the validated (cleaned) payload — Zod strips unknown fields
+    const validatedPayload = validation.data as any;
 
     switch (type as WSMessageType) {
       // Game actions
       case 'game:join':
-        await gameCoordinator.joinGame(userId, (payload as any).gameId);
+        await gameCoordinator.joinGame(userId, validatedPayload.gameId);
         break;
 
       case 'game:leave':
@@ -128,7 +187,7 @@ export async function handleWebSocketMessage(ws: ServerWebSocket<WebSocketData>,
         break;
 
       case 'game:move':
-        await gameCoordinator.handleMove(userId, payload as any);
+        await gameCoordinator.handleMove(userId, validatedPayload);
         break;
 
       case 'game:resign':
@@ -157,7 +216,7 @@ export async function handleWebSocketMessage(ws: ServerWebSocket<WebSocketData>,
 
       // Queue actions
       case 'queue:join':
-        await gameCoordinator.handleQueueJoin(userId, payload);
+        await gameCoordinator.handleQueueJoin(userId, validatedPayload);
         break;
 
       case 'queue:leave':
@@ -166,48 +225,54 @@ export async function handleWebSocketMessage(ws: ServerWebSocket<WebSocketData>,
 
       // Spectator actions
       case 'spectate:join':
-        await gameCoordinator.joinSpectate(userId, (payload as any).gameId);
+        await gameCoordinator.joinSpectate(userId, validatedPayload.gameId);
         break;
 
-      case 'spectate:leave':
-        if (ws.data.spectatingGameId) {
-          gameCoordinator.leaveSpectate(userId, ws.data.spectatingGameId);
+      case 'spectate:leave': {
+        const leaveGameId = validatedPayload?.gameId || ws.data.spectatingGameId;
+        if (leaveGameId) {
+          gameCoordinator.leaveSpectate(userId, leaveGameId);
         }
+        break;
+      }
+
+      case 'spectate:leave_all':
+        gameCoordinator.leaveAllSpectating(userId);
         break;
 
       // Challenge actions
       case 'challenge:create':
-        await challengeCoordinator.handleCreate(userId, payload as any);
+        await challengeCoordinator.handleCreate(userId, validatedPayload);
         break;
 
       case 'challenge:cancel':
-        await challengeCoordinator.handleCancel(userId, (payload as any).challengeId);
+        await challengeCoordinator.handleCancel(userId, validatedPayload.challengeId);
         break;
 
       case 'challenge:accept':
-        await challengeCoordinator.handleAccept(userId, (payload as any).challengeId);
+        await challengeCoordinator.handleAccept(userId, validatedPayload.challengeId);
         break;
 
       case 'challenge:confirm':
-        await challengeCoordinator.handleConfirm(userId, (payload as any).challengeId);
+        await challengeCoordinator.handleConfirm(userId, validatedPayload.challengeId);
         break;
 
       case 'challenge:decline':
-        await challengeCoordinator.handleDecline(userId, (payload as any).challengeId);
+        await challengeCoordinator.handleDecline(userId, validatedPayload.challengeId);
         break;
 
       // Spectator chat
       case 'spectator:chat_send':
-        await gameCoordinator.handleSpectatorChatSend(userId, payload as any);
+        await gameCoordinator.handleSpectatorChatSend(userId, validatedPayload);
         break;
 
       // Spectator predictions
       case 'spectator:prediction_create':
-        await gameCoordinator.handleSpectatorPredictionCreate(userId, payload as any);
+        await gameCoordinator.handleSpectatorPredictionCreate(userId, validatedPayload);
         break;
 
       case 'spectator:prediction_accept':
-        await gameCoordinator.handleSpectatorPredictionAccept(userId, (payload as any).predictionId);
+        await gameCoordinator.handleSpectatorPredictionAccept(userId, validatedPayload.predictionId);
         break;
 
       // Keepalive

@@ -1,14 +1,34 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+/**
+ * WalletButton - Connect wallet and authenticate via SIWE
+ *
+ * This button handles the complete wallet authentication flow:
+ * 1. Click → Connect wallet (via wagmi/RainbowKit)
+ * 2. Once connected → Automatically trigger SIWE sign-in
+ * 3. User signs message in wallet
+ * 4. Server verifies → User authenticated
+ *
+ * The component supports three wallet providers:
+ * - WalletConnect: Works with most mobile wallets
+ * - Coinbase Wallet: Coinbase's official wallet
+ * - Phantom: Popular Solana wallet (also supports EVM)
+ *
+ * Why separate buttons instead of one "Connect" button?
+ * - Users often have a preferred wallet
+ * - Clicking directly on their wallet icon is faster
+ * - Matches the UX pattern on Polymarket and other crypto apps
+ */
+
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { useAccount, useConnect } from 'wagmi';
+import { useWalletAuth } from '@/hooks/useWalletAuth';
 
 type WalletProvider = 'walletconnect' | 'coinbase' | 'phantom';
 
 interface WalletButtonProps {
   provider: WalletProvider;
-  isLoading?: boolean;
   disabled?: boolean;
-  onClick?: () => void;
 }
 
 /**
@@ -65,15 +85,41 @@ const WALLET_NAMES: Record<WalletProvider, string> = {
   phantom: 'Phantom',
 };
 
+/**
+ * Maps our provider names to wagmi connector IDs.
+ *
+ * Wagmi connectors have specific IDs that we need to match.
+ * These IDs come from the @rainbow-me/rainbowkit configuration.
+ */
+const CONNECTOR_IDS: Record<WalletProvider, string[]> = {
+  walletconnect: ['walletConnect', 'walletConnectLegacy'],
+  coinbase: ['coinbaseWallet', 'coinbaseWalletSDK'],
+  phantom: ['phantom', 'app.phantom'],
+};
+
 export function WalletButton({
   provider,
-  isLoading = false,
   disabled = false,
-  onClick
 }: WalletButtonProps) {
-  const [isConnecting, setIsConnecting] = useState(false);
+  // Wagmi hooks for wallet connection
+  const { isConnected, address } = useAccount();
+  const { connect, connectors, isPending: isConnecting } = useConnect();
+
+  // Our SIWE authentication hook
+  const { signIn, isLoading: isAuthenticating, error: authError, step, reset } = useWalletAuth();
+
+  // Local state
   const [showTooltip, setShowTooltip] = useState(false);
+  const [localError, setLocalError] = useState<string | null>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const hasTriggeredSignIn = useRef(false);
+
+  // Find the connector for this provider
+  const connector = connectors.find((c) =>
+    CONNECTOR_IDS[provider].some(
+      (id) => c.id.toLowerCase().includes(id.toLowerCase()) || c.name.toLowerCase().includes(id.toLowerCase())
+    )
+  );
 
   // Clean up tooltip timeout on unmount to prevent memory leaks
   useEffect(() => {
@@ -95,23 +141,92 @@ export function WalletButton({
     setShowTooltip(false);
   };
 
-  const handleClick = () => {
-    if (disabled || isLoading || isConnecting) return;
+  /**
+   * Handle button click
+   *
+   * If wallet is not connected: Connect the wallet
+   * If wallet is connected: Trigger SIWE sign-in
+   */
+  const handleClick = useCallback(() => {
+    if (disabled || isConnecting || isAuthenticating) return;
 
-    setIsConnecting(true);
+    setLocalError(null);
+    reset();
 
-    // Call the provided onClick handler
-    // In the future, this will trigger the actual wallet connection
-    if (onClick) {
-      onClick();
+    if (!isConnected) {
+      // Step 1: Connect wallet
+      if (connector) {
+        connect({ connector });
+      } else {
+        // Fallback: If specific connector not found, try any available
+        const fallbackConnector = connectors[0];
+        if (fallbackConnector) {
+          connect({ connector: fallbackConnector });
+        } else {
+          setLocalError('No wallet connector available');
+        }
+      }
+    } else {
+      // Wallet already connected, trigger sign-in
+      signIn();
+    }
+  }, [disabled, isConnecting, isAuthenticating, isConnected, connector, connectors, connect, signIn, reset]);
+
+  /**
+   * Auto-trigger SIWE sign-in after wallet connection
+   *
+   * When the wallet connects, we automatically start the SIWE flow.
+   * This provides a seamless experience - one click to connect AND authenticate.
+   */
+  useEffect(() => {
+    // Only trigger if:
+    // 1. Wallet just connected (isConnected becomes true)
+    // 2. We haven't already triggered sign-in
+    // 3. We're not already authenticating
+    // 4. We have an address
+    if (isConnected && address && !hasTriggeredSignIn.current && !isAuthenticating && step === 'idle') {
+      // Small delay to ensure connection is fully established
+      const timer = setTimeout(() => {
+        if (!hasTriggeredSignIn.current) {
+          hasTriggeredSignIn.current = true;
+          signIn();
+        }
+      }, 500);
+
+      return () => clearTimeout(timer);
     }
 
-    // Reset after a short delay (will be replaced with actual connection logic)
-    setTimeout(() => setIsConnecting(false), 2000);
-  };
+    // Reset the flag when disconnected
+    if (!isConnected) {
+      hasTriggeredSignIn.current = false;
+    }
+  }, [isConnected, address, isAuthenticating, step, signIn]);
 
-  const isDisabled = disabled || isLoading || isConnecting;
-  const showLoading = isLoading || isConnecting;
+  // Determine loading state
+  const isLoading = isConnecting || isAuthenticating;
+  const isDisabled = disabled || isLoading;
+
+  // Error display
+  const displayError = localError || authError;
+
+  // Tooltip text based on state
+  const getTooltipText = () => {
+    if (displayError) return displayError.toLowerCase();
+    if (isConnecting) return 'connecting...';
+    if (isAuthenticating) {
+      switch (step) {
+        case 'requesting_nonce':
+          return 'preparing...';
+        case 'awaiting_signature':
+          return 'sign in wallet';
+        case 'verifying':
+          return 'verifying...';
+        default:
+          return 'authenticating...';
+      }
+    }
+    return WALLET_NAMES[provider].toLowerCase();
+  };
 
   const displayName = WALLET_NAMES[provider];
 
@@ -137,9 +252,10 @@ export function WalletButton({
             ? 'opacity-50 cursor-not-allowed'
             : 'hover:border-white hover:text-white hover:bg-white/5'
           }
+          ${displayError ? 'border-red-500/50' : ''}
         `}
       >
-        {showLoading ? (
+        {isLoading ? (
           <span className="animate-blink text-sm">_</span>
         ) : (
           <span className="transition-transform duration-150 group-hover:scale-110">
@@ -151,10 +267,16 @@ export function WalletButton({
       {/* Tooltip */}
       {showTooltip && (
         <div className="absolute z-50 bottom-full mb-2 left-1/2 -translate-x-1/2 whitespace-nowrap">
-          <div className="px-2 py-1 bg-black border border-white/20 text-[10px] font-mono text-white/70 lowercase">
-            {displayName.toLowerCase()}
+          <div className={`
+            px-2 py-1 bg-black border text-[10px] font-mono lowercase
+            ${displayError ? 'border-red-500/50 text-red-400' : 'border-white/20 text-white/70'}
+          `}>
+            {getTooltipText()}
           </div>
-          <div className="absolute -bottom-[3px] left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-black border-r border-b border-white/20 rotate-45" />
+          <div className={`
+            absolute -bottom-[3px] left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-black border-r border-b rotate-45
+            ${displayError ? 'border-red-500/50' : 'border-white/20'}
+          `} />
         </div>
       )}
     </div>
