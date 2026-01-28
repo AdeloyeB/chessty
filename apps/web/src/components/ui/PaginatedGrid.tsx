@@ -114,7 +114,7 @@ interface PaginatedListProps<T> {
   itemsPerPage: number;
   renderItem: (item: T, index: number) => ReactNode;
   emptyMessage?: string;
-  gap?: 'sm' | 'md';
+  gap?: 'none' | 'sm' | 'md';
 }
 
 export function PaginatedList<T>({
@@ -141,7 +141,7 @@ export function PaginatedList<T>({
     setCurrentPage((prev) => Math.min(totalPages - 1, prev + 1));
   }, [totalPages]);
 
-  const gapClass = gap === 'sm' ? 'space-y-2' : 'space-y-3';
+  const gapClass = gap === 'none' ? '' : gap === 'sm' ? 'space-y-2' : 'space-y-3';
 
   if (items.length === 0) {
     return (

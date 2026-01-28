@@ -15,28 +15,26 @@ interface OpeningsTabProps {
 export function OpeningsTab({ games, isLoading }: OpeningsTabProps) {
   const openingsData = useOpeningsData({ games, isLoading });
 
-  // Loading skeleton: 3 placeholder cards with pulse animation
+  // Loading skeleton: compact rows matching the stacked-bar layout
   if (isLoading) {
     return (
-      <div className="p-4 space-y-3">
-        {[...Array(3)].map((_, i) => (
+      <div>
+        {/* Header skeleton */}
+        <div className="flex items-center gap-3 px-4 py-2 border-b border-white/10">
+          <div className="w-[220px] h-3 bg-white/5" />
+          <div className="w-[48px] h-3 bg-white/5" />
+          <div className="flex-1 h-3 bg-white/5" />
+          <div className="w-[100px] h-3 bg-white/5" />
+        </div>
+        {[...Array(6)].map((_, i) => (
           <div
             key={i}
-            className="bg-off-black border border-white/15 p-4 animate-pulse"
+            className="flex items-center gap-3 px-4 py-3 border-b border-white/10 animate-pulse"
           >
-            {/* Title row skeleton */}
-            <div className="flex items-center justify-between mb-3">
-              <div className="h-4 w-40 bg-white/10" />
-              <div className="h-3 w-8 bg-white/10" />
-            </div>
-            {/* Bar skeleton */}
-            <div className="h-1.5 w-full bg-white/10 mb-3" />
-            {/* Stats skeleton */}
-            <div className="h-3 w-48 bg-white/10 mb-2" />
-            {/* Color breakdown skeleton */}
-            <div className="h-3 w-64 bg-white/10 mb-2" />
-            {/* Last played skeleton */}
-            <div className="h-3 w-32 bg-white/10" />
+            <div className="w-[220px] h-4 bg-white/10 shrink-0" />
+            <div className="w-[48px] h-3 bg-white/10 shrink-0" />
+            <div className="flex-1 h-5 bg-white/[0.06]" />
+            <div className="w-[100px] h-3 bg-white/10 shrink-0" />
           </div>
         ))}
       </div>
@@ -79,11 +77,27 @@ export function OpeningsTab({ games, isLoading }: OpeningsTabProps) {
         />
       </div>
 
+      {/* Column header */}
+      <div className="flex items-center gap-3 px-4 py-2 border-b border-white/10">
+        <span className="w-[220px] shrink-0 text-[10px] font-mono text-white/25 uppercase tracking-wider">
+          opening
+        </span>
+        <span className="w-[48px] shrink-0 text-[10px] font-mono text-white/25 uppercase tracking-wider text-right">
+          games
+        </span>
+        <span className="flex-1 text-[10px] font-mono text-white/25 uppercase tracking-wider text-center">
+          win · draw · loss
+        </span>
+        <span className="w-[100px] shrink-0 text-[10px] font-mono text-white/25 uppercase tracking-wider text-right">
+          record
+        </span>
+      </div>
+
       {/* Openings List */}
-      <div className="p-4">
+      <div>
         <PaginatedList
           items={openingsData.openings}
-          itemsPerPage={8}
+          itemsPerPage={12}
           renderItem={(opening) => (
             <OpeningCard
               opening={opening}
@@ -91,7 +105,7 @@ export function OpeningsTab({ games, isLoading }: OpeningsTabProps) {
             />
           )}
           emptyMessage="no openings match your filters"
-          gap="md"
+          gap="none"
         />
       </div>
 
