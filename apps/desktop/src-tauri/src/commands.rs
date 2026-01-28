@@ -1,4 +1,4 @@
- // =============================================================================
+// =============================================================================
 // commands.rs — IPC Command Handlers (Tauri v2)
 // =============================================================================
 //
@@ -17,11 +17,21 @@
 //   ipcMain.handle('store:delete', ...)-->  store_delete()
 //   ipcMain.handle('store:clear', ...) -->  store_clear()
 //   ipcMain.handle('auth:openExternal', ...) --> auth_open_external()
+//
+// Engine commands for Stockfish integration:
+//   init_engine()      --> Initialize the Stockfish engine
+//   analyze_position() --> Analyze a single chess position
+//   analyze_game()     --> Analyze all positions in a game
+//   stop_analysis()    --> Stop current analysis
+//   get_engine_info()  --> Get engine info (name, version)
 // =============================================================================
 
 use serde_json::Value;
-use tauri::AppHandle;
+use tauri::{AppHandle, Emitter, State};
 use tauri_plugin_store::StoreExt;
+
+// Import our engine module types
+use crate::engine::{EngineEvaluation, EngineInfo, EngineState, StockfishEngine};
 
 /// The filename for our persistent key-value store on disk.
 /// This matches the Electron store name "chess-gamble-config" so migrating
@@ -167,4 +177,186 @@ pub async fn auth_open_external(
         .map_err(|e| format!("Failed to open URL in browser: {}", e))?;
 
     Ok(())
+}
+
+// =============================================================================
+// Engine Commands (Stockfish Integration)
+// =============================================================================
+// These commands let the frontend interact with the Stockfish chess engine.
+// The engine runs as a separate process (sidecar) and communicates via UCI.
+//
+// Typical usage flow:
+// 1. Frontend calls init_engine() on app startup
+// 2. Frontend calls analyze_position() when user wants analysis
+// 3. Frontend calls stop_analysis() if user cancels
+// 4. Engine state persists until app closes
+// =============================================================================
+
+/// Initialize the Stockfish engine.
+///
+/// This spawns the Stockfish process and performs the UCI handshake.
+/// Should be called once on app startup. If already initialized, returns
+/// the existing engine info without restarting.
+///
+/// Frontend usage:
+///   const info = await invoke("init_engine");
+///   console.log(`Using ${info.name} by ${info.author}`);
+#[tauri::command]
+pub async fn init_engine(
+    app: AppHandle,
+    state: State<'_, EngineState>,
+) -> Result<EngineInfo, String> {
+    // Lock the mutex to access the engine
+    // `.lock().await` waits if another task is using the engine
+    let mut guard = state.engine.lock().await;
+
+    // Check if engine is already initialized
+    if guard.is_some() {
+        // Already initialized — just return the info
+        return Ok(guard.as_ref().unwrap().info());
+    }
+
+    // Not initialized — spawn a new engine
+    let engine = StockfishEngine::new(&app).await?;
+    let info = engine.info();
+
+    // Store the engine in the state
+    *guard = Some(engine);
+
+    Ok(info)
+}
+
+/// Analyze a single chess position.
+///
+/// Parameters:
+/// - fen: The position in FEN notation (e.g., starting position:
+///        "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
+/// - depth: How many moves ahead to analyze (1-30, higher = slower but better)
+///
+/// Returns the best move and evaluation.
+///
+/// Frontend usage:
+///   const result = await invoke("analyze_position", {
+///     fen: "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1",
+///     depth: 20
+///   });
+///   console.log(`Best move: ${result.best_move}, Score: ${result.score_cp}`);
+#[tauri::command]
+pub async fn analyze_position(
+    fen: String,
+    depth: u8,
+    state: State<'_, EngineState>,
+) -> Result<EngineEvaluation, String> {
+    // Validate depth — reasonable range is 1-30
+    let clamped_depth = depth.clamp(1, 30);
+
+    let mut guard = state.engine.lock().await;
+    let engine = guard
+        .as_mut()
+        .ok_or("Engine not initialized. Call init_engine first.")?;
+
+    engine.analyze_position(&fen, clamped_depth).await
+}
+
+/// Analyze multiple positions (an entire game).
+///
+/// Analyzes each FEN position in sequence, emitting progress events so the
+/// frontend can show a progress bar. Useful for post-game analysis.
+///
+/// Parameters:
+/// - fens: Array of FEN strings (one per game position)
+/// - depth: Analysis depth for each position
+///
+/// Emits "analysis:progress" events with { current, total } payload.
+///
+/// Frontend usage:
+///   // Listen for progress events
+///   await listen("analysis:progress", (event) => {
+///     const { current, total } = event.payload;
+///     console.log(`Analyzing position ${current}/${total}`);
+///   });
+///
+///   // Start analysis
+///   const results = await invoke("analyze_game", { fens: gameFens, depth: 15 });
+#[tauri::command]
+pub async fn analyze_game(
+    fens: Vec<String>,
+    depth: u8,
+    state: State<'_, EngineState>,
+    window: tauri::Window,
+) -> Result<Vec<EngineEvaluation>, String> {
+    let clamped_depth = depth.clamp(1, 30);
+    let total = fens.len();
+
+    if total == 0 {
+        return Ok(vec![]);
+    }
+
+    let mut guard = state.engine.lock().await;
+    let engine = guard
+        .as_mut()
+        .ok_or("Engine not initialized. Call init_engine first.")?;
+
+    let mut results = Vec::with_capacity(total);
+
+    for (i, fen) in fens.iter().enumerate() {
+        // Emit progress event
+        // The frontend can listen with: listen("analysis:progress", ...)
+        let _ = window.emit(
+            "analysis:progress",
+            serde_json::json!({
+                "current": i + 1,
+                "total": total
+            }),
+        );
+
+        // Analyze this position
+        let eval = engine.analyze_position(fen, clamped_depth).await?;
+        results.push(eval);
+    }
+
+    // Emit completion
+    let _ = window.emit(
+        "analysis:progress",
+        serde_json::json!({
+            "current": total,
+            "total": total,
+            "complete": true
+        }),
+    );
+
+    Ok(results)
+}
+
+/// Stop the current analysis.
+///
+/// If the engine is analyzing, this tells it to stop immediately.
+/// The engine will return the best move it found so far.
+///
+/// Frontend usage:
+///   await invoke("stop_analysis");
+#[tauri::command]
+pub async fn stop_analysis(state: State<'_, EngineState>) -> Result<(), String> {
+    let mut guard = state.engine.lock().await;
+    if let Some(engine) = guard.as_mut() {
+        engine.stop().await?;
+    }
+    Ok(())
+}
+
+/// Get information about the engine.
+///
+/// Returns the engine name, author, and ready status.
+/// Fails if the engine hasn't been initialized.
+///
+/// Frontend usage:
+///   const info = await invoke("get_engine_info");
+///   console.log(`Engine: ${info.name}`);
+#[tauri::command]
+pub async fn get_engine_info(state: State<'_, EngineState>) -> Result<EngineInfo, String> {
+    let guard = state.engine.lock().await;
+    let engine = guard
+        .as_ref()
+        .ok_or("Engine not initialized. Call init_engine first.")?;
+    Ok(engine.info())
 }

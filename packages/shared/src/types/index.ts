@@ -519,3 +519,6 @@ export * from './flags';
 
 // Re-export profile types
 export * from './profile';
+
+// Re-export analysis types
+export * from './analysis';

@@ -1,0 +1,2 @@
+# This file ensures the binaries directory exists in git
+# Actual binary files are gitignored - see README.md for download instructions

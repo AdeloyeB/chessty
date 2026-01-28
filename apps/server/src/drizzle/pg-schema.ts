@@ -1,5 +1,6 @@
-import { pgTable, text, integer, numeric, boolean, timestamp, jsonb, unique } from 'drizzle-orm/pg-core';
+import { pgTable, text, integer, numeric, boolean, timestamp, jsonb, unique, index } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
+import { nanoid } from 'nanoid';
 
 // Users table
 export const users = pgTable('users', {
@@ -56,6 +57,20 @@ export const games = pgTable('games', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().$defaultFn(() => new Date()),
   startedAt: timestamp('started_at', { withTimezone: true }),
   endedAt: timestamp('ended_at', { withTimezone: true }),
+  // Analysis metadata
+  analysisEngine: text('analysis_engine'),
+  analysisDepth: integer('analysis_depth'),
+  analysisCompletedAt: timestamp('analysis_completed_at', { withTimezone: true }),
+  // Accuracy scores (percentage with 2 decimal places, e.g., 95.23)
+  whiteAccuracy: numeric('white_accuracy', { precision: 5, scale: 2 }),
+  blackAccuracy: numeric('black_accuracy', { precision: 5, scale: 2 }),
+  // Blunder/mistake/inaccuracy counts per player
+  whiteBlunders: integer('white_blunders').default(0),
+  blackBlunders: integer('black_blunders').default(0),
+  whiteMistakes: integer('white_mistakes').default(0),
+  blackMistakes: integer('black_mistakes').default(0),
+  whiteInaccuracies: integer('white_inaccuracies').default(0),
+  blackInaccuracies: integer('black_inaccuracies').default(0),
 });
 
 // Bets table
@@ -196,6 +211,49 @@ export const mfaTotpUsage = pgTable('mfa_totp_usage', {
   unique('user_code_unique').on(table.userId, table.codeHash),
 ]);
 
+// Move analysis table - stores per-move engine evaluations
+// This is where we save detailed analysis from engines like Stockfish
+export const moveAnalysis = pgTable('move_analysis', {
+  // Primary key - auto-generated unique ID
+  id: text('id').primaryKey().$defaultFn(() => nanoid()),
+  // Foreign key to games table - cascades delete when game is removed
+  gameId: text('game_id').notNull().references(() => games.id, { onDelete: 'cascade' }),
+  // Which move in the game (1, 2, 3, etc.)
+  moveNumber: integer('move_number').notNull(),
+  // Which player made this move ('white' or 'black')
+  playerColor: text('player_color').notNull(),
+
+  // Engine evaluation scores (in centipawns)
+  // Positive = white advantage, negative = black advantage
+  // 100 centipawns = 1 pawn worth of advantage
+  evalBefore: integer('eval_before'),           // Position evaluation before the move
+  evalAfter: integer('eval_after'),             // Position evaluation after the move
+  evalMateIn: integer('eval_mate_in'),          // Forced mate in N moves (null if not mate)
+
+  // What the engine thinks was the best move
+  bestMove: text('best_move'),                  // Engine's recommended move (UCI format, e.g., "e2e4")
+  bestMoveSan: text('best_move_san'),           // Engine's recommended move (SAN format, e.g., "e4")
+  // The engine's calculated best line of play (sequence of moves)
+  principalVariation: jsonb('principal_variation').$type<string[]>(),
+
+  // Move quality classification
+  // Ranges from 'brilliant' (exceptional) to 'blunder' (losing move)
+  classification: text('classification').notNull(),
+  // How many centipawns were "lost" compared to the best move
+  // Higher = worse move. A blunder might be 200+ centipawn loss
+  centipawnLoss: integer('centipawn_loss'),
+
+  // Metadata about the analysis itself
+  engineDepth: integer('engine_depth').notNull(),  // How many moves ahead the engine looked
+  engineName: text('engine_name').notNull(),       // Which engine (e.g., "stockfish-16")
+  analyzedAt: timestamp('analyzed_at', { withTimezone: true }).notNull().$defaultFn(() => new Date()),
+}, (table) => [
+  // Ensure we can't have duplicate analysis for same move in same game
+  unique('move_analysis_game_move').on(table.gameId, table.moveNumber),
+  // Index for fast lookups when loading all moves for a game
+  index('move_analysis_game_idx').on(table.gameId),
+]);
+
 // Security audit log table
 export const securityAuditLog = pgTable('security_audit_log', {
   id: text('id').primaryKey(),
@@ -263,6 +321,7 @@ export const gamesRelations = relations(games, ({ one, many }) => ({
   bets: many(bets),
   spectatorPredictions: many(spectatorPredictions),
   spectatorChatMessages: many(spectatorChat),
+  moveAnalyses: many(moveAnalysis),
 }));
 
 export const betsRelations = relations(bets, ({ one }) => ({
@@ -376,6 +435,13 @@ export const mfaTotpUsageRelations = relations(mfaTotpUsage, ({ one }) => ({
   }),
 }));
 
+export const moveAnalysisRelations = relations(moveAnalysis, ({ one }) => ({
+  game: one(games, {
+    fields: [moveAnalysis.gameId],
+    references: [games.id],
+  }),
+}));
+
 // Type exports
 export type FeatureFlag = typeof featureFlags.$inferSelect;
 export type NewFeatureFlag = typeof featureFlags.$inferInsert;
@@ -407,3 +473,5 @@ export type MfaEnrollment = typeof mfaEnrollments.$inferSelect;
 export type NewMfaEnrollment = typeof mfaEnrollments.$inferInsert;
 export type MfaTotpUsage = typeof mfaTotpUsage.$inferSelect;
 export type NewMfaTotpUsage = typeof mfaTotpUsage.$inferInsert;
+export type MoveAnalysis = typeof moveAnalysis.$inferSelect;
+export type NewMoveAnalysis = typeof moveAnalysis.$inferInsert;

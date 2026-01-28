@@ -46,5 +46,11 @@ log/
 **/target/
 **/src-tauri/gen/
 
+# Stockfish binaries (large files, download separately - see binaries/README.md)
+**/src-tauri/binaries/stockfish-*
+!**/src-tauri/binaries/.gitkeep
+!**/src-tauri/binaries/README.md
+!**/src-tauri/binaries/download-stockfish.sh
+
 # Claude local settings
 .claude/settings.local.json

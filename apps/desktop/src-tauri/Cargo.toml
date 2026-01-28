@@ -14,8 +14,13 @@ tauri-plugin-store = "2"
 tauri-plugin-opener = "2"
 tauri-plugin-deep-link = "2"
 tauri-plugin-os = "2"
+tauri-plugin-shell = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+# Tokio is an async runtime — it provides async-aware synchronization primitives
+# like Mutex that can be held across .await points. The standard library's Mutex
+# can't be used with async code because it would block the entire thread.
+tokio = { version = "1", features = ["sync"] }
 
 [features]
 default = []
