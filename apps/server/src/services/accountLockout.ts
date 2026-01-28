@@ -184,7 +184,7 @@ export async function recordFailedAttempt(
   // Log the failed attempt
   await logSecurityEvent('login_failed', userId, ipAddress, userAgent, {
     attemptNumber: newAttemptCount,
-    email: user.email,
+    email: user.email ?? undefined,
   });
 
   // Check if we should lock the account
@@ -248,7 +248,7 @@ export async function unlockAccount(
   ipAddress: string | null,
   userAgent: string | null
 ): Promise<boolean> {
-  const result = await db.update(users).set({
+  await db.update(users).set({
     failedLoginAttempts: 0,
     lastFailedLoginAt: null,
     lockedUntil: null,
