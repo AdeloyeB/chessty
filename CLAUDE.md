@@ -39,6 +39,65 @@ Always explain new technologies, patterns, and concepts in plain language. The d
 
 ---
 
+## Desktop Architecture (Tauri-Only)
+
+**This is a Tauri desktop app. Not a web app with optional desktop support.**
+
+The web code (Next.js/React) runs inside Tauri's webview. There is no separate browser mode for production. The architecture looks like this:
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    TAURI DESKTOP APP                     │
+├─────────────────────────────────────────────────────────┤
+│  ┌───────────────────────────────────────────────────┐  │
+│  │              WEBVIEW (Next.js/React)              │  │
+│  │                                                   │  │
+│  │   - UI components                                 │  │
+│  │   - State management (Zustand)                    │  │
+│  │   - Game logic (chess.js)                         │  │
+│  │   - WebSocket connection to server                │  │
+│  │                                                   │  │
+│  └──────────────────────┬────────────────────────────┘  │
+│                         │ IPC (invoke)                   │
+│  ┌──────────────────────▼────────────────────────────┐  │
+│  │              RUST BACKEND                         │  │
+│  │                                                   │  │
+│  │   - Window controls (titlebar)                    │  │
+│  │   - Secure storage (tauri-plugin-store)           │  │
+│  │   - Stockfish engine (sidecar binary)             │  │
+│  │   - Anti-cheat validation                         │  │
+│  │   - Deep linking (chessgamble:// protocol)        │  │
+│  │                                                   │  │
+│  └───────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Key Points
+
+1. **No `isTauri()` checks** — Don't write conditional code that falls back to browser APIs. The app assumes Tauri is always available.
+
+2. **Tauri APIs via IPC** — Call Rust functions from TypeScript using `invoke()`:
+   ```typescript
+   import { invoke } from '@tauri-apps/api/core';
+   const result = await invoke<ReturnType>('rust_command_name', { arg1, arg2 });
+   ```
+
+3. **SSR compatibility** — Next.js does server-side rendering. Tauri APIs aren't available during SSR. Use:
+   - Dynamic imports: `const { invoke } = await import('@tauri-apps/api/core');`
+   - Client-only state: `const [mounted, setMounted] = useState(false); useEffect(() => setMounted(true), []);`
+
+4. **Desktop chrome** — TitleBar and TickerBar are always rendered (after client mount). No conditional hiding.
+
+### Sidecar Binaries (Stockfish)
+
+Stockfish runs as a sidecar binary managed by Tauri:
+
+- **Config**: `tauri.conf.json` → `bundle.externalBin: ["binaries/stockfish"]`
+- **Rust API**: `app.shell().sidecar("stockfish")` (basename only, not full path)
+- **Binary location**: `apps/desktop/src-tauri/binaries/stockfish-{target-triple}`
+
+---
+
 ## Rust Development
 
 ### Cargo Commands

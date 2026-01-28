@@ -17,7 +17,9 @@
         "minWidth": 1024,
         "minHeight": 700,
         "decorations": false,
-        "center": true
+        "transparent": true,
+        "center": true,
+        "shadow": true
       }
     ],
     "security": {

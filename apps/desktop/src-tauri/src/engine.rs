@@ -530,12 +530,20 @@ impl StockfishEngine {
     /// If any step fails, we return an error.
     pub async fn new(app: &AppHandle) -> Result<Self, String> {
         // Spawn the Stockfish sidecar using Tauri's shell plugin.
-        // "binaries/stockfish" matches the externalBin path in tauri.conf.json.
-        // The `.sidecar()` method looks for a binary in the app bundle.
-        // Tauri automatically appends the platform suffix (e.g., -x86_64-apple-darwin).
+        //
+        // IMPORTANT: In Tauri v2, the Rust sidecar() function takes just the binary NAME,
+        // not the full path from externalBin. The shell plugin resolves the path internally.
+        //
+        // Config structure:
+        // - tauri.conf.json: externalBin: ["binaries/stockfish"]
+        // - capabilities:    name: "binaries/stockfish" (for permissions)
+        // - Rust code:       sidecar("stockfish") (just the name!)
+        //
+        // Tauri automatically appends the platform suffix (e.g., -aarch64-apple-darwin)
+        // and resolves the path to src-tauri/binaries/stockfish-{target}
         let sidecar_command = app
             .shell()
-            .sidecar("binaries/stockfish")
+            .sidecar("stockfish")
             .map_err(|e| format!("Failed to create sidecar command: {}", e))?;
 
         // `.spawn()` starts the process and returns:

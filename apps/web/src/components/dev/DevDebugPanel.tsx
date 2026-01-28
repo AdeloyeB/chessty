@@ -26,10 +26,11 @@ import {
   getRandomPlayers,
   generateMockChallenges,
   generateMockChatMessages,
-  generateMockActiveGames,
   TIME_CONTROLS,
   SAMPLE_FENS,
 } from '@/lib/mock/mockData';
+import { AnalysisBoard } from '@/components/analysis/AnalysisBoard';
+import type { HistoryGame, Move } from '@chess-game/shared';
 
 // Only render in development
 const isDev = process.env.NODE_ENV === 'development';
@@ -100,9 +101,67 @@ const btnSuccess =
 const btnNeutral =
   'w-full px-3 py-2 bg-black border border-white/20 text-white/50 font-mono text-xs hover:border-white/40 hover:text-white/70 transition-colors';
 
+// Mock game data for analysis board testing
+const MOCK_ANALYSIS_GAME: HistoryGame = {
+  id: 'mock-analysis-game-1',
+  opponent: {
+    id: 'opp-1',
+    username: 'StockfishTest',
+    displayName: 'StockfishTest',
+    eloRating: 2100,
+    peakEloRating: 2200,
+    gamesPlayed: 500,
+    gamesWon: 300,
+    gamesLost: 150,
+    gamesDraw: 50,
+  },
+  playerColor: 'white',
+  result: 'win',
+  resultDetail: 'white_wins',
+  gameMode: 'standard',
+  timeControlInitial: 300,
+  timeControlIncrement: 0,
+  timeControlLabel: '5 min',
+  wagerAmount: 25,
+  totalPot: 50,
+  eloChange: 12,
+  eloAtStart: 1850,
+  opponentEloAtStart: 2100,
+  opening: 'Italian Game',
+  moveCount: 20,
+  moves: [
+    // Italian Game - Scholar's Mate attempt defense
+    { from: 'e2', to: 'e4', san: 'e4', fen: 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1', timestamp: 1 },
+    { from: 'e7', to: 'e5', san: 'e5', fen: 'rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq e6 0 2', timestamp: 2 },
+    { from: 'g1', to: 'f3', san: 'Nf3', fen: 'rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2', timestamp: 3 },
+    { from: 'b8', to: 'c6', san: 'Nc6', fen: 'r1bqkbnr/pppp1ppp/2n5/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 3', timestamp: 4 },
+    { from: 'f1', to: 'c4', san: 'Bc4', fen: 'r1bqkbnr/pppp1ppp/2n5/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 3 3', timestamp: 5 },
+    { from: 'g8', to: 'f6', san: 'Nf6', fen: 'r1bqkb1r/pppp1ppp/2n2n2/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 4 4', timestamp: 6 },
+    { from: 'd2', to: 'd3', san: 'd3', fen: 'r1bqkb1r/pppp1ppp/2n2n2/4p3/2B1P3/3P1N2/PPP2PPP/RNBQK2R b KQkq - 0 4', timestamp: 7 },
+    { from: 'f8', to: 'c5', san: 'Bc5', fen: 'r1bqk2r/pppp1ppp/2n2n2/2b1p3/2B1P3/3P1N2/PPP2PPP/RNBQK2R w KQkq - 1 5', timestamp: 8 },
+    { from: 'c2', to: 'c3', san: 'c3', fen: 'r1bqk2r/pppp1ppp/2n2n2/2b1p3/2B1P3/2PP1N2/PP3PPP/RNBQK2R b KQkq - 0 5', timestamp: 9 },
+    { from: 'd7', to: 'd6', san: 'd6', fen: 'r1bqk2r/ppp2ppp/2np1n2/2b1p3/2B1P3/2PP1N2/PP3PPP/RNBQK2R w KQkq - 0 6', timestamp: 10 },
+    { from: 'e1', to: 'g1', san: 'O-O', fen: 'r1bqk2r/ppp2ppp/2np1n2/2b1p3/2B1P3/2PP1N2/PP3PPP/RNBQ1RK1 b kq - 1 6', timestamp: 11 },
+    { from: 'e8', to: 'g8', san: 'O-O', fen: 'r1bq1rk1/ppp2ppp/2np1n2/2b1p3/2B1P3/2PP1N2/PP3PPP/RNBQ1RK1 w - - 2 7', timestamp: 12 },
+    { from: 'h2', to: 'h3', san: 'h3', fen: 'r1bq1rk1/ppp2ppp/2np1n2/2b1p3/2B1P3/2PP1N1P/PP3PP1/RNBQ1RK1 b - - 0 7', timestamp: 13 },
+    { from: 'c8', to: 'e6', san: 'Be6', fen: 'r2q1rk1/ppp2ppp/2npbn2/2b1p3/2B1P3/2PP1N1P/PP3PP1/RNBQ1RK1 w - - 1 8', timestamp: 14 },
+    { from: 'c4', to: 'b3', san: 'Bb3', fen: 'r2q1rk1/ppp2ppp/2npbn2/2b1p3/4P3/1BPP1N1P/PP3PP1/RNBQ1RK1 b - - 2 8', timestamp: 15 },
+    { from: 'd8', to: 'd7', san: 'Qd7', fen: 'r4rk1/pppq1ppp/2npbn2/2b1p3/4P3/1BPP1N1P/PP3PP1/RNBQ1RK1 w - - 3 9', timestamp: 16 },
+    { from: 'b1', to: 'a3', san: 'Na3', fen: 'r4rk1/pppq1ppp/2npbn2/2b1p3/4P3/NBPP1N1P/PP3PP1/R1BQ1RK1 b - - 4 9', timestamp: 17 },
+    { from: 'a7', to: 'a6', san: 'a6', fen: 'r4rk1/1ppq1ppp/p1npbn2/2b1p3/4P3/NBPP1N1P/PP3PP1/R1BQ1RK1 w - - 0 10', timestamp: 18 },
+    { from: 'a3', to: 'c2', san: 'Nc2', fen: 'r4rk1/1ppq1ppp/p1npbn2/2b1p3/4P3/1BPP1N1P/PPN2PP1/R1BQ1RK1 b - - 1 10', timestamp: 19 },
+    { from: 'c5', to: 'a7', san: 'Ba7', fen: 'r4rk1/bppq1ppp/p1npbn2/4p3/4P3/1BPP1N1P/PPN2PP1/R1BQ1RK1 w - - 2 11', timestamp: 20 },
+  ] as Move[],
+  pgn: '1. e4 e5 2. Nf3 Nc6 3. Bc4 Nf6 4. d3 Bc5 5. c3 d6 6. O-O O-O 7. h3 Be6 8. Bb3 Qd7 9. Na3 a6 10. Nc2 Ba7',
+  startingFen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
+  endedAt: new Date(),
+  duration: 420,
+};
+
 export function DevDebugPanel() {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedFen, setSelectedFen] = useState(Object.keys(FAMOUS_POSITIONS)[0]);
+  const [showAnalysisBoard, setShowAnalysisBoard] = useState(false);
 
   // ── Store hooks (only call at top level) ──────────────────────────────
   const { addAchievementNotification, addNotification, clearAll } =
@@ -364,10 +423,10 @@ export function DevDebugPanel() {
 
   return (
     <>
-      {/* Toggle Button - Fixed bottom left */}
+      {/* Toggle Button - Fixed bottom left, above ticker bar */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="fixed bottom-4 left-4 z-50 w-10 h-10 bg-purple-600 hover:bg-purple-500 text-white font-mono text-sm flex items-center justify-center border border-purple-400 transition-colors"
+        className="fixed bottom-14 left-4 z-50 w-10 h-10 bg-purple-600 hover:bg-purple-500 text-white font-mono text-sm flex items-center justify-center border border-purple-400 rounded-lg transition-colors shadow-lg"
         title="Dev Debug Panel"
       >
         {isOpen ? '×' : '🛠'}
@@ -375,7 +434,7 @@ export function DevDebugPanel() {
 
       {/* Debug Panel */}
       {isOpen && (
-        <div className="fixed bottom-16 left-4 z-50 w-80 bg-black border border-purple-500/50 shadow-lg shadow-purple-500/20">
+        <div className="fixed bottom-[72px] left-4 z-50 w-80 bg-black border border-purple-500/50 shadow-lg shadow-purple-500/20 rounded-lg overflow-hidden">
           {/* Header */}
           <div className="p-3 border-b border-purple-500/30 flex items-center justify-between">
             <span className="text-purple-400 font-mono text-sm">
@@ -611,7 +670,22 @@ export function DevDebugPanel() {
 
             <div className="border-t border-purple-500/10" />
 
-            {/* ═══ Section 6: State Reset ═══ */}
+            {/* ═══ Section 6: Analysis Mode ═══ */}
+            <Section title="analysis_mode">
+              <button
+                onClick={() => setShowAnalysisBoard(true)}
+                className={btn}
+              >
+                ▶ open_analysis_board (Italian Game, 20 moves)
+              </button>
+              <p className="text-xs font-mono text-purple-400/40 px-1">
+                opens with mock game data for testing
+              </p>
+            </Section>
+
+            <div className="border-t border-purple-500/10" />
+
+            {/* ═══ Section 7: State Reset ═══ */}
             <Section title="state_reset">
               <button onClick={handleResetAll} className={btnDanger}>
                 ⚠ reset_all_stores
@@ -626,6 +700,14 @@ export function DevDebugPanel() {
             </p>
           </div>
         </div>
+      )}
+
+      {/* Analysis Board Modal */}
+      {showAnalysisBoard && (
+        <AnalysisBoard
+          game={MOCK_ANALYSIS_GAME}
+          onClose={() => setShowAnalysisBoard(false)}
+        />
       )}
     </>
   );

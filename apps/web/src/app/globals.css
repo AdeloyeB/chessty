@@ -206,3 +206,19 @@ body.tauri-app {
 body.tauri-app .tauri-hidden {
   display: none;
 }
+
+/* Rounded corners for Tauri desktop app - Discord/modern app style.
+   With transparent: true in tauri.conf.json, we clip the content to
+   create the rounded corner effect seen in modern desktop apps. */
+html.tauri-app,
+body.tauri-app {
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+/* Apply the rounded corners on macOS for that native app feel */
+@supports (-webkit-app-region: drag) {
+  html.tauri-app {
+    background: transparent;
+  }
+}
