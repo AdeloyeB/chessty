@@ -888,12 +888,42 @@ fn parse_info_line(line: &str) -> Option<PartialEval> {
                 }
             }
             "pv" => {
-                // PV is a sequence of moves — collect all remaining tokens until end
-                // (or until we hit another keyword, but typically pv is last)
-                let pv_moves: Vec<String> =
-                    parts[i + 1..].iter().map(|s| s.to_string()).collect();
+                // Parse PV (Principal Variation) moves defensively.
+                //
+                // UCI spec doesn't guarantee PV is the last token in the info line.
+                // Some engines may send additional tokens after PV. We need to:
+                // 1. Stop collecting moves when we hit a known UCI keyword
+                // 2. Validate that each token looks like a UCI move (4-5 chars, alphanumeric)
+                //
+                // UCI move format: e2e4 (4 chars) or e7e8q (5 chars for promotion)
+                const UCI_KEYWORDS: &[&str] = &[
+                    "depth", "seldepth", "multipv", "score", "nodes", "nps", "hashfull",
+                    "tbhits", "time", "pv", "currmove", "currmovenumber", "string",
+                    "refutation", "bmc", "cpuload", "sbhits", "wdl",
+                ];
+
+                let mut pv_moves = Vec::new();
+                for part in &parts[i + 1..] {
+                    // Stop if we hit another UCI keyword
+                    if UCI_KEYWORDS.contains(part) {
+                        break;
+                    }
+                    // Validate move format: 4-5 characters, all alphanumeric
+                    // Examples: e2e4, g1f3, e7e8q (pawn promotion)
+                    if part.len() >= 4
+                        && part.len() <= 5
+                        && part.chars().all(|c| c.is_ascii_alphanumeric())
+                    {
+                        pv_moves.push(part.to_string());
+                    } else {
+                        // Invalid move format — stop collecting
+                        // This handles unexpected tokens after PV
+                        break;
+                    }
+                }
                 eval.pv = pv_moves;
-                break; // PV is always at the end, so we're done
+                // Don't break — continue parsing in case there are other fields
+                // (though in practice, most engines put PV last)
             }
             _ => {}
         }
@@ -1053,5 +1083,45 @@ impl EngineState {
 impl Default for EngineState {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+// =============================================================================
+// Resource Cleanup — Drop Trait Implementation
+// =============================================================================
+// The Drop trait is Rust's destructor — it runs automatically when a value
+// goes out of scope or is explicitly dropped. This is critical for cleanup.
+//
+// Why this matters:
+// -----------------
+// If the Tauri app crashes, closes unexpectedly, or the EngineState is dropped
+// for any reason, we need to ensure the Stockfish child process is terminated.
+// Without this, orphaned Stockfish processes would continue running, consuming
+// CPU and memory (zombie processes).
+//
+// Implementation notes:
+// --------------------
+// - Drop cannot be async, so we can't use .await or async locks
+// - We use try_lock() instead of lock().await to avoid deadlocks
+// - We use try_send() which is non-blocking (doesn't need .await)
+// - This is "best-effort" cleanup — if the lock is held elsewhere, we skip it
+//   (the OS will clean up the process when our app fully exits anyway)
+// =============================================================================
+
+impl Drop for EngineState {
+    fn drop(&mut self) {
+        // Best-effort cleanup: send quit command to engine
+        // Use try_lock to avoid deadlocks during drop (Drop can't be async)
+        if let Ok(mut guard) = self.handle.try_lock() {
+            if let Some(handle) = guard.take() {
+                // Attempt to send quit command (non-blocking)
+                // try_send() returns immediately — either succeeds or fails
+                // We ignore the result because we're in cleanup anyway
+                let _ = handle.command_tx.try_send(EngineCommand::Quit);
+            }
+        }
+        // If try_lock fails, another task holds the lock — that's OK.
+        // Either that task will clean up, or the OS will kill the child
+        // process when our entire app exits.
     }
 }

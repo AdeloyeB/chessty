@@ -29,6 +29,9 @@ mock.module('../drizzle', () => ({
       transactions: {
         findMany: mock(() => Promise.resolve([])),
       },
+      spectatorPredictions: {
+        findMany: mock(() => Promise.resolve([])),
+      },
     },
     update: mock(() => ({
       set: mock(() => ({
@@ -271,7 +274,7 @@ describe('Game Service - endGame', () => {
     const setMock = mock(() => ({ where: whereMock }));
     (db.update as any) = mock(() => ({ set: setMock }));
 
-    const result = await gameService.endGame('test-game-1', 'white_wins', 'user-white');
+    const _result = await gameService.endGame('test-game-1', 'white_wins', 'user-white');
 
     // Verify wallet service was called to award winnings
     expect(awardWinningsSpy).toHaveBeenCalledWith('user-white', 100, 'test-game-1');
@@ -300,7 +303,7 @@ describe('Game Service - endGame', () => {
     (db.query.games.findFirst as any) = findFirstMock;
 
     const awardWinningsCalls: any[] = [];
-    const awardWinningsSpy = spyOn(walletService, 'awardWinnings').mockImplementation(
+    const _awardWinningsSpy = spyOn(walletService, 'awardWinnings').mockImplementation(
       async (userId, amount, gameId) => {
         awardWinningsCalls.push({ userId, amount, gameId });
         return 50;

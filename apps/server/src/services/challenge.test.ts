@@ -8,10 +8,10 @@
  * - Canceling and declining challenges
  * - Creating games from confirmed challenges
  */
-import { describe, test, expect, mock, beforeEach, spyOn } from 'bun:test';
+import { describe, test, expect, mock, spyOn } from 'bun:test';
 import * as challengeService from './challenge';
 import * as walletService from './wallet';
-import { db, challenges, users, games } from '../drizzle';
+import { db } from '../drizzle';
 
 // Mock the drizzle database
 mock.module('../drizzle', () => ({
@@ -288,14 +288,34 @@ describe('Challenge Service - acceptChallenge', () => {
       id: 'challenge-1',
       creatorId: 'user-1',
       status: 'accepted', // Already accepted
+      wagerAmount: '10',
+      minElo: null,
+      maxElo: null,
+      expiresAt: new Date(Date.now() + 3600000),
       creator: { id: 'user-1', username: 'creator' },
     };
 
     const findFirstMock = mock(() => Promise.resolve(mockChallenge));
     (db.query.challenges.findFirst as any) = findFirstMock;
 
+    // Mock acceptor user lookup
+    const mockAcceptor = {
+      id: 'user-2',
+      username: 'acceptor',
+      balance: '1000',
+      eloRating: 1200,
+    };
+    (db.query.users.findFirst as any) = mock(() => Promise.resolve(mockAcceptor));
+
+    // Mock db.update to return empty array (simulating atomic update failure
+    // because WHERE status='open' doesn't match when status='accepted')
+    const updateReturningMock = mock(() => Promise.resolve([]));
+    const updateWhereMock = mock(() => ({ returning: updateReturningMock }));
+    const updateSetMock = mock(() => ({ where: updateWhereMock }));
+    (db.update as any) = mock(() => ({ set: updateSetMock }));
+
     await expect(challengeService.acceptChallenge('challenge-1', 'user-2')).rejects.toThrow(
-      'Challenge is not available'
+      'Challenge is no longer available'
     );
   });
 
@@ -453,7 +473,7 @@ function createMockTx(challengeRow: any, users: { creator: any; acceptor?: any }
     })),
     query: {
       users: {
-        findFirst: mock(({ where }: any) => {
+        findFirst: mock(({ where: _where }: any) => {
           // Return creator or acceptor based on what's being queried
           if (users.acceptor) {
             // For simplicity, return creator first, then acceptor
