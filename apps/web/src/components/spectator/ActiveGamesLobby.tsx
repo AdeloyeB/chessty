@@ -4,14 +4,18 @@ import { useQuery } from '@tanstack/react-query';
 import { useApi } from '@/hooks/useApi';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { useSpectatorStore } from '@/store/spectator';
+import { useMultiSpectatorStore } from '@/store/multiSpectator';
+import { useFeatureFlag } from '@/store/flags';
 import { SpectatorView } from './SpectatorView';
 import { formatTime } from '@/lib/utils';
 import { USDCAmount } from '../wallet/USDCAmount';
 
 export function ActiveGamesLobby() {
   const { getActiveGames } = useApi();
-  const { spectateGame } = useWebSocket();
+  const { spectateGame, spectateMultiGame } = useWebSocket();
   const { isSpectating } = useSpectatorStore();
+  const multiGameEnabled = useFeatureFlag('spectator_multi_game');
+  const _multiGameCount = useMultiSpectatorStore((s) => Object.keys(s.games).length);
 
   const { data: games, isLoading, refetch } = useQuery({
     queryKey: ['activeGames'],
@@ -19,7 +23,9 @@ export function ActiveGamesLobby() {
     refetchInterval: 5000,
   });
 
-  if (isSpectating) {
+  // Legacy single-game flow: show SpectatorView directly
+  // Multi-game flow: the SpectatorViewManager handles view switching, so lobby just stays as lobby
+  if (!multiGameEnabled && isSpectating) {
     return <SpectatorView />;
   }
 
@@ -74,15 +80,15 @@ export function ActiveGamesLobby() {
               className={`w-full text-left p-4 bg-black cursor-pointer hover:bg-white/5 transition-colors focus:outline-none focus:ring-1 focus:ring-white/50 ${
                 !isRightColumn ? 'md:border-r md:border-white/15' : ''
               } ${isNotLastRow ? 'border-b border-white/15' : ''}`}
-              onClick={() => spectateGame(game.id)}
-              aria-label={`Watch ${game.whitePlayer.username} vs ${game.blackPlayer.username}`}
+              onClick={() => multiGameEnabled ? spectateMultiGame(game.id) : spectateGame(game.id)}
+              aria-label={`Watch ${game.whitePlayer.displayName ?? game.whitePlayer.username} vs ${game.blackPlayer.displayName ?? game.blackPlayer.username}`}
             >
               <div className="flex justify-between items-start mb-4">
                 <div className="space-y-2">
                   <div className="flex items-center gap-3">
                     <span className="w-3 h-3 bg-white border border-white/50" />
                     <span className="text-white font-mono">
-                      {game.whitePlayer.username}
+                      {game.whitePlayer.displayName ?? game.whitePlayer.username}
                     </span>
                     <span className="text-xs text-white/30 font-mono">
                       {game.whitePlayer.eloRating}
@@ -91,7 +97,7 @@ export function ActiveGamesLobby() {
                   <div className="flex items-center gap-3">
                     <span className="w-3 h-3 bg-black border border-white/50" />
                     <span className="text-white font-mono">
-                      {game.blackPlayer.username}
+                      {game.blackPlayer.displayName ?? game.blackPlayer.username}
                     </span>
                     <span className="text-xs text-white/30 font-mono">
                       {game.blackPlayer.eloRating}

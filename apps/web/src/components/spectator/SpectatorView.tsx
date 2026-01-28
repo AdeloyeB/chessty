@@ -2,21 +2,46 @@
 
 import { ChessBoard } from '../chess/ChessBoard';
 import { useSpectatorStore } from '@/store/spectator';
+import { useMultiSpectatorStore } from '@/store/multiSpectator';
 import { useWebSocket } from '@/hooks/useWebSocket';
+import { useFeatureFlag } from '@/store/flags';
 import { PredictionPanel } from '../predictions/PredictionPanel';
 import { formatTime } from '@/lib/utils';
 
-export function SpectatorView() {
-  const {
-    currentFen,
-    whitePlayer,
-    blackPlayer,
-    whiteTimeRemaining,
-    blackTimeRemaining,
-    gameId,
-  } = useSpectatorStore();
+interface SpectatorViewProps {
+  /** When provided, reads game data from the multi-spectator store.
+   *  When omitted, falls back to the legacy single-game spectator store. */
+  gameId?: string;
+}
 
-  const { stopSpectating } = useWebSocket();
+export function SpectatorView({ gameId: gameIdProp }: SpectatorViewProps) {
+  // Multi-game store (used when gameId prop is provided)
+  const multiGame = useMultiSpectatorStore((s) =>
+    gameIdProp ? s.games[gameIdProp] : null
+  );
+
+  // Legacy single-game store (fallback when no gameId prop)
+  const legacyStore = useSpectatorStore();
+
+  // Resolve values: multi-game store takes priority when prop is given
+  const currentFen = multiGame?.currentFen ?? legacyStore.currentFen;
+  const whitePlayer = multiGame?.whitePlayer ?? legacyStore.whitePlayer;
+  const blackPlayer = multiGame?.blackPlayer ?? legacyStore.blackPlayer;
+  const whiteTimeRemaining = multiGame?.whiteTimeRemaining ?? legacyStore.whiteTimeRemaining;
+  const blackTimeRemaining = multiGame?.blackTimeRemaining ?? legacyStore.blackTimeRemaining;
+  const resolvedGameId = gameIdProp ?? legacyStore.gameId;
+
+  const { stopSpectating, stopSpectatingGame } = useWebSocket();
+  const predictionsEnabled = useFeatureFlag('spectator_predictions');
+  const multiGameEnabled = useFeatureFlag('spectator_multi_game');
+
+  const handleLeave = () => {
+    if (gameIdProp && multiGameEnabled) {
+      stopSpectatingGame(gameIdProp);
+    } else {
+      stopSpectating();
+    }
+  };
 
   return (
     <div className="max-w-6xl mx-auto">
@@ -25,7 +50,7 @@ export function SpectatorView() {
           <p className="text-xs font-mono text-mid-light mb-1">live</p>
           <h2 className="text-xl font-mono text-pure-white">spectating</h2>
         </div>
-        <button onClick={stopSpectating} className="btn btn-secondary">
+        <button onClick={handleLeave} className="btn btn-secondary">
           leave
         </button>
       </div>
@@ -92,10 +117,12 @@ export function SpectatorView() {
           </div>
         </div>
 
-        {/* Right: Prediction Panel */}
-        <div className="order-3">
-          {gameId && <PredictionPanel gameId={gameId} />}
-        </div>
+        {/* Right: Prediction Panel (gated by spectator_predictions flag) */}
+        {predictionsEnabled && (
+          <div className="order-3">
+            {resolvedGameId && <PredictionPanel gameId={resolvedGameId} />}
+          </div>
+        )}
       </div>
     </div>
   );

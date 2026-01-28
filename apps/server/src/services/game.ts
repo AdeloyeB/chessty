@@ -1,7 +1,6 @@
-import { eq, or, and, desc, gte, lte, sql, count, sum, avg } from 'drizzle-orm';
+import { eq, or, and, desc, gte, lte, count } from 'drizzle-orm';
 import { db, games, users, transactions } from '../drizzle';
-import type { Game, Move, GameResult, GameStatus, HistoryFilters, HistoryGame, HistoryStats, HistoryTransaction, DateRange, getTimeControlCategory, getTimeControlLabel } from '@chess-game/shared';
-import { STARTING_FEN } from '@chess-game/shared';
+import type { Move, GameResult, HistoryFilters, HistoryStats, DateRange } from '@chess-game/shared';
 import * as eloService from './elo';
 import * as walletService from './wallet';
 import * as bettingService from './betting';
@@ -81,6 +80,15 @@ export async function makeMove(
   return updated;
 }
 
+/**
+ * H7 FIX: Atomic endGame with WHERE status='active'.
+ *
+ * Without this, two simultaneous end-game triggers (e.g. checkmate + timeout)
+ * could both execute, double-paying winnings and double-updating ELO.
+ *
+ * The atomic UPDATE ensures only the first call succeeds. If RETURNING is empty,
+ * the game was already ended by another call — we bail out safely.
+ */
 export async function endGame(
   gameId: string,
   result: GameResult,
@@ -88,6 +96,30 @@ export async function endGame(
 ): Promise<{ game: typeof games.$inferSelect; eloChanges: eloService.EloUpdate }> {
   const game = await getGame(gameId);
   if (!game) throw new Error('Game not found');
+
+  // H7 FIX: Atomically claim the game — only proceed if status is still 'active'
+  const [claimed] = await db
+    .update(games)
+    .set({
+      status: 'completed',
+      result,
+      winnerId,
+      endedAt: new Date(),
+      updatedAt: new Date(),
+    })
+    .where(and(eq(games.id, gameId), eq(games.status, 'active')))
+    .returning();
+
+  if (!claimed) {
+    // Game was already ended by another call (checkmate + timeout race, etc.)
+    // Return the current state without double-processing
+    const currentGame = await getGame(gameId);
+    if (!currentGame) throw new Error('Game not found');
+    return {
+      game: currentGame,
+      eloChanges: { whiteChange: 0, blackChange: 0, whiteNewElo: 0, blackNewElo: 0 },
+    };
+  }
 
   // Determine result type for ELO calculation
   let eloResult: 'white' | 'black' | 'draw';
@@ -108,6 +140,12 @@ export async function endGame(
     eloResult
   );
 
+  // Update elo change on the game record
+  await db
+    .update(games)
+    .set({ eloChange: Math.abs(eloChanges.whiteChange) })
+    .where(eq(games.id, gameId));
+
   // Distribute winnings
   const totalPot = parseFloat(game.totalPot);
   if (winnerId) {
@@ -124,21 +162,15 @@ export async function endGame(
   // Settle spectator bets
   await bettingService.settleBetsForGame(gameId, winnerId);
 
-  // Update game record
-  const [updated] = await db
-    .update(games)
-    .set({
-      status: 'completed',
-      result,
-      winnerId,
-      eloChange: Math.abs(eloChanges.whiteChange),
-      endedAt: new Date(),
-      updatedAt: new Date(),
-    })
-    .where(eq(games.id, gameId))
-    .returning();
+  // Settle spectator predictions
+  try {
+    const { settlePredictionsForGame } = await import('./spectatorPrediction');
+    await settlePredictionsForGame(gameId, winnerId);
+  } catch (error) {
+    console.error(`[endGame] Failed to settle predictions for game ${gameId}:`, error);
+  }
 
-  return { game: updated, eloChanges };
+  return { game: claimed, eloChanges };
 }
 
 export async function abandonGame(gameId: string, abandoningPlayerId: string): Promise<typeof games.$inferSelect> {
@@ -307,10 +339,9 @@ export async function getUserGameHistoryFiltered(
   });
 
   // Filter by result and time control in memory (more complex conditions)
-  let filtered = allGames.filter(game => {
+  const filtered = allGames.filter(game => {
     // Result filter
     if (filters.result !== 'all') {
-      const playerIsWhite = game.whitePlayerId === userId;
       const isWin = game.winnerId === userId;
       const isDraw = game.winnerId === null && game.result !== 'abandonment';
 

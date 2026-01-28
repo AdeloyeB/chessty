@@ -90,7 +90,7 @@ export async function handleStartEnrollment(req: Request): Promise<Response> {
   if (auth instanceof Response) return auth;
 
   const { userId } = auth;
-  const clientIp = getClientIp(req);
+  const _clientIp = getClientIp(req); // Reserved for future audit logging
 
   // Apply enrollment rate limiter (by user ID, not IP)
   const rateLimitResult = mfaEnrollLimiter.consume(userId);
@@ -112,7 +112,7 @@ export async function handleStartEnrollment(req: Request): Promise<Response> {
     }
 
     // Start enrollment
-    const result = await mfaService.startEnrollment(userId, user.email);
+    const result = await mfaService.startEnrollment(userId, user.email ?? user.username);
 
     if (!result.started) {
       return Response.json(
@@ -158,7 +158,7 @@ export async function handleCompleteEnrollment(req: Request): Promise<Response> 
   if (auth instanceof Response) return auth;
 
   const { userId } = auth;
-  const clientIp = getClientIp(req);
+  const _clientIp = getClientIp(req); // Reserved for future audit logging
 
   // Apply verification rate limiter
   const rateLimitResult = mfaVerifyLimiter.consume(clientIp);
@@ -396,7 +396,7 @@ export async function handleDisableMFA(req: Request): Promise<Response> {
   if (auth instanceof Response) return auth;
 
   const { userId } = auth;
-  const clientIp = getClientIp(req);
+  const _clientIp = getClientIp(req); // Reserved for future audit logging
 
   // Apply verification rate limiter
   const rateLimitResult = mfaVerifyLimiter.consume(clientIp);

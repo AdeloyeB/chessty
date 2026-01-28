@@ -1,10 +1,11 @@
 'use client';
 
 import { useEffect, useRef, useCallback, useState } from 'react';
-import type { WSMessage, WSMessageType, GameMode, ChallengeCreatePayload } from '@chess-game/shared';
+import type { WSMessage, WSMessageType, GameMode } from '@chess-game/shared';
 import { useAuthStore } from '@/store/auth';
 import { useGameStore } from '@/store/game';
 import { useSpectatorStore } from '@/store/spectator';
+import { useMultiSpectatorStore } from '@/store/multiSpectator';
 import { useChallengeStore } from '@/store/challenge';
 import { useSpectatorChatStore } from '@/store/spectatorChat';
 import { useNotificationStore } from '@/store/notification';
@@ -17,11 +18,13 @@ export function useWebSocket() {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectAttemptsRef = useRef(0);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
+  const connectRef = useRef<() => void>(() => {});
   const [isConnected, setIsConnected] = useState(false);
 
   const { token } = useAuthStore();
   const gameStore = useGameStore();
   const spectatorStore = useSpectatorStore();
+  const multiSpectatorStore = useMultiSpectatorStore();
   const challengeStore = useChallengeStore();
   const spectatorChatStore = useSpectatorChatStore();
 
@@ -45,16 +48,11 @@ export function useWebSocket() {
             const data = payload as any;
             gameStore.addMove(data.move);
             gameStore.updateClocks(data.whiteTimeRemaining, data.blackTimeRemaining);
-            break;
-          }
-
-          case 'game:clock_update': {
-            const data = payload as any;
-            gameStore.updateClocks(data.whiteTimeRemaining, data.blackTimeRemaining);
-            // Also update spectator store if spectating
-            if (spectatorStore.isSpectating) {
-              spectatorStore.updateGameState(
-                spectatorStore.currentFen,
+            // Multi-game store: spectators receive move_made events too
+            if (data.gameId && multiSpectatorStore.hasGame(data.gameId)) {
+              multiSpectatorStore.updateGameState(
+                data.gameId,
+                data.move.fen,
                 data.whiteTimeRemaining,
                 data.blackTimeRemaining
               );
@@ -62,9 +60,39 @@ export function useWebSocket() {
             break;
           }
 
+          case 'game:clock_update': {
+            const data = payload as any;
+            gameStore.updateClocks(data.whiteTimeRemaining, data.blackTimeRemaining);
+            // Legacy single-game spectator store
+            if (spectatorStore.isSpectating) {
+              spectatorStore.updateGameState(
+                spectatorStore.currentFen,
+                data.whiteTimeRemaining,
+                data.blackTimeRemaining
+              );
+            }
+            // Multi-game store: route by gameId
+            if (data.gameId && multiSpectatorStore.hasGame(data.gameId)) {
+              const game = multiSpectatorStore.games[data.gameId];
+              if (game) {
+                multiSpectatorStore.updateGameState(
+                  data.gameId,
+                  game.currentFen,
+                  data.whiteTimeRemaining,
+                  data.blackTimeRemaining
+                );
+              }
+            }
+            break;
+          }
+
           case 'game:ended': {
             const data = payload as any;
             gameStore.endGame(data.result, data.whiteEloChange);
+            // Multi-game store: mark game as ended
+            if (data.gameId && multiSpectatorStore.hasGame(data.gameId)) {
+              multiSpectatorStore.setGameEnded(data.gameId);
+            }
             break;
           }
 
@@ -99,18 +127,34 @@ export function useWebSocket() {
           // Spectator events
           case 'spectate:game_state': {
             const data = payload as any;
+            // Legacy single-game store
             spectatorStore.setPlayers(data.game.whitePlayer, data.game.blackPlayer);
             spectatorStore.updateGameState(
               data.game.currentFen,
               data.game.whiteTimeRemaining,
               data.game.blackTimeRemaining
             );
+            // Multi-game store: route by gameId
+            if (data.game.id) {
+              multiSpectatorStore.setGamePlayers(data.game.id, data.game.whitePlayer, data.game.blackPlayer);
+              multiSpectatorStore.updateGameState(
+                data.game.id,
+                data.game.currentFen,
+                data.game.whiteTimeRemaining,
+                data.game.blackTimeRemaining
+              );
+            }
             break;
           }
 
           case 'odds:updated': {
             const data = payload as any;
+            // Legacy single-game store
             spectatorStore.updateOdds(data.whiteOdds, data.blackOdds);
+            // Multi-game store: route by gameId
+            if (data.gameId) {
+              multiSpectatorStore.updateGameOdds(data.gameId, data.whiteOdds, data.blackOdds);
+            }
             break;
           }
 
@@ -225,7 +269,7 @@ export function useWebSocket() {
         console.error('Failed to parse WebSocket message:', error);
       }
     },
-    [gameStore, spectatorStore, challengeStore, spectatorChatStore]
+    [gameStore, spectatorStore, multiSpectatorStore, challengeStore, spectatorChatStore]
   );
 
   const connect = useCallback(() => {
@@ -244,12 +288,12 @@ export function useWebSocket() {
       setIsConnected(false);
       wsRef.current = null;
 
-      // Attempt reconnect
+      // Attempt reconnect via ref to avoid accessing connect before declaration
       if (reconnectAttemptsRef.current < MAX_RECONNECT_ATTEMPTS) {
         const delay = RECONNECT_DELAY * Math.pow(2, reconnectAttemptsRef.current);
         reconnectTimeoutRef.current = setTimeout(() => {
           reconnectAttemptsRef.current++;
-          connect();
+          connectRef.current();
         }, delay);
       }
     };
@@ -262,6 +306,11 @@ export function useWebSocket() {
 
     wsRef.current = ws;
   }, [token, handleMessage]);
+
+  // Keep the ref in sync so onclose can always call the latest version
+  useEffect(() => {
+    connectRef.current = connect;
+  }, [connect]);
 
   const disconnect = useCallback(() => {
     if (reconnectTimeoutRef.current) {
@@ -334,7 +383,7 @@ export function useWebSocket() {
     [send]
   );
 
-  // Spectator actions
+  // Spectator actions (legacy single-game)
   const spectateGame = useCallback(
     (gameId: string) => {
       spectatorStore.startSpectating(gameId);
@@ -347,6 +396,28 @@ export function useWebSocket() {
     send('spectate:leave', {});
     spectatorStore.stopSpectating();
   }, [send, spectatorStore]);
+
+  // Multi-game spectator actions
+  const spectateMultiGame = useCallback(
+    (gameId: string) => {
+      multiSpectatorStore.addGame(gameId);
+      send('spectate:join', { gameId });
+    },
+    [send, multiSpectatorStore]
+  );
+
+  const stopSpectatingGame = useCallback(
+    (gameId: string) => {
+      send('spectate:leave', { gameId });
+      multiSpectatorStore.removeGame(gameId);
+    },
+    [send, multiSpectatorStore]
+  );
+
+  const stopAllSpectating = useCallback(() => {
+    send('spectate:leave_all', {});
+    multiSpectatorStore.removeAllGames();
+  }, [send, multiSpectatorStore]);
 
   // Challenge actions
   const createChallenge = useCallback(
@@ -439,6 +510,10 @@ export function useWebSocket() {
     leaveQueue: leaveQueueWs,
     spectateGame,
     stopSpectating,
+    // Multi-game spectator actions
+    spectateMultiGame,
+    stopSpectatingGame,
+    stopAllSpectating,
     // Challenge actions
     createChallenge,
     cancelChallenge,

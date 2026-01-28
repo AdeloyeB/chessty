@@ -42,5 +42,9 @@ coverage
 chesscracked-master/
 log/
 
+# Rust / Tauri
+**/target/
+**/src-tauri/gen/
+
 # Claude local settings
 .claude/settings.local.json

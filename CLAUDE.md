@@ -10,250 +10,101 @@ Always explain new technologies, patterns, and concepts in plain language. The d
 - **No assumed knowledge** — If introducing something like pub/sub, event emitters, Lua scripts, circuit breakers, etc., explain what they are first
 - **Connect to this project** — Always tie explanations back to the chess game specifically
 
+### Working Dynamic
+
+**Claude builds, the developer reviews.** The developer's goal is to become a strong code reviewer and technical decision-maker — not to write every line from scratch.
+
+- **Claude writes the code** and **teaches while building** — explain every new function, syntax pattern, and concept inline. When writing Rust, TypeScript, or any code: annotate what each part does, why it's structured that way, and what the developer should go study to understand it deeper. Be a teacher building something, not just a builder.
+- **Claude suggests learning topics** — "Go read about X while I build Y" so learning happens in parallel
+- **The developer reviews PRs** — Reads the code, asks questions, requests changes when needed
+- **The developer makes final calls** — Architecture decisions, product direction, what ships
+
 ---
 
-## Technology Stack (What Everything Does)
+## Technology Stack
 
 | Technology | What It Is | Why We Use It Here |
 |-----------|------------|-------------------|
-| **Bun.js** | A fast JavaScript/TypeScript runtime (like Node.js but faster). Runs our server code. | Handles WebSocket connections and HTTP requests for the chess game server |
-| **Next.js** | A React framework that handles routing, server-side rendering, and building the web app | Powers our web frontend (the UI players see) |
-| **Electron** | Wraps a web app into a desktop application (like how Discord or VS Code work) | Lets players install the chess game as a desktop app |
-| **Drizzle ORM** | A tool that lets you write database queries in TypeScript instead of raw SQL | Talks to our database to store users, games, bets, etc. |
-| **SQLite** | A simple file-based database (one file = entire database). Good for development. | Stores all our data locally during development. Will switch to PostgreSQL for production |
-| **PostgreSQL** | A production-grade database that handles many users reading/writing at the same time | What we'll use when real users are playing (handles concurrency better than SQLite) |
-| **Redis** | An in-memory data store (like a super-fast dictionary that lives in RAM). Data is accessed in microseconds. | Will store active game state (board positions, clocks) so games survive server restarts and we can run multiple servers |
-| **Zustand** | A lightweight state management library for React (simpler alternative to Redux) | Keeps the frontend in sync — stores game state, auth, spectator data in the browser |
-| **WebSocket** | A persistent two-way connection between browser and server (unlike HTTP which is request/response) | Lets the server push moves, clock updates, and chat messages to players instantly |
-| **Wagmi/RainbowKit** | Libraries for connecting crypto wallets (MetaMask, etc.) to a web app | Future on-chain betting and wallet integration |
-| **chess.js** | A chess engine library that knows all the rules of chess | Validates moves, detects checkmate/stalemate/draw, generates legal moves |
-| **ioredis** | A Node.js/Bun client library for talking to a Redis server | How our server code communicates with Redis (not installed yet, prepared for Phase 3) |
-
-### Architecture Patterns Used
-
-| Pattern | What It Is | Where We Use It |
-|---------|------------|-----------------|
-| **Event Emitter** | A pattern where code "emits" events (like "a move was made") and other code "listens" for those events and reacts. Like a radio station broadcasting — listeners tune in independently. | `apps/server/src/events/` — Decouples game logic from side effects (broadcasts, achievements, odds) |
-| **Circuit Breaker** | A safety pattern that "breaks the circuit" (stops trying) after too many failures, then periodically retries. Like a fuse box in your house. | `apps/server/src/redis/circuitBreaker.ts` — Prevents the server from hanging if Redis goes down |
-| **Coordinator/Orchestrator** | A thin "manager" that doesn't do work itself but tells other modules what to do in what order. Like a conductor in an orchestra. | `GameCoordinator.ts` — Validates moves, then tells the clock, state manager, and event system what happened |
-| **Lua Scripts (Redis)** | Small programs that run directly inside Redis atomically (all-or-nothing, no interruption). Like a bank transaction that either fully completes or doesn't happen at all. | `apps/server/src/redis/scripts/` — Clock decrements need to be atomic so two ticks can't race each other |
-| **Pub/Sub** | A messaging pattern where publishers send messages to a "channel" and subscribers receive them. Neither knows about the other. | Future use — will let multiple server instances broadcast to each other |
-| **Monorepo** | Keeping all related projects (server, web, desktop, shared packages) in one Git repository with shared tooling. | Our Turborepo setup at the root — all packages build together |
-| **Workspace Packages** | Packages within a monorepo that can depend on each other using `workspace:*` instead of version numbers. Changes are instant (no publishing needed). | `packages/chess-engine/` and `packages/shared/` — the server and web app import from these directly |
+| **Bun.js** | A fast JavaScript/TypeScript runtime (like Node.js but faster) | Handles WebSocket connections and HTTP requests for the server |
+| **Next.js** | A React framework for routing, SSR, and building the web app | Powers our web frontend |
+| **Tauri** | Wraps a web app into a desktop app using OS native webview + Rust backend | Desktop app — lightweight (~8MB) and secure (Rust backend). See `docs/ELECTRON_TO_TAURI_MIGRATION.md` |
+| **Rust** | Systems programming language (compiled to machine code) | Tauri backend + anti-cheat (tamper-resistant, not readable like JS) |
+| **Drizzle ORM** | Write database queries in TypeScript instead of raw SQL | Talks to our database |
+| **PostgreSQL** | Production-grade database for concurrent read/writes | Stores users, games, bets |
+| **Redis** | In-memory data store (microsecond access) | Game state persistence, multi-server support |
+| **Zustand** | Lightweight React state management | Frontend state (game, auth, spectator) |
+| **WebSocket** | Persistent two-way browser↔server connection | Real-time moves, clocks, chat |
+| **Wagmi/RainbowKit** | Crypto wallet connection libraries | Future on-chain betting |
+| **chess.js** | Chess engine library | Move validation, checkmate detection |
 
 ---
 
 ## Development Workflow
 
-### Electron App
-**Always rebuild the Electron app after making changes:**
-```bash
-pnpm build        # Build all packages
-pnpm dev:desktop  # Run Electron app (needs web server on port 3000)
-```
-
-Or run everything together:
+### Running the App
 ```bash
 pnpm dev          # Starts web, server, and desktop concurrently
+pnpm build        # Build all packages
+pnpm dev:desktop  # Run Tauri desktop app (needs web server on port 3000)
 ```
 
-> **Important**: Hot reload doesn't work reliably for Electron. Always rebuild after UI changes.
+### Git Workflow
 
-### Git Branching (GitHub Flow)
-
-All work happens on feature branches. `main` is protected — no direct pushes, PRs required.
-
-**Branch naming:**
-
-| Prefix | Use Case | Example |
-|--------|----------|---------|
-| `feature/` | New functionality | `feature/spectator-chat` |
-| `fix/` | Bug fixes | `fix/clock-timeout-leak` |
-| `refactor/` | Code restructuring | `refactor/extract-redis` |
-| `docs/` | Documentation only | `docs/api-reference` |
-| `chore/` | Deps, config, CI | `chore/add-github-actions` |
-
-**Workflow:**
-```bash
-git checkout -b feature/my-thing    # Create branch
-# ... work and commit ...
-git push -u origin feature/my-thing # Push
-gh pr create                         # Open PR
-# After review: squash merge via gh pr merge --squash --delete-branch
-```
-
----
-
-## Session Logging
-
-Always capture clear logs in the `log/` folder. Name files with format: `YYYY-MM-DD-description.md`
-
-Include:
-- Summary of changes made
-- Files created/modified
-- Known issues
-- Next steps
+**Always use `/pr` for any git operations** — commits, pushes, pull requests, anything touching GitHub. Never run `git commit`, `git push`, or `gh pr create` manually. The `/pr` command handles everything and enforces standards.
 
 ### Error Logging
 
-Whenever fixing errors (build failures, runtime errors, type errors, etc.), create or update an error log for the current day in `log/`.
+When fixing errors, log them in `log/YYYY-MM-DD-description.md` with:
+- **Error**: The message
+- **Root Cause**: Why it happened
+- **Fix**: What was changed
+- **Files Modified**: Which files
 
-**Format**: `log/YYYY-MM-DD-description.md`
-
-Each error entry should include:
-- **Error**: What the error message was
-- **Root Cause**: Why it happened (beginner-friendly explanation)
-- **Fix**: What was changed to resolve it
-- **Files Modified**: Which files were touched
-
-This helps track what broke, why, and how it was fixed — useful for learning and for debugging if similar issues appear later.
-
-> The `log/` folder is in `.gitignore` — it's a local reference only, not committed to GitHub.
+> The `log/` folder is gitignored — local reference only.
 
 ---
 
 ## Claude Skills
 
-Skills live in `.claude/commands/` and are auto-routable — you can invoke them explicitly (`/skill-name`) or just describe what you want and Claude will route to the right skill.
+Skills live in `.claude/commands/` — invoke explicitly (`/skill-name`) or describe what you want.
 
-| Skill | Purpose | Example Triggers |
-|-------|---------|-----------------|
-| `/technical-review [scope]` | Code quality, performance, architecture review | "review the code quality" |
-| `/security-audit [scope]` | Security vulnerability analysis | "check for security issues" |
-| `/architect [feature]` | Feature design and implementation planning | "design the spectator system" |
-| `/code-review` | Independent PR review (fresh context, no bias) | "review my PR" |
-| `/fetch-review [PR#]` | Fetch Code Rabbit AI review, explain issues, offer fixes | "what did Code Rabbit say" |
-| `/crypto-review [scope]` | Betting mechanics, tokenomics, exploit analysis | "review the betting logic" |
-| `/pr [description]` | Commit, push, and open a PR with standard format | "open a pull request" |
-
-### Mandatory: Use `/pr` for All Pull Requests
-
-**Always use the `/pr` command** when committing, pushing, or opening pull requests. Never manually run `gh pr create` — the `/pr` command enforces:
-
-1. **Type-prefixed titles** — `feat:`, `fix:`, `chore:` (required)
-2. **Standard body format** — Feature, Changes, Bugs/Known Issues, Testing sections
-3. **Auto-opens in browser** — The PR page opens automatically after creation
-
-If you need to push and open a PR, run `/pr` and it handles everything (commit, push, create, open browser).
+| Skill | Purpose |
+|-------|---------|
+| `/pr` | Commit, push, and open a PR with standard format |
+| `/architect [feature]` | Feature design and implementation planning |
+| `/code-review` | Independent PR review |
+| `/fetch-review [PR#]` | Fetch Code Rabbit AI review and offer fixes |
+| `/technical-review [scope]` | Code quality, performance, architecture review |
+| `/security-audit [scope]` | Security vulnerability analysis |
+| `/crypto-review [scope]` | Betting mechanics, tokenomics, exploit analysis |
+| `/run-tests` | Run the test suite |
+| `/nb` | Voice-dictated note-taking via nb CLI |
 
 ---
 
 ## UI/UX Principles
 
 ### No Scrolling Lists
-Avoid requiring users to scroll through lists of items. Use pagination with arrow navigation instead.
+Use pagination instead of scrolling:
 
-**Bad:**
 ```tsx
-// Long scrolling list
-<div className="space-y-2">
-  {items.map((item) => <ItemCard key={item.id} item={item} />)}
-</div>
-```
-
-**Good:**
-```tsx
-// Paginated with arrows
 import { PaginatedList, PaginatedGrid } from '@/components/ui/PaginatedGrid';
 
-<PaginatedList
-  items={items}
-  itemsPerPage={10}
-  renderItem={(item) => <ItemCard key={item.id} item={item} />}
-/>
+<PaginatedGrid items={items} itemsPerPage={6} columns={3}
+  renderItem={(item) => <Card item={item} />} />
+
+<PaginatedList items={items} itemsPerPage={10}
+  renderItem={(item) => <Row item={item} />} />
 ```
 
-### When to Use Each Component
-
-| Component | Use Case | Items per Page |
-|-----------|----------|----------------|
-| `PaginatedGrid` | Cards, achievements, visual items | 6 (3 columns) |
-| `PaginatedList` | Vertical lists, leaderboards, transactions | 10 |
-
-### Exceptions (Scrolling Allowed)
-- **In-depth data views**: Game statistics, financial data, match history (dedicated pages)
-- **Game boards**: Chess board and move history during active games
-- **Chat/messages**: Real-time communication
-
----
-
-## Full-Screen IDE Layout
-
-For immersive experiences (practice mode, game boards), use an IDE/trading-terminal style layout:
-
-```
-┌─────────────────────────────────────────────────────────┐
-│ NAV BAR (64px)                                          │
-├──────────────┬──────────────────────────────────────────┤
-│              │                                          │
-│   SIDEBAR    │              MAIN AREA                   │
-│   (256px)    │         (chess board, etc.)              │
-│              │                                          │
-│  - Stats     │                                          │
-│  - History   │                                          │
-│  - Actions   │                                          │
-│              │                                          │
-├──────────────┴──────────────────────────────────────────┤
-│ STATUS BAR (32px) - session id, time, scores, FEN       │
-└─────────────────────────────────────────────────────────┘
-```
-
-**Parent container (in Dashboard):**
-```tsx
-{activeTab === 'practice' ? (
-  <main className="h-[calc(100vh-64px)]">
-    <LocalGame />
-  </main>
-) : (
-  <main className="container mx-auto px-6 py-8">
-    {/* other tabs */}
-  </main>
-)}
-```
-
-**IDE component structure:**
-```tsx
-<div className="h-full bg-pure-black flex flex-col overflow-hidden">
-  {/* Main Content */}
-  <div className="flex-1 flex min-h-0">
-    {/* Sidebar */}
-    <div className="w-64 border-r border-mid/30 flex flex-col bg-off-black">
-      {/* Header, Stats, Actions */}
-    </div>
-
-    {/* Main Area */}
-    <div className="flex-1 flex flex-col min-h-0 bg-pure-black">
-      {/* Top bar */}
-      <div className="p-3 border-b border-mid/30">...</div>
-      {/* Content */}
-      <div className="flex-1 flex items-center justify-center p-6 min-h-0">
-        {/* Responsive square content */}
-        <div className="aspect-square max-h-full max-w-full" style={{ height: 'min(100%, calc(100vw - 320px))' }}>
-          {/* Chess board, etc. */}
-        </div>
-      </div>
-      {/* Bottom bar */}
-      <div className="p-3 border-t border-mid/30">...</div>
-    </div>
-  </div>
-
-  {/* Status Bar */}
-  <div className="h-8 border-t border-mid/30 bg-off-black flex items-center px-3">
-    {/* Session info, stats */}
-  </div>
-</div>
-```
-
----
-
-## CSS Conventions
+**Exceptions**: Game boards, chat, dedicated data pages.
 
 ### Color System
 ```
-pure-black: #000000    - Backgrounds, deepest layer
+pure-black: #000000    - Backgrounds
 off-black: #0a0a0a     - Cards, elevated surfaces
 mid: #666666           - Borders, muted elements
-mid-light: #888888     - Secondary text, labels
+mid-light: #888888     - Secondary text
 light: #cccccc         - Tertiary text
 pure-white: #ffffff    - Primary text, accents
 ```
@@ -263,623 +114,161 @@ pure-white: #ffffff    - Primary text, accents
 **Card Container:**
 ```tsx
 <div className="bg-off-black border border-mid/30">
-  {/* Header */}
   <div className="p-4 border-b border-mid/30">
-    <p className="text-xs font-mono text-mid-light">section_label</p>
+    <p className="text-xs font-mono text-mid-light">label</p>
   </div>
-  {/* Content */}
-  <div className="p-6">
-    {/* ... */}
-  </div>
+  <div className="p-6">{/* content */}</div>
 </div>
 ```
 
 **Button States:**
 ```tsx
 // Selected
-className="bg-pure-white text-pure-black border-pure-white"
-
+"bg-pure-white text-pure-black border-pure-white"
 // Unselected
-className="bg-pure-black border-mid/50 text-mid-light hover:border-pure-white hover:text-pure-white"
-
+"bg-pure-black border-mid/50 text-mid-light hover:border-pure-white hover:text-pure-white"
 // Disabled
-className="border-mid/20 text-mid/40 cursor-not-allowed"
-```
-
-**Data Cards:**
-```tsx
-<div className="p-3 bg-pure-black border border-mid/30 text-center">
-  <p className="text-lg font-mono text-pure-white">{value}</p>
-  <p className="text-xs font-mono text-mid-light">{label}</p>
-</div>
-```
-
----
-
-## Reusable Components
-
-### PaginatedGrid
-For grid layouts with pagination.
-
-```tsx
-import { PaginatedGrid } from '@/components/ui/PaginatedGrid';
-
-<PaginatedGrid
-  items={achievements}
-  itemsPerPage={6}
-  renderItem={(achievement) => <AchievementCard achievement={achievement} />}
-  columns={3}           // 1 | 2 | 3 | 4
-  emptyMessage="No items"
-  showCount             // Shows "X items" above grid
-  countLabel="achievements"
-/>
-```
-
-### PaginatedList
-For vertical lists with pagination.
-
-```tsx
-import { PaginatedList } from '@/components/ui/PaginatedGrid';
-
-<PaginatedList
-  items={leaderboardEntries}
-  itemsPerPage={10}
-  renderItem={(entry, index) => <LeaderboardRow entry={entry} rank={index + 1} />}
-  emptyMessage="No data available"
-  gap="sm"              // "sm" | "md"
-/>
+"border-mid/20 text-mid/40 cursor-not-allowed"
 ```
 
 ---
 
 ## Server Architecture
 
-The server uses an **event-driven architecture** where game actions (like making a move) trigger events, and independent handlers react to those events.
+Event-driven architecture where game actions trigger events and handlers react independently.
 
-### How a Move Flows Through the System
+### How a Move Flows
 
 ```
 Player sends "game:move" via WebSocket
-    │
-    ▼
-handler.ts (receives message, routes to coordinator)
-    │
-    ▼
-GameCoordinator.handleMove()
-    ├── 1. Validates it's your turn (checks database)
-    ├── 2. Validates the move is legal (GameStateManager + chess engine)
-    ├── 3. Updates the clock (ClockManager)
-    └── 4. Emits "game:move_made" event ──────────────────┐
-                                                          │
-                                              Event Handlers React:
-                                              │
-                                              ├── Priority 10: persistence.ts
-                                              │   └── Saves move to database
-                                              │
-                                              ├── Priority 50: broadcast.ts
-                                              │   └── Sends move to both players + spectators
-                                              │
-                                              └── Priority 100 (fire-and-forget):
-                                                  ├── odds.ts → recalculates betting odds
-                                                  └── (future: analytics, Discord, etc.)
+    ↓
+handler.ts → GameCoordinator.handleMove()
+    ├── Validates turn + move legality
+    ├── Updates clock
+    └── Emits "game:move_made" event
+                ↓
+        Event Handlers React:
+        ├── persistence.ts → Saves to DB
+        ├── broadcast.ts → Sends to players/spectators
+        └── odds.ts → Recalculates betting odds
 ```
 
-### Server File Structure
+### Key Directories
 
 ```
 apps/server/src/
-├── events/                    # Event system (the "radio station")
-│   ├── types.ts               # What events exist and their data shapes
-│   ├── GameEventEmitter.ts    # The emitter class (broadcasts events)
-│   └── handlers/              # Listeners that react to events
-│       ├── index.ts           # Registers all handlers at startup
-│       ├── broadcast.ts       # Sends WebSocket messages to clients
-│       ├── persistence.ts     # Saves data to the database
-│       ├── achievements.ts    # Checks if players unlocked achievements
-│       ├── odds.ts            # Recalculates betting odds
-│       └── predictions.ts     # Settles spectator bets when game ends
-│
-├── websocket/                 # WebSocket modules (the "game engine")
-│   ├── handler.ts             # Entry point - receives WS messages, routes them
-│   ├── ConnectionManager.ts   # Tracks who's connected (userId → WebSocket)
-│   ├── RoomManager.ts         # Tracks who's in which game/spectating
-│   ├── BroadcastService.ts    # Sends messages to users/rooms
-│   ├── ClockManager.ts        # Game clocks (start, tick, timeout)
-│   ├── GameStateManager.ts    # Chess board state (FEN, moves, draw offers)
-│   ├── GameCoordinator.ts     # Orchestrates game flow (move, resign, draw)
-│   └── ChallengeCoordinator.ts # Challenge accept/confirm flow
-│
-├── redis/                     # Redis integration (prepared, not active yet)
-│   ├── client.ts              # Connection to Redis server
-│   ├── circuitBreaker.ts      # Safety pattern for Redis failures
-│   └── scripts/               # Lua scripts for atomic operations
-│       ├── clock_tick.lua      # Decrement clock safely
-│       └── clock_move.lua      # Add time increment on move
-│
-├── services/                  # Business logic (database operations)
-│   ├── game.ts                # Create/update/end games in DB
-│   ├── auth.ts                # Login, register, JWT tokens
-│   ├── matchmaking.ts         # Find opponents by ELO/stake
-│   ├── betting.ts             # Odds calculation, bet placement
-│   ├── achievements.ts        # Unlock tracking
-│   └── ...                    # wallet, challenge, spectator, etc.
-│
-├── routes/                    # HTTP API endpoints (REST)
-│   ├── auth.ts                # POST /api/auth/login, etc.
-│   ├── games.ts               # GET /api/games/active, etc.
-│   └── ...                    # betting, wallet, leaderboard, etc.
-│
-├── drizzle/                   # Database schema and connection
-│   ├── schema.ts              # Table definitions (users, games, bets, etc.)
-│   └── index.ts               # Database connection
-│
-└── index.ts                   # Server entry point (starts HTTP + WebSocket)
-```
+├── events/           # Event emitter + handlers
+├── websocket/        # WS modules (handler, coordinators, managers)
+├── services/         # Business logic (DB operations)
+├── routes/           # HTTP API endpoints
+└── drizzle/          # Database schema
 
-### Package Structure
-
-```
 packages/
-├── chess-engine/              # Pure chess rules (zero dependencies on anything else)
-│   └── src/index.ts           # ChessEngine class: validates moves, detects checkmate
-│
-└── shared/                    # Shared types and constants used by ALL apps
-    ├── src/types/             # TypeScript interfaces (Move, Game, User, etc.)
-    ├── src/constants/         # Shared values (CLOCK_SYNC_INTERVAL, etc.)
-    └── src/chess/index.ts     # Re-exports chess-engine for backward compatibility
-```
-
----
-
-## File Organization
-
-```
-apps/web/src/components/
-├── ui/                 # Reusable primitives
-│   └── PaginatedGrid.tsx
-├── profile/            # Profile-related components
-├── dashboard/          # Dashboard components
-├── chess/              # Game board, moves
-├── wallet/             # Balance, transactions
-└── marketplace/        # Challenges, matchmaking
+├── chess-engine/     # Pure chess rules
+└── shared/           # Shared types and constants
 ```
 
 ---
 
 ## Mock Data
 
-All mock data is documented in `MOCK_DATA.md`.
-
-When adding mock data:
-1. Use clear constant names prefixed with `MOCK_`
-2. Add comment block marking the mock data section
-3. Update `MOCK_DATA.md` with location and structure
-4. Plan the API endpoint that will replace it
-
-```tsx
-// ============================================================================
-// MOCK DATA - See MOCK_DATA.md for all mock data locations
-// ============================================================================
-const MOCK_EXAMPLE = {
-  // ...
-};
-// ============================================================================
-```
-
----
-
-## NB CLI Voice Commands (Wispr Flow → Claude Code)
-
-The user dictates commands via **Wispr Flow** (voice-to-text). When you recognize any of the phrases below (or close variations), execute the corresponding `nb` CLI command using Bash. The user's current notebook is `home`.
-
-### Quick Reference
-
-| Voice Phrase | Command |
-|-------------|---------|
-| "create a note about [topic]" | `nb add --title "[topic]"` |
-| "new note titled [title]" | `nb add --title "[title]"` |
-| "add a note with content [text]" | `nb add --title "Untitled" --content "[text]"` |
-| "write a note about [topic] saying [content]" | `nb add --title "[topic]" --content "[content]"` |
-| "create a todo [task]" | `nb todo add "[task]"` |
-| "add a task [task]" | `nb todo add "[task]"` |
-| "mark todo [number] as done" | `nb do [number]` |
-| "complete task [number]" | `nb do [number]` |
-| "show my notes" | `nb ls` |
-| "list my notes" | `nb ls` |
-| "list all notes" | `nb ls -a` |
-| "show note [id or title]" | `nb show [id or title]` |
-| "open note [id or title]" | `nb show [id or title]` |
-| "read note [id or title]" | `nb show [id or title]` |
-| "search notes for [query]" | `nb search "[query]"` |
-| "find notes about [query]" | `nb search "[query]"` |
-| "edit note [id or title]" | `nb edit [id or title]` |
-| "update note [id or title]" | `nb edit [id or title]` |
-| "delete note [id or title]" | `nb delete [id or title] --force` |
-| "remove note [id or title]" | `nb delete [id or title] --force` |
-| "bookmark [url]" | `nb bookmark [url]` |
-| "save this link [url]" | `nb bookmark [url]` |
-| "bookmark [url] tagged [tags]" | `nb bookmark [url] --tags [tags]` |
-| "tag note [id] with [tags]" | `nb edit [id] --content "$(nb show [id] --no-color)" --overwrite` (append tags) |
-| "create a folder called [name]" | `nb folders add [name]` |
-| "new folder [name]" | `nb folders add [name]` |
-| "move note [id] to [folder]" | `nb move [id] [folder]/` |
-| "list notebooks" | `nb notebooks` |
-| "create notebook [name]" | `nb notebooks add [name]` |
-| "switch to notebook [name]" | `nb use [name]` |
-| "sync notes" | `nb sync` |
-| "count my notes" | `nb count` |
-| "pin note [id]" | `nb pin [id]` |
-| "unpin note [id]" | `nb unpin [id]` |
-| "show my todos" | `nb tasks` |
-| "list tasks" | `nb tasks` |
-| "export note [id] as PDF" | `nb export [id] ./export.pdf` |
-| "show note history" | `nb history` |
-
-### Interpretation Rules
-
-1. **Fuzzy matching** — The user won't say these phrases exactly. Match intent, not exact wording. For example, "jot down a note about Docker" = `nb add --title "Docker"`.
-2. **Title extraction** — Whatever the user says the note is "about" or "titled" becomes the `--title` value.
-3. **Content extraction** — If the user provides body content ("saying...", "with content...", "that says..."), pass it via `--content`.
-4. **Tags** — If the user mentions "tagged with" or "tag it as", use `--tags tag1,tag2`.
-5. **IDs vs titles** — If the user says a number, treat it as an ID. If they say words, treat it as a title search.
-6. **Confirmation for destructive actions** — Always confirm before `delete`. Ask "Delete note [id/title]?" before running.
-7. **Show output** — After creating or modifying a note, show the result using `nb show` or `nb ls` so the user sees confirmation.
-8. **Multi-step notes** — If the user dictates a long note with multiple points, combine them into one `--content` string with newlines.
-
-### Example Voice → Command Flows
-
-**User says:** "Create a note about the Docker setup we just did"
-```bash
-nb add --title "Docker setup" --content "Notes on Docker configuration for the chess game Bun server."
-```
-
-**User says:** "Add a todo to set up Redis"
-```bash
-nb todo add "Set up Redis for game state persistence"
-```
-
-**User says:** "Find my notes about Polygon"
-```bash
-nb search "Polygon"
-```
-
-**User says:** "Show me note 3"
-```bash
-nb show 3
-```
-
-**User says:** "Bookmark this link <https://docs.polygon.technology> tagged crypto,polygon"
-```bash
-nb bookmark "https://docs.polygon.technology" --tags crypto,polygon
-```
-
-**User says:** "Delete note 5"
-→ First confirm: "Delete note 5?" → Then: `nb delete 5 --force`
+All mock data documented in `MOCK_DATA.md`. When adding:
+1. Prefix with `MOCK_`
+2. Mark with comment block
+3. Update `MOCK_DATA.md`
 
 ---
 
 ## Product Context
 
-### What This Is
+**What**: Real-money chess prediction/betting platform for crypto-native users. Players wager USDC, spectators bet on outcomes. Think Polymarket meets Chess.com.
 
-A **real-money chess prediction/betting platform** for crypto-native users. Players wager USDC on chess games, and spectators can bet on outcomes. Think Polymarket meets Chess.com.
+**Target**: Crypto-native chess enthusiasts active on Polymarket, comfortable with Web3 UX, typical stakes $5-$500.
 
-### Target Audience
-
-**Primary:** Crypto-native chess enthusiasts
-- Active on Polymarket, familiar with USDC and wallet connections
-- Play chess casually between trading sessions
-- Value transparency and trustless verification
-- Comfortable with Web3 UX (wallet signing, gas concepts)
-- Typical stakes: $5 - $500 per game
-
-### Platform Strategy
-
-| Decision | Choice | Rationale |
-|----------|--------|-----------|
-| Desktop-first | ✅ Yes | Target users are on computers trading/working. Mobile app is future roadmap. |
-| Crypto-only | ✅ Required | Prediction markets cannot use Stripe/PayPal (see Payment section) |
-| Electron app | ✅ Yes | Desktop app for serious players, like Discord or Slack |
-
-### Future Features (Roadmap)
-
-| Feature | Purpose | Priority |
-|---------|---------|----------|
-| Discord Bot | Analytics notifications (game results, leaderboard changes, platform stats) — NOT for gameplay | Medium |
-| Mobile App | React Native port for on-the-go play | Low (future) |
-| Tournament System | Organized competition with prize pools | Medium |
-| Streaming Integration | Twitch/YouTube for spectated games | Low |
+**Platform**: Desktop-first (Tauri), crypto-only payments.
 
 ---
 
 ## Payment & Regulatory Context
 
-### CRITICAL: Traditional Payment Processors Are NOT An Option
+### Traditional Processors Are NOT An Option
 
-This is a **prediction market / betting platform**. Traditional payment processors explicitly prohibit this category:
+| Provider | Status |
+|----------|--------|
+| Stripe/PayPal/Square/Venmo | ❌ Betting prohibited in ToS |
 
-| Provider | Status | Reason |
-|----------|--------|--------|
-| Stripe | ❌ Prohibited | "Games of skill with entry fees" banned in ToS |
-| PayPal | ❌ Prohibited | Gambling/betting explicitly banned |
-| Square | ❌ Prohibited | No gaming/gambling merchants |
-| Venmo | ❌ Prohibited | Same as PayPal |
-| Adyen | ⚠️ Restricted | Requires gambling license, high fees, case-by-case |
+**Crypto/USDC is required** — permissionless, global, instant settlement, no chargebacks, on-chain transparency.
 
-**When building ANY payment feature, NEVER consider traditional processors. They will terminate your account and freeze funds.**
-
-### Why Crypto/USDC is Required (Not Optional)
-
-This isn't a "Web3 feature" — it's the **only viable payment infrastructure**:
-
-| Requirement | Why Traditional Fails | USDC/Polygon Solution |
-|-------------|----------------------|------------------------|
-| Accept payments | Stripe/PayPal ban betting | USDC is permissionless |
-| Global users | Banks block gambling transactions | Crypto works worldwide |
-| Instant settlement | Card processors hold funds 30+ days | Settles in seconds |
-| No chargebacks | Losing bettors dispute credit card charges | Blockchain is final |
-| Transparency | "Trust us" doesn't work for betting | On-chain verification |
-
-### Approved Payment Solutions ONLY
-
-| Solution | Use Case | Notes |
-|----------|----------|-------|
-| **USDC (Polygon)** | Primary deposits/withdrawals | Circle's stablecoin, 1:1 USD backed |
-| **Coinbase Commerce** | Fiat on-ramp | Users buy USDC with card → deposit |
-| **MoonPay** | Alternative fiat on-ramp | Supports prediction markets |
-| **Transak** | Alternative fiat on-ramp | Good international coverage |
-
-### Legal Model (Reference: Polymarket)
-
-Polymarket structure: Offshore entity (Cayman Islands) + geo-restrictions where required
-- Smart contracts are permissionless (no KYC at contract level)
-- Frontend can implement geo-blocking if legally required
-- **This is NOT legal advice** — consult a crypto/gambling attorney before launch
+### Approved Solutions
+- **USDC (Polygon)** — Primary deposits/withdrawals
+- **Coinbase Commerce / MoonPay / Transak** — Fiat on-ramps
 
 ---
 
 ## Security Requirements (MANDATORY)
 
-This is a **real-money platform**. Security failures can result in:
-- Users losing funds
-- Platform insolvency
-- Legal liability
-- Criminal prosecution
-
-**Every feature touching user funds MUST follow these requirements. No shortcuts.**
-
-### Core Security Principles
-
-1. **Defense in Depth** — Never rely on a single security layer
-2. **Fail Secure** — When in doubt, block the transaction and alert
-3. **Assume Breach** — Design systems assuming attackers will get partial access
-4. **Audit Trail** — Every money movement must be logged and verifiable
-5. **Least Privilege** — Components only get the minimum access they need
+Real-money platform. Security failures = users losing funds, legal liability.
 
 ### Database Operations (Money)
 
-**NEVER do read-then-write (vulnerable to race conditions):**
+**NEVER read-then-write (race condition vulnerable):**
 ```typescript
-// ❌ VULNERABLE: Race condition allows double-spend
+// ❌ VULNERABLE
 const balance = await getBalance(userId);
-if (balance >= amount) {
-  await updateBalance(userId, balance - amount);
-}
+if (balance >= amount) await updateBalance(userId, balance - amount);
 ```
 
-**ALWAYS use atomic updates with conditions in WHERE clause:**
+**ALWAYS atomic updates:**
 ```typescript
-// ✅ SAFE: Atomic update — check and deduct happen together
+// ✅ SAFE
 const result = await db.update(users)
   .set({ balance: sql`balance - ${amount}` })
-  .where(and(
-    eq(users.id, userId),
-    sql`balance >= ${amount}`  // Condition in WHERE = atomic check
-  ))
+  .where(and(eq(users.id, userId), sql`balance >= ${amount}`))
   .returning();
-
 if (result.length === 0) throw new Error('Insufficient balance');
 ```
 
-### Smart Contract Security Requirements
+### Smart Contract Security
 
-| Requirement | Implementation | Why |
-|-------------|----------------|-----|
-| Multi-signature | Gnosis Safe (2-of-3 minimum) | No single key can drain funds |
-| Time-locks | 48hr delay on admin functions | Time to detect and respond to compromise |
-| Withdrawal delays | 24hr for amounts > $500 | Limits damage from hot wallet compromise |
-| Rate limits | Daily settlement caps in contract | Caps losses even if fully compromised |
-| Emergency pause | Guardian wallet can freeze all operations | Kill switch for attacks |
-| Third-party audit | Required before mainnet | Professional review catches bugs |
+| Requirement | Implementation |
+|-------------|----------------|
+| Multi-signature | Gnosis Safe (2-of-3 minimum) |
+| Time-locks | 48hr delay on admin functions |
+| Withdrawal delays | 24hr for amounts > $500 |
+| Rate limits | Daily settlement caps |
+| Emergency pause | Guardian wallet freeze |
+| Third-party audit | Required before mainnet |
 
 ### Secrets Management
 
-| Environment | Solution | Cost |
-|-------------|----------|------|
-| Development | `.env.local` (gitignored) | Free |
-| Staging | Doppler (free tier) | Free |
-| Production | Doppler or AWS Secrets Manager | $0-18/mo |
-
-**Recommended:** Start with **Doppler** — free tier supports 5 users with unlimited secrets, excellent CLI integration.
-
-```bash
-# Doppler usage
-doppler run -- bun run start  # Injects secrets as environment variables
-```
-
-**NEVER:**
-- Hardcode private keys in source code
-- Commit `.env` files to git
-- Log private keys or secrets
-- Use the same wallet for multiple purposes
-- Store production secrets in plain text files
-
-### Server Wallet Security
-
-The server wallet (hot wallet) signs blockchain transactions. If compromised, attackers can steal funds.
-
-**Required Controls:**
-- Hot wallet holds maximum 24 hours of expected settlements
-- Auto-refill from cold multi-sig storage when low
-- Alerts when balance exceeds threshold
-- Separate wallets for development/staging/production
-
-### Required Monitoring & Alerts
-
-Set up alerts (PagerDuty, Opsgenie, or similar) for:
-- Single settlement > $1,000
-- Daily settlements > $10,000
-- Failed settlement attempts (any)
-- Contract pause triggered
-- Withdrawal patterns > 3 standard deviations from mean
-- Hot wallet balance anomalies
+- **Dev**: `.env.local` (gitignored)
+- **Production**: Doppler or AWS Secrets Manager
+- **NEVER** hardcode keys, commit `.env`, or log secrets
 
 ---
 
 ## Blockchain Architecture (Polygon)
 
-### Why Polygon
-
-| Requirement | Polygon Advantage |
-|-------------|-------------------|
-| Low fees | ~$0.01-0.05 per transaction |
-| Fast finality | ~2 seconds confirmation |
-| USDC native | Circle's official USDC deployment |
-| EVM compatible | Standard Solidity, familiar tooling |
-| Battle-tested | Polymarket, Aavegotchi, major DeFi protocols |
+**Why Polygon**: Low fees (~$0.01), fast finality (~2s), native USDC, EVM compatible.
 
 ### Contract Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    GNOSIS SAFE (2-of-3)                      │
-│            Multi-sig owner of all platform contracts         │
-│                                                              │
-│   Signer 1: Founder hardware wallet (Ledger)                 │
-│   Signer 2: Co-founder / advisor hardware wallet             │
-│   Signer 3: Server operational wallet (for routine ops)      │
-└─────────────────────────────────────────────────────────────┘
-                            │ owns
-                            ▼
-┌─────────────────────────────────────────────────────────────┐
-│                    ChessEscrow.sol                           │
-│                                                              │
-│  - Holds all user USDC deposits                              │
-│  - Locks stakes when games start                             │
-│  - Settles games (pays winners, takes platform fee)          │
-│  - Enforces rate limits (daily max settlements)              │
-│  - Time-locked withdrawals for large amounts                 │
-│  - Emergency pause functionality                             │
-└─────────────────────────────────────────────────────────────┘
-                            │ records
-                            ▼
-┌─────────────────────────────────────────────────────────────┐
-│                    GameRegistry.sol                          │
-│                                                              │
-│  - Immutable record of game results                          │
-│  - Stores hash of final position + move history              │
-│  - Enables dispute verification (anyone can replay & check)  │
-│  - Audit trail for regulatory compliance                     │
-└─────────────────────────────────────────────────────────────┘
+GNOSIS SAFE (2-of-3 multi-sig)
+    ↓ owns
+ChessEscrow.sol
+    - Holds USDC deposits
+    - Locks stakes, settles games
+    - Rate limits, time-locks, emergency pause
+    ↓ records
+GameRegistry.sol
+    - Immutable game results
+    - Dispute verification
 ```
 
 ### Settlement Flow
 
-```
-1. Game ends (checkmate, resign, timeout, draw)
-   └── Server determines winner (off-chain, instant)
-
-2. Server calls ChessEscrow.settleGame()
-   ├── Contract verifies: game exists, not already settled, within daily limits
-   ├── Contract calculates: winner payout = (stake × 2) - platform fee
-   ├── Contract updates: winner's on-chain balance
-   └── Contract emits: GameSettled event (for indexing/analytics)
-
-3. GameRegistry.recordResult()
-   └── Stores: gameId, winner, loser, finalFenHash, moveHistoryHash, timestamp
-
-4. User withdraws (anytime)
-   ├── Small amounts (<$500): Instant
-   └── Large amounts (≥$500): 24-hour time-lock
-```
-
----
-
-## Scaling Architecture
-
-### Current State (Development)
-- Single Bun.js server process
-- PostgreSQL (Neon serverless)
-- In-memory game state (lost on restart)
-- WebSocket connections on single instance
-
-### Phase 1: Production Ready (10,000 concurrent users)
-
-| Component | Current | Production Solution |
-|-----------|---------|---------------------|
-| Database | Neon PostgreSQL | Same + connection pooling tuned |
-| Cache | None | Redis (Upstash serverless) |
-| Game state | In-memory | Redis with Lua scripts for atomicity |
-| WebSocket | Single server | Single server with sticky sessions |
-| Blockchain | None | Polygon mainnet + Alchemy RPC |
-| Monitoring | Console logs | Datadog or Grafana Cloud |
-| Secrets | .env files | Doppler |
-| Rate limiting | In-memory | Redis-backed (distributed) |
-
-### Phase 2: Scale (100,000 concurrent users)
-
-| Component | Solution |
-|-----------|----------|
-| WebSocket | Multiple server instances + Redis Pub/Sub for cross-instance messaging |
-| Load balancer | AWS ALB with WebSocket sticky sessions |
-| Database | Read replicas for query-heavy operations |
-| Game state | Redis Cluster (sharded) |
-| CDN | CloudFlare for static assets |
-| Background jobs | BullMQ (Redis-backed job queue) |
-
-### Phase 3: Global Scale (1,000,000+ users)
-
-| Component | Solution |
-|-----------|----------|
-| Multi-region | Deploy to US-East, EU-West, Asia-Pacific |
-| Database | CockroachDB or Neon multi-region |
-| WebSocket | Regional clusters with global Redis Pub/Sub |
-| Blockchain | Multiple RPC providers (Alchemy + Infura + QuickNode) with failover |
-| Settlement | Queue-based with retry logic and dead-letter handling |
-
----
-
-## Feature Roadmap
-
-### Completed ✅
-- [x] Core chess engine with full move validation
-- [x] WebSocket real-time gameplay (moves, clocks, chat)
-- [x] User authentication (email/password + Google/GitHub OAuth)
-- [x] MFA (TOTP) support with backup codes
-- [x] ELO rating system with rank tiers
-- [x] Matchmaking by ELO range and stake amount
-- [x] Challenge system (direct player-to-player challenges)
-- [x] Spectator mode with real-time updates
-- [x] Betting system for spectators (database-backed)
-- [x] Wallet balance system with atomic updates (race condition fixed)
-- [x] Game clocks with Fischer increment
-
-### In Progress 🔨
-- [ ] Polygon smart contract integration
-- [ ] Multi-sig wallet setup (Gnosis Safe)
-- [ ] Redis integration for game state persistence
-
-### Next Priority 📋
-- [ ] Smart contract development (ChessEscrow.sol, GameRegistry.sol)
-- [ ] Smart contract security audit (before mainnet)
-- [ ] Redis game state (games survive server restarts)
-- [ ] Production monitoring and alerting
-- [ ] Withdrawal time-locks and rate limiting
-- [ ] Anti-cheat measures (move time analysis, engine detection)
-
-### Future Roadmap 🔮
-- [ ] Tournament system with brackets and prize pools
-- [ ] Discord bot for analytics/notifications
-- [ ] Advanced analytics dashboard
-- [ ] Streaming integration (Twitch/YouTube embed)
-- [ ] Mobile app (React Native) — desktop-first, mobile later
+1. Game ends → Server determines winner (off-chain)
+2. `ChessEscrow.settleGame()` → Verifies, calculates payout, updates balance
+3. `GameRegistry.recordResult()` → Stores immutable record
+4. User withdraws → Instant (<$500) or 24hr time-lock (≥$500)

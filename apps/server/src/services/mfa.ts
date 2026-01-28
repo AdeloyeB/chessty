@@ -14,9 +14,9 @@
  * - All comparisons use timing-safe functions to prevent timing attacks
  */
 
-import { eq } from 'drizzle-orm';
+import { eq, and, lt } from 'drizzle-orm';
 import * as OTPAuth from 'otpauth';
-import { db, mfaEnrollments } from '../drizzle';
+import { db, mfaEnrollments, mfaTotpUsage } from '../drizzle';
 
 // ============================================================================
 // Configuration
@@ -581,10 +581,68 @@ export interface MFAVerificationResult {
 }
 
 /**
+ * Hash a TOTP code for storage in the replay prevention table.
+ * Uses SHA-256 so we never store the plaintext code.
+ */
+async function hashTOTPCode(userId: string, code: string): Promise<string> {
+  const data = new TextEncoder().encode(`${userId}:${code}`);
+  const hash = await crypto.subtle.digest('SHA-256', data);
+  return bytesToHex(new Uint8Array(hash));
+}
+
+/**
+ * C8 FIX: Check if a TOTP code has already been used (replay prevention).
+ * Returns true if the code was already used within the recent window.
+ */
+async function isTOTPCodeUsed(userId: string, code: string): Promise<boolean> {
+  const codeHash = await hashTOTPCode(userId, code);
+
+  const existing = await db.query.mfaTotpUsage.findFirst({
+    where: and(
+      eq(mfaTotpUsage.userId, userId),
+      eq(mfaTotpUsage.codeHash, codeHash)
+    ),
+  });
+
+  return !!existing;
+}
+
+/**
+ * C8 FIX: Record a TOTP code as used to prevent replay.
+ */
+async function recordTOTPCodeUsage(userId: string, code: string): Promise<void> {
+  const codeHash = await hashTOTPCode(userId, code);
+
+  await db.insert(mfaTotpUsage).values({
+    id: crypto.randomUUID(),
+    userId,
+    codeHash,
+    usedAt: new Date(),
+  }).onConflictDoNothing(); // Ignore if somehow already recorded
+}
+
+/**
+ * C8 FIX: Clean up expired TOTP usage records.
+ * Call this periodically (e.g. every hour) to prevent the table from growing unbounded.
+ * Records older than 2 minutes are safe to delete (TOTP window is ~90 seconds).
+ */
+export async function cleanupExpiredTOTPUsage(): Promise<number> {
+  const cutoff = new Date(Date.now() - 2 * 60 * 1000);
+  const deleted = await db
+    .delete(mfaTotpUsage)
+    .where(lt(mfaTotpUsage.usedAt, cutoff))
+    .returning();
+  return deleted.length;
+}
+
+/**
  * Verify MFA during login
  *
  * This should be called after password verification but before issuing a session token.
  * Accepts either a TOTP code or a backup code.
+ *
+ * C7 FIX: Backup code removal uses optimistic locking via updatedAt.
+ * C8 FIX: TOTP codes are tracked to prevent replay attacks.
  *
  * @param userId - The user's ID
  * @param code - The code entered by the user (TOTP or backup)
@@ -604,6 +662,15 @@ export async function verifyMFA(userId: string, code: string): Promise<MFAVerifi
   const totpValid = verifyTOTPCode(secret, code);
 
   if (totpValid) {
+    // C8 FIX: Check if this exact code was already used (replay prevention)
+    const alreadyUsed = await isTOTPCodeUsed(userId, code);
+    if (alreadyUsed) {
+      return { success: false, usedBackupCode: false, error: 'Code already used. Please wait for a new code.' };
+    }
+
+    // C8 FIX: Record this code as used
+    await recordTOTPCodeUsage(userId, code);
+
     // Update last used timestamp
     await db
       .update(mfaEnrollments)
@@ -618,17 +685,31 @@ export async function verifyMFA(userId: string, code: string): Promise<MFAVerifi
   const matchIndex = await verifyBackupCode(hashedCodes, code);
 
   if (matchIndex >= 0) {
-    // Remove the used backup code
+    // C7 FIX: Atomic backup code removal with optimistic locking.
+    // We use the enrollment's updatedAt as a version — if another request
+    // modified the row between our read and write, the UPDATE matches zero rows.
+    const previousUpdatedAt = enrollment.updatedAt;
     hashedCodes.splice(matchIndex, 1);
 
-    await db
+    const updated = await db
       .update(mfaEnrollments)
       .set({
         backupCodes: JSON.stringify(hashedCodes),
         lastUsedAt: new Date(),
         updatedAt: new Date(),
       })
-      .where(eq(mfaEnrollments.userId, userId));
+      .where(
+        and(
+          eq(mfaEnrollments.userId, userId),
+          eq(mfaEnrollments.updatedAt, previousUpdatedAt)
+        )
+      )
+      .returning();
+
+    if (updated.length === 0) {
+      // Another request modified the enrollment concurrently — retry
+      return verifyMFA(userId, code);
+    }
 
     return { success: true, usedBackupCode: true };
   }

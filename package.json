@@ -2,6 +2,7 @@
   "name": "the-chess-game",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "workspaces": [
     "apps/*",
     "packages/*"
@@ -16,6 +17,7 @@
     "dev:server": "turbo dev --filter=@chess-game/server",
     "dev:desktop": "turbo dev --filter=@chess-game/desktop",
     "build:desktop": "turbo build --filter=@chess-game/desktop",
+    "dev:desktop:tauri": "turbo dev --filter=@chess-game/desktop -- --tauri",
     "db:generate": "pnpm --filter=@chess-game/server db:generate",
     "db:migrate": "pnpm --filter=@chess-game/server db:migrate",
     "db:studio": "pnpm --filter=@chess-game/server db:studio",
@@ -23,9 +25,19 @@
     "test:coverage": "pnpm --filter=@chess-game/server test --coverage",
     "prepare": "husky"
   },
+  "lint-staged": {
+    "*.{ts,tsx}": "eslint --fix",
+    "*.rs": "bash -c 'source \"$HOME/.cargo/env\" 2>/dev/null; cd apps/desktop/src-tauri && cargo clippy --fix --allow-dirty --allow-staged'"
+  },
   "devDependencies": {
+    "@eslint/js": "^9.39.2",
+    "eslint": "^9.39.2",
+    "eslint-config-next": "^16.1.5",
+    "eslint-plugin-react-hooks": "^7.0.1",
     "husky": "^9.1.7",
+    "lint-staged": "^16.2.7",
     "turbo": "^2.0.0",
-    "typescript": "^5.4.0"
+    "typescript": "^5.4.0",
+    "typescript-eslint": "^8.54.0"
   }
 }

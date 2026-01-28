@@ -1,4 +1,4 @@
-import { eq, and, or, gt, lt, ne } from 'drizzle-orm';
+import { eq, and, or, gt, lt } from 'drizzle-orm';
 import { db, challenges, users, games } from '../drizzle';
 import type { PublicUser, ChallengeWithCreator, GameMode } from '@chess-game/shared';
 import { CHALLENGE_TIME_CONTROLS, CHALLENGE_EXPIRATION, STARTING_FEN } from '@chess-game/shared';
@@ -9,6 +9,7 @@ function toPublicUser(user: typeof users.$inferSelect): PublicUser {
   return {
     id: user.id,
     username: user.username,
+    displayName: user.displayName,
     eloRating: user.eloRating,
     peakEloRating: user.peakEloRating,
     gamesPlayed: user.gamesPlayed,
@@ -125,6 +126,17 @@ export async function cancelChallenge(challengeId: string, userId: string): Prom
     .where(eq(challenges.id, challengeId));
 }
 
+/**
+ * C3 FIX: Atomic challenge acceptance.
+ *
+ * The old code had a TOCTOU race condition:
+ * 1. Read challenge, check status='open'
+ * 2. Update challenge to 'accepted'
+ *
+ * Two users could both read 'open' and both accept. Now we use
+ * UPDATE ... WHERE status='open' — only ONE request succeeds.
+ * If the RETURNING clause is empty, someone else accepted first.
+ */
 export async function acceptChallenge(
   challengeId: string,
   acceptorId: string
@@ -135,7 +147,6 @@ export async function acceptChallenge(
   });
 
   if (!challenge) throw new Error('Challenge not found');
-  if (challenge.status !== 'open') throw new Error('Challenge is not available');
   if (challenge.creatorId === acceptorId) throw new Error('Cannot accept your own challenge');
 
   // Check if challenge is expired
@@ -165,14 +176,21 @@ export async function acceptChallenge(
   // Reserve the acceptor's wager
   await walletService.deductWager(acceptorId, wagerAmount, `challenge-${challengeId}`);
 
+  // C3 FIX: Atomic update — WHERE status='open' ensures only one acceptor succeeds
   const [updated] = await db
     .update(challenges)
     .set({
       status: 'accepted',
       acceptedById: acceptorId,
     })
-    .where(eq(challenges.id, challengeId))
+    .where(and(eq(challenges.id, challengeId), eq(challenges.status, 'open')))
     .returning();
+
+  if (!updated) {
+    // Another user accepted first — refund this user's wager
+    await walletService.refundWager(acceptorId, wagerAmount, `challenge-${challengeId}-rejected`);
+    throw new Error('Challenge is no longer available');
+  }
 
   return toChallengeWithCreator(updated, challenge.creator, acceptor);
 }

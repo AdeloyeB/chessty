@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useAuthStore } from '@/store/auth';
@@ -8,9 +8,10 @@ import { useGameStore } from '@/store/game';
 import { useApi } from '@/hooks/useApi';
 import { useWallet } from '@/hooks/useWallet';
 import { ChallengeMarketplace } from '../marketplace/ChallengeMarketplace';
-import { GameBoard } from '../chess/GameBoard';
 import { LocalGame } from '../chess/LocalGame';
+import { LiveGame } from '../chess/LiveGame';
 import { ActiveGamesLobby } from '../spectator/ActiveGamesLobby';
+import { SpectatorViewManager } from '../spectator/SpectatorViewManager';
 import { Leaderboard } from './Leaderboard';
 import { HistoryPage } from '../history/HistoryPage';
 import { USDCAmount } from '../wallet/USDCAmount';
@@ -18,10 +19,13 @@ import { WalletButton } from '../wallet/WalletButton';
 import { BalanceDisplay } from '../wallet/BalanceDisplay';
 import { RankBadge, RankBadgeCompact } from '../profile/RankBadge';
 import { AchievementBadge } from '../profile/AchievementBadge';
+import { TitleBar } from '../desktop/TitleBar';
+import { TickerBar } from '../desktop/TickerBar';
 import { getRankTier, getProgressToNextRank, getNextRankTier } from '@chess-game/shared';
+import { useFeatureFlag } from '@/store/flags';
 import type { LeaderboardEntry, PublicUser } from '@chess-game/shared';
 
-type Tab = 'home' | 'practice' | 'play' | 'watch' | 'history' | 'leaderboard';
+type Tab = 'home' | 'practice' | 'play' | 'watch' | 'history' | 'leaderboard' | 'live_game';
 
 // ActiveGame interface matching server response from /api/games/active
 interface ActiveGame {
@@ -94,6 +98,7 @@ function HomeContent({ onNavigate }: { onNavigate: (tab: Tab) => void }) {
   const { user } = useAuthStore();
   const { isConnected, initDevMode, isDevMode } = useWallet();
   const { getEloLeaderboard, getActiveGames } = useApi();
+  const spectatorEnabled = useFeatureFlag('spectator_mode');
 
   // ============================================================================
   // MOCK DATA - See MOCK_DATA.md for all mock data locations
@@ -283,12 +288,14 @@ function HomeContent({ onNavigate }: { onNavigate: (tab: Tab) => void }) {
           <div className="bg-black border-b border-white/15">
             <div className="flex items-center justify-between p-4 border-b border-white/15">
               <p className="text-xs font-mono text-white/50 lowercase">live_matches</p>
-              <button
-                onClick={() => onNavigate('watch')}
-                className="text-xs font-mono text-white/30 hover:text-white transition-colors lowercase"
-              >
-                view_all
-              </button>
+              {spectatorEnabled && (
+                <button
+                  onClick={() => onNavigate('watch')}
+                  className="text-xs font-mono text-white/30 hover:text-white transition-colors lowercase"
+                >
+                  view_all
+                </button>
+              )}
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3">
               {loadingGames ? (
@@ -407,25 +414,55 @@ export function HomeDashboard() {
   const { user } = useAuthStore();
   const { status } = useGameStore();
   const { logout } = useApi();
+  const spectatorEnabled = useFeatureFlag('spectator_mode');
+  const multiGameEnabled = useFeatureFlag('spectator_multi_game');
 
-  // If in a game, show the game board
-  if (status === 'playing' || status === 'matched' || status === 'queuing') {
-    return <GameBoard />;
-  }
+  // Track whether we're in an active game (queuing, matched, or playing)
+  const isInGame = status === 'queuing' || status === 'matched' || status === 'playing';
+  const isGameEnded = status === 'ended';
 
+  // Auto-switch to live_game tab when a game starts
+  const prevStatusRef = useRef(status);
+  useEffect(() => {
+    if (isInGame && prevStatusRef.current === 'idle') {
+      setActiveTab('live_game');
+    }
+    prevStatusRef.current = status;
+  }, [isInGame, status]);
+
+  // When game ends and user dismisses the dialog (reset → idle),
+  // return to home tab and remove the live_game tab
+  useEffect(() => {
+    if (status === 'idle' && activeTab === 'live_game') {
+      setActiveTab('home');
+    }
+  }, [status, activeTab]);
+
+  // Build tabs array — live_game appears dynamically when in a game or game just ended
+  // spectate tab is behind the spectator_mode feature flag
+  const showLiveTab = isInGame || isGameEnded;
   const tabs: { id: Tab; label: string }[] = [
     { id: 'home', label: 'home' },
     { id: 'play', label: 'find_game' },
+    ...(showLiveTab ? [{ id: 'live_game' as Tab, label: 'live_game' }] : []),
     { id: 'practice', label: 'practice' },
-    { id: 'watch', label: 'spectate' },
+    ...(spectatorEnabled ? [{ id: 'watch' as Tab, label: 'spectate' }] : []),
     { id: 'history', label: 'history' },
     { id: 'leaderboard', label: 'rankings' },
   ];
 
   return (
     <div className="min-h-screen bg-black">
-      {/* Top Navigation Bar */}
-      <nav className="border-b border-white/15 bg-black sticky top-0 z-50">
+      {/* Desktop Titlebar — only renders inside Tauri (not in browser) */}
+      <TitleBar
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        user={user ? { username: user.username, eloRating: user.eloRating, balance: user.balance } : null}
+        onLogout={logout}
+      />
+
+      {/* Top Navigation Bar — shown in browser, hidden when TitleBar is active */}
+      <nav className="border-b border-white/15 bg-black sticky top-0 z-50 tauri-hidden">
         <div className="container mx-auto px-6">
           <div className="flex items-center justify-between h-16">
             {/* Left: Logo & Nav */}
@@ -440,13 +477,16 @@ export function HomeDashboard() {
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
-                    className={`px-4 py-2 font-mono text-sm transition-all relative ${
+                    className={`px-4 py-2 font-mono text-sm transition-all relative flex items-center gap-1.5 ${
                       activeTab === tab.id
                         ? 'text-white'
                         : 'text-white/40 hover:text-white/70'
                     }`}
                   >
                     {tab.label}
+                    {tab.id === 'live_game' && (
+                      <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />
+                    )}
                     {/* White glow underline for active tab */}
                     {activeTab === tab.id && (
                       <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-3/4 h-px bg-white shadow-[0_0_8px_rgba(255,255,255,0.8)]" />
@@ -489,13 +529,16 @@ export function HomeDashboard() {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`px-4 py-3 font-mono text-xs whitespace-nowrap transition-all relative ${
+                className={`px-4 py-3 font-mono text-xs whitespace-nowrap transition-all relative flex items-center gap-1 ${
                   activeTab === tab.id
                     ? 'text-white'
                     : 'text-white/40'
                 }`}
               >
                 {tab.label}
+                {tab.id === 'live_game' && (
+                  <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />
+                )}
                 {activeTab === tab.id && (
                   <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-3/4 h-px bg-white shadow-[0_0_8px_rgba(255,255,255,0.8)]" />
                 )}
@@ -506,9 +549,18 @@ export function HomeDashboard() {
       </nav>
 
       {/* Main Content */}
-      {activeTab === 'practice' ? (
+      {activeTab === 'live_game' ? (
+        <main className="h-[calc(100vh-64px)]">
+          <LiveGame />
+        </main>
+      ) : activeTab === 'practice' ? (
         <main className="h-[calc(100vh-64px)]">
           <LocalGame />
+        </main>
+      ) : activeTab === 'watch' && multiGameEnabled ? (
+        // Multi-game spectator: sub-nav + content managed by SpectatorViewManager
+        <main>
+          <SpectatorViewManager />
         </main>
       ) : (
         <main className="container mx-auto px-6 py-6">
@@ -519,6 +571,12 @@ export function HomeDashboard() {
           {activeTab === 'leaderboard' && <Leaderboard />}
         </main>
       )}
+
+      {/* Desktop Ticker Bar — persistent bottom bar, only in Tauri */}
+      <TickerBar
+        balance={user?.balance ?? 0}
+        isConnected={true}
+      />
     </div>
   );
 }

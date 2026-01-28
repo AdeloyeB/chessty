@@ -111,6 +111,15 @@ export async function invalidateSession(sessionId: string): Promise<void> {
 }
 
 /**
+ * H5 FIX: Invalidate ALL sessions for a user (logout-all).
+ * Returns the number of sessions deleted.
+ */
+export async function invalidateAllUserSessions(userId: string): Promise<number> {
+  const deleted = await db.delete(sessions).where(eq(sessions.userId, userId)).returning();
+  return deleted.length;
+}
+
+/**
  * Generate a temporary token for MFA verification
  *
  * This token is short-lived (5 minutes) and is used between password verification
@@ -198,8 +207,9 @@ export async function register(
 
 export interface LoginResult {
   user: User;
-  token: string;
+  token?: string;
   warning?: string;
+  mfaRequired?: boolean;
 }
 
 export interface LoginContext {
@@ -251,9 +261,10 @@ export async function login(
   // Successful login - reset failed attempts
   await recordSuccessfulLogin(user.id, ipAddress, userAgent);
 
-  const token = await generateToken(user.id, ipAddress, userAgent);
-
-  return { user, token };
+  // C2 FIX: Do NOT create a session here. The route handler decides whether
+  // to issue a full token (no MFA) or a temp token (MFA required).
+  // This prevents session fixation — no DB session exists until MFA is verified.
+  return { user };
 }
 
 export async function getUserById(userId: string): Promise<User | null> {
@@ -358,8 +369,8 @@ export async function findOrCreateOAuthUser(
   return { user, token };
 }
 
-export function sanitizeUser(user: User): Omit<User, 'passwordHash' | 'googleId' | 'githubId' | 'twitterId' | 'appleId'> {
-  const { passwordHash, googleId, githubId, twitterId, appleId, ...sanitized } = user;
+export function sanitizeUser(user: User): Omit<User, 'passwordHash' | 'googleId' | 'githubId' | 'twitterId' | 'appleId' | 'walletAddress'> {
+  const { passwordHash: _pw, googleId: _g, githubId: _gh, twitterId: _t, appleId: _a, walletAddress: _w, ...sanitized } = user;
   return sanitized;
 }
 
@@ -367,6 +378,7 @@ export function toPublicUser(user: User) {
   return {
     id: user.id,
     username: user.username,
+    displayName: user.displayName,
     eloRating: user.eloRating,
     peakEloRating: user.peakEloRating,
     gamesPlayed: user.gamesPlayed,

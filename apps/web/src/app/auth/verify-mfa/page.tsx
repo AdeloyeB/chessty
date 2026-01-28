@@ -54,6 +54,7 @@ function VerifyMFAContent() {
       const mockUser = {
         id: 'user-1',
         username: 'player',
+        displayName: 'Player',
         email: 'player@example.com',
         eloRating: 1200,
         peakEloRating: 1350,
@@ -106,6 +107,7 @@ function VerifyMFAContent() {
       const mockUser = {
         id: 'user-1',
         username: 'player',
+        displayName: 'Player',
         email: 'player@example.com',
         eloRating: 1200,
         peakEloRating: 1350,
