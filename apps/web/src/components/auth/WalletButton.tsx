@@ -121,6 +121,15 @@ export function WalletButton({
     )
   );
 
+  // Clean up tooltip timeout on unmount to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, []);
+
   const handleMouseEnter = () => {
     timeoutRef.current = setTimeout(() => setShowTooltip(true), 400);
   };

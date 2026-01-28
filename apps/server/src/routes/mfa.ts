@@ -161,7 +161,7 @@ export async function handleCompleteEnrollment(req: Request): Promise<Response> 
   const _clientIp = getClientIp(req); // Reserved for future audit logging
 
   // Apply verification rate limiter
-  const rateLimitResult = mfaVerifyLimiter.consume(clientIp);
+  const rateLimitResult = mfaVerifyLimiter.consume(_clientIp);
   if (!rateLimitResult.allowed) {
     return rateLimitResponse(rateLimitResult.retryAfter!);
   }
@@ -194,7 +194,7 @@ export async function handleCompleteEnrollment(req: Request): Promise<Response> 
     }
 
     // Reset rate limiter on successful enrollment
-    mfaVerifyLimiter.reset(clientIp);
+    mfaVerifyLimiter.reset(_clientIp);
 
     return Response.json({
       success: true,
@@ -399,7 +399,7 @@ export async function handleDisableMFA(req: Request): Promise<Response> {
   const _clientIp = getClientIp(req); // Reserved for future audit logging
 
   // Apply verification rate limiter
-  const rateLimitResult = mfaVerifyLimiter.consume(clientIp);
+  const rateLimitResult = mfaVerifyLimiter.consume(_clientIp);
   if (!rateLimitResult.allowed) {
     return rateLimitResponse(rateLimitResult.retryAfter!);
   }
@@ -452,13 +452,15 @@ export async function handleDisableMFA(req: Request): Promise<Response> {
       );
     }
 
-    // Verify TOTP code
-    const mfaResult = await mfaService.verifyMFA(userId, code);
-    if (!mfaResult.success) {
+    // Verify TOTP code (backup codes NOT accepted for disabling MFA —
+    // we need proof the user has their authenticator device, not just a
+    // one-time backup code that could have been stolen)
+    const totpValid = await mfaService.verifyTOTPOnly(userId, code);
+    if (!totpValid) {
       return Response.json(
         {
           success: false,
-          error: { code: 'MFA_VERIFICATION_FAILED', message: 'Invalid verification code' },
+          error: { code: 'MFA_VERIFICATION_FAILED', message: 'Invalid verification code. A TOTP code from your authenticator app is required.' },
         } satisfies ApiResponse<never>,
         { status: 401 }
       );
@@ -478,7 +480,7 @@ export async function handleDisableMFA(req: Request): Promise<Response> {
     }
 
     // Reset rate limiter on success
-    mfaVerifyLimiter.reset(clientIp);
+    mfaVerifyLimiter.reset(_clientIp);
 
     return Response.json({
       success: true,
