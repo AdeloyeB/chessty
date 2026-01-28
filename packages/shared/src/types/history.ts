@@ -1,5 +1,4 @@
-import { z } from 'zod';
-import type { GameMode, GameResult, GameStatus, PublicUser, Move, TransactionType } from './index';
+import type { GameMode, GameResult, PublicUser, Move, TransactionType } from './index';
 
 // Date range for filtering
 export interface DateRange {
@@ -225,3 +224,30 @@ export function getDateRangeFromPreset(preset: DateRangePreset): DateRange {
       return { start: null, end: null };
   }
 }
+
+// ============================================================================
+// Opening Statistics
+// ============================================================================
+
+export interface OpeningStats {
+  name: string;
+  ecoCode: string | null;
+  gamesPlayed: number;
+  wins: number;
+  losses: number;
+  draws: number;
+  winRate: number; // 0-100
+  gamesAsWhite: number;
+  winsAsWhite: number;
+  gamesAsBlack: number;
+  winsAsBlack: number;
+  winRateAsWhite: number; // 0-100
+  winRateAsBlack: number; // 0-100
+  games: HistoryGame[];
+  lastPlayed: Date;
+  averageGameDuration: number; // seconds
+}
+
+export type OpeningSortOption = 'most-played' | 'best-winrate' | 'worst-winrate' | 'most-recent';
+export type OpeningResultFilter = 'all' | 'win' | 'loss' | 'draw';
+export type OpeningColorFilter = 'all' | 'white' | 'black';

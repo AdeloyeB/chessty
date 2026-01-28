@@ -13,8 +13,9 @@ import { FinancialSummary } from './financial/FinancialSummary';
 import { GameDetailDrawer } from './detail/GameDetailDrawer';
 import { ExportDropdown } from './export/ExportDropdown';
 import { HistoryCharts } from './charts/HistoryCharts';
+import { OpeningsTab } from './openings/OpeningsTab';
 
-type Tab = 'analytics' | 'games' | 'financial';
+type Tab = 'analytics' | 'games' | 'financial' | 'openings';
 
 export function HistoryPage() {
   const [activeTab, setActiveTab] = useState<Tab>('analytics');
@@ -90,6 +91,12 @@ export function HistoryPage() {
           onClick={() => setActiveTab('financial')}
         >
           financial
+        </TabButton>
+        <TabButton
+          active={activeTab === 'openings'}
+          onClick={() => setActiveTab('openings')}
+        >
+          openings
         </TabButton>
       </div>
 
@@ -169,6 +176,14 @@ export function HistoryPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Openings Tab */}
+      {activeTab === 'openings' && (
+        <OpeningsTab
+          games={historyData.allFilteredGames}
+          isLoading={historyData.isLoadingAllGames}
+        />
       )}
 
       {/* Game Detail Drawer */}
