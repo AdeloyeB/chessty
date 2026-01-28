@@ -75,7 +75,8 @@ export type KnownFeatureFlag =
   | 'spectator_mode'
   | 'spectator_predictions'
   | 'spectator_chat'
-  | 'spectator_multi_game';
+  | 'spectator_multi_game'
+  | 'history_openings_tab';
 
 /**
  * Type-safe flag check helper type

@@ -50,7 +50,7 @@ const TIME_CONTROLS = [
 ];
 
 const RESULTS: Array<'win' | 'loss' | 'draw'> = ['win', 'win', 'win', 'loss', 'loss', 'draw'];
-const RESULT_DETAILS = ['white_wins', 'black_wins', 'resignation', 'timeout', 'checkmate', 'stalemate'];
+const _RESULT_DETAILS = ['white_wins', 'black_wins', 'resignation', 'timeout', 'checkmate', 'stalemate'];
 
 // Generate realistic mock moves
 function generateMockMoves(count: number): Move[] {
@@ -266,6 +266,9 @@ interface UseHistoryDataOptions {
 interface UseHistoryDataReturn {
   // Data
   games: HistoryGame[];
+  // All filtered games (unpaginated — for aggregate analysis like openings tab)
+  allFilteredGames: HistoryGame[];
+  isLoadingAllGames: boolean;
   stats: HistoryStats | undefined;
   transactions: HistoryTransaction[];
   financialSummary: FinancialSummary | undefined;
@@ -300,7 +303,7 @@ interface UseHistoryDataReturn {
   refetchAll: () => void;
 }
 
-const DEFAULT_FILTERS: HistoryFilters = {
+const _DEFAULT_FILTERS: HistoryFilters = {
   dateRange: { start: null, end: null },
   result: 'all',
   timeControl: 'all',
@@ -516,6 +519,8 @@ export function useHistoryData({
   return {
     // Data
     games: gamesQuery.data?.data ?? [],
+    allFilteredGames: useMockData ? filteredMockGames : (gamesQuery.data?.data ?? []),
+    isLoadingAllGames: useMockData ? false : gamesQuery.isLoading,
     stats: statsQuery.data,
     transactions: transactionsQuery.data?.data ?? [],
     financialSummary: financialQuery.data,

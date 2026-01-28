@@ -90,6 +90,13 @@ export const DEFAULT_FEATURE_FLAGS = {
     description: 'Allow spectators to watch up to 5 games simultaneously with a sub-nav and drag-and-drop grid view',
     enabled: true,
   },
+
+  // History features
+  history_openings_tab: {
+    name: 'Openings Analysis Tab',
+    description: 'Show opening statistics and analysis in the history page',
+    enabled: true,
+  },
 } as const;
 
 export type DefaultFeatureFlagId = keyof typeof DEFAULT_FEATURE_FLAGS;
@@ -103,6 +110,7 @@ export const FEATURE_FLAG_CATEGORIES = {
   SOCIAL: ['leaderboard_public', 'achievements_enabled'],
   GAME_MODES: ['practice_mode', 'challenge_marketplace'],
   SPECTATOR: ['spectator_mode', 'spectator_predictions', 'spectator_chat', 'spectator_multi_game'],
+  HISTORY: ['history_openings_tab'],
 } as const;
 
 /**
