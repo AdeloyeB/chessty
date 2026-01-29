@@ -5,8 +5,8 @@
   "identifier": "com.chessgamble.desktop",
   "build": {
     "devUrl": "http://localhost:3000",
-    "beforeBuildCommand": "cd ../web && pnpm build",
-    "frontendDist": "../web/out"
+    "beforeBuildCommand": "cd ../web && pnpm build:tauri",
+    "frontendDist": "../../web/out"
   },
   "app": {
     "windows": [
