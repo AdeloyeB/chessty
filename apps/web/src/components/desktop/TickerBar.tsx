@@ -69,13 +69,13 @@ export function TickerBar({ balance = 0, isConnected = false, activeBet = null }
               </span>
             </>
           ) : (
-            <span className="text-white/30">no active bets</span>
+            <span className="text-white/50">no active bets</span>
           )}
         </div>
 
         {/* === CENTER: Scrolling Ticker === */}
         <div className="flex-1 overflow-hidden mx-6">
-          <div className="ticker-scroll flex items-center gap-8 text-white/25 whitespace-nowrap">
+          <div className="ticker-scroll flex items-center gap-8 text-white/40 whitespace-nowrap">
             <span>♔ platform live — 12 games in progress</span>
             <span>·</span>
             <span>top match: player_1 vs player_2 — 24 moves</span>
@@ -88,7 +88,7 @@ export function TickerBar({ balance = 0, isConnected = false, activeBet = null }
 
         {/* === RIGHT: Wallet + Connection === */}
         <div className="flex items-center gap-4 shrink-0">
-          <span className="text-white/50">
+          <span className="text-white/60">
             {balance.toLocaleString()} usdc
           </span>
           <div className="flex items-center gap-1.5">
@@ -97,7 +97,7 @@ export function TickerBar({ balance = 0, isConnected = false, activeBet = null }
                 isConnected ? 'bg-green-500' : 'bg-red-500'
               }`}
             />
-            <span className="text-white/30">
+            <span className="text-white/50">
               {isConnected ? 'live' : 'offline'}
             </span>
           </div>
