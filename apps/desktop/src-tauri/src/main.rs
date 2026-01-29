@@ -23,6 +23,16 @@
 mod commands;
 mod engine;
 
+// Anti-cheat module — client-side cheat detection (environment, input, network).
+// This is part of our defense-in-depth strategy. The client collects data about:
+// - Running processes (chess engines, screen sharing, automation tools)
+// - Input patterns (mouse movements, timing — bot vs human detection)
+// - Network activity (requests to chess analysis APIs)
+//
+// This data is sent to the server where it's combined with statistical move
+// analysis for final cheat probability scoring. See docs/ANTI_CHEAT_PLAN.md.
+mod anticheat;
+
 use tauri::Emitter;
 
 // Import the EngineState so we can register it with Tauri's state management.
