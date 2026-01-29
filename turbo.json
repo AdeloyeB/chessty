@@ -4,7 +4,7 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": [".next/**", "!.next/cache/**", "dist/**", "src-tauri/target/**"]
+      "outputs": [".next/**", "!.next/cache/**", "dist/**", "out/**", "src-tauri/target/**"]
     },
     "dev": {
       "cache": false,
