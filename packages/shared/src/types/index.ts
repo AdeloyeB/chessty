@@ -522,3 +522,6 @@ export * from './profile';
 
 // Re-export analysis types
 export * from './analysis';
+
+// Re-export anti-cheat types
+export * from './anticheat';

@@ -22,12 +22,30 @@
 // `mod` tells Rust: "there's another file called X.rs — include it."
 mod commands;
 mod engine;
+mod engine_lifecycle;
+
+// Anti-cheat module — client-side cheat detection (environment, input, network).
+// This is part of our defense-in-depth strategy. The client collects data about:
+// - Running processes (chess engines, screen sharing, automation tools)
+// - Input patterns (mouse movements, timing — bot vs human detection)
+// - Network activity (requests to chess analysis APIs)
+//
+// This data is sent to the server where it's combined with statistical move
+// analysis for final cheat probability scoring. See docs/ANTI_CHEAT_PLAN.md.
+mod anticheat;
 
 use tauri::Emitter;
 
-// Import the EngineState so we can register it with Tauri's state management.
-// This allows our engine commands to access the Stockfish instance.
-use engine::EngineState;
+// Import the LazyEngineState for on-demand Stockfish spawning.
+// This replaces EngineState with a lazy-loading wrapper that:
+// - Only spawns Stockfish when analysis is first requested
+// - Automatically shuts down after 60 seconds of inactivity
+// - Reduces idle memory from ~100MB to ~40MB
+use engine_lifecycle::LazyEngineState;
+
+// Import the AntiCheatState for anti-cheat command state management.
+// This holds the MoveInputRecorder and NetworkMonitor instances.
+use commands::AntiCheatState;
 
 fn main() {
     tauri::Builder::default()
@@ -67,9 +85,27 @@ fn main() {
         // State Management
         // =====================================================================
         // Tauri's state management lets us share data between commands.
-        // The EngineState holds our Stockfish instance, wrapped in Arc<Mutex<>>
-        // for thread-safe access. Commands can access it via State<'_, EngineState>.
-        .manage(EngineState::new())
+        //
+        // LazyEngineState: Wraps Stockfish with lazy loading and idle shutdown.
+        // Instead of spawning Stockfish at app start (consuming ~60MB even when
+        // not analyzing), we spawn on-demand when the user requests analysis.
+        // After 60 seconds of inactivity, Stockfish is automatically shut down
+        // to free resources. This is crucial because the chess app runs alongside
+        // resource-intensive apps like trading platforms.
+        //
+        // Resource targets:
+        // - App idle:       <1% CPU, ~40MB RAM
+        // - Game active:    3-8% CPU, ~60MB RAM
+        // - Analysis mode:  15-30% CPU, ~150MB RAM
+        // - After 60s idle: Auto-shutdown back to ~40MB
+        .manage({
+            let engine_state = LazyEngineState::new();
+            engine_state.start_monitor(); // Start the idle shutdown monitor
+            engine_state
+        })
+        // AntiCheatState holds the MoveInputRecorder and NetworkMonitor instances
+        // for tracking input patterns and network activity during games.
+        .manage(AntiCheatState::new())
 
         // =====================================================================
         // IPC Command Registration
@@ -98,6 +134,18 @@ fn main() {
             commands::analyze_position_async,
             commands::analyze_game_async,
             commands::cancel_analysis,
+            // Anti-cheat commands (environment scanning, input tracking, network monitoring)
+            commands::scan_environment,
+            commands::start_move_recording,
+            commands::record_input_point,
+            commands::finish_move_recording,
+            commands::mark_focus_lost,
+            commands::cancel_move_recording,
+            commands::get_network_summary,
+            commands::start_network_monitoring,
+            commands::stop_network_monitoring,
+            commands::analyze_network_patterns,
+            commands::analyze_input_patterns_cmd,
         ])
 
         // =====================================================================

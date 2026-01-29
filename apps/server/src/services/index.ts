@@ -8,3 +8,7 @@ export * as challengeService from './challenge';
 export * as chess960Service from './chess960';
 export * as spectatorChatService from './spectatorChat';
 export * as spectatorPredictionService from './spectatorPrediction';
+export * as anticheatService from './anticheat';
+export * as stockfishService from './stockfish';
+export * as settlementService from './settlement';
+export * as juryService from './jury';
