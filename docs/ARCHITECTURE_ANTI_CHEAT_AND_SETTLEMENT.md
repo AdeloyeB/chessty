@@ -19,6 +19,9 @@ This document covers the complete architecture for cheat detection, game settlem
 7. [Technical Implementation](#7-technical-implementation)
 8. [Pre-Release Must-Haves](#8-pre-release-must-haves)
 9. [Future Considerations](#9-future-considerations)
+10. [Manual Steps & TODOs](#10-manual-steps--todos)
+11. [Jury UI Accessibility Ideas](#11-jury-ui-accessibility-ideas)
+12. [Implementation Status](#12-implementation-status)
 
 ---
 
@@ -925,63 +928,63 @@ juryEvents.on('case:quorum_reached', async (caseId) => {
 │                                                                                     │
 │  SMART CONTRACTS                                                         Status    │
 │  ═══════════════                                                                   │
-│  [ ] ChessEscrow.sol - Basic escrow with deposit/withdraw                ______   │
-│  [ ] ChessEscrow.sol - Disputed state and resolution                     ______   │
-│  [ ] ChessEscrow.sol - 48h timeout safety valve                          ______   │
-│  [ ] ChessEscrow.sol - Platform fee deduction                            ______   │
-│  [ ] Testnet deployment and testing                                      ______   │
-│  [ ] Security audit (external)                                           ______   │
-│  [ ] Mainnet deployment                                                  ______   │
+│  [ ] ChessEscrow.sol - Basic escrow with deposit/withdraw                TODO      │
+│  [ ] ChessEscrow.sol - Disputed state and resolution                     TODO      │
+│  [ ] ChessEscrow.sol - 48h timeout safety valve                          TODO      │
+│  [ ] ChessEscrow.sol - Platform fee deduction                            TODO      │
+│  [ ] Testnet deployment and testing                                      TODO      │
+│  [ ] Security audit (external)                                           TODO      │
+│  [ ] Mainnet deployment                                                  TODO      │
 │                                                                                     │
 │  ANTI-CHEAT ENGINE                                                                 │
 │  ═════════════════                                                                 │
-│  [ ] Environment scanning (client-side)                                  ______   │
-│  [ ] Input pattern recording (client-side)                               ______   │
-│  [ ] Statistical move analysis (server-side)                             ______   │
-│  [ ] Timing analysis (server-side)                                       ______   │
-│  [ ] Suspicion score aggregation                                         ______   │
-│  [ ] Threshold tuning and testing                                        ______   │
+│  [ ] Environment scanning (client-side)                                  TODO      │
+│  [ ] Input pattern recording (client-side)                               TODO      │
+│  [ ] Statistical move analysis (server-side)                             TODO      │
+│  [ ] Timing analysis (server-side)                                       TODO      │
+│  [ ] Suspicion score aggregation                                         TODO      │
+│  [ ] Threshold tuning and testing                                        TODO      │
 │                                                                                     │
 │  SETTLEMENT SYSTEM                                                                 │
 │  ════════════════                                                                  │
-│  [ ] Auto-settlement for clean games                                     ______   │
-│  [ ] Hold mechanism for flagged games                                    ______   │
-│  [ ] Player notification system                                          ______   │
-│  [ ] Settlement status tracking                                          ______   │
+│  [ ] Auto-settlement for clean games                                     TODO      │
+│  [ ] Hold mechanism for flagged games                                    TODO      │
+│  [ ] Player notification system                                          TODO      │
+│  [ ] Settlement status tracking                                          TODO      │
 │                                                                                     │
 │  JURY SYSTEM                                                                       │
 │  ═══════════                                                                       │
-│  [ ] Juror eligibility checking                                          ______   │
-│  [ ] Case assignment algorithm                                           ______   │
-│  [ ] Anonymized case presentation UI                                     ______   │
-│  [ ] Verdict submission                                                  ______   │
-│  [ ] Weighted verdict aggregation                                        ______   │
-│  [ ] Juror scoring system                                                ______   │
-│  [ ] Test case insertion                                                 ______   │
+│  [ ] Juror eligibility checking                                          TODO      │
+│  [ ] Case assignment algorithm                                           TODO      │
+│  [ ] Anonymized case presentation UI                                     TODO      │
+│  [ ] Verdict submission                                                  TODO      │
+│  [ ] Weighted verdict aggregation                                        TODO      │
+│  [ ] Juror scoring system                                                TODO      │
+│  [ ] Test case insertion                                                 TODO      │
 │                                                                                     │
 │  ADMIN TOOLS                                                                       │
 │  ═══════════                                                                       │
-│  [ ] Settlement dashboard                                                ______   │
-│  [ ] Manual resolution capability                                        ______   │
-│  [ ] Juror management                                                    ______   │
-│  [ ] Audit logs                                                          ______   │
+│  [ ] Settlement dashboard                                                TODO      │
+│  [ ] Manual resolution capability                                        TODO      │
+│  [ ] Juror management                                                    TODO      │
+│  [ ] Audit logs                                                          TODO      │
 │                                                                                     │
 │  PERFORMANCE                                                                       │
 │  ═══════════                                                                       │
-│  [ ] Stockfish lazy loading                                              ______   │
-│  [ ] Stockfish auto-shutdown                                             ______   │
-│  [ ] Thread/hash capping                                                 ______   │
-│  [ ] Environment scan caching                                            ______   │
-│  [ ] Input recording bounds                                              ______   │
+│  [x] Stockfish lazy loading                                              DONE      │
+│  [x] Stockfish auto-shutdown (60s idle)                                  DONE      │
+│  [x] Thread/hash capping (N-1 threads, max 4)                            DONE      │
+│  [ ] Environment scan caching                                            TODO      │
+│  [ ] Input recording bounds                                              TODO      │
 │                                                                                     │
 │  TESTING                                                                           │
 │  ═══════                                                                           │
-│  [ ] Unit tests for anti-cheat scoring                                   ______   │
-│  [ ] Integration tests for settlement flow                               ______   │
-│  [ ] Load testing for jury system                                        ______   │
-│  [ ] End-to-end test: clean game → auto-settle                          ______   │
-│  [ ] End-to-end test: flagged game → jury → resolution                  ______   │
-│  [ ] End-to-end test: timeout → safety valve release                    ______   │
+│  [ ] Unit tests for anti-cheat scoring                                   TODO      │
+│  [ ] Integration tests for settlement flow                               TODO      │
+│  [ ] Load testing for jury system                                        TODO      │
+│  [ ] End-to-end test: clean game → auto-settle                          TODO      │
+│  [ ] End-to-end test: flagged game → jury → resolution                  TODO      │
+│  [ ] End-to-end test: timeout → safety valve release                    TODO      │
 │                                                                                     │
 └─────────────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -1059,6 +1062,352 @@ juryEvents.on('case:quorum_reached', async (caseId) => {
 │                                                                                     │
 └─────────────────────────────────────────────────────────────────────────────────────┘
 ```
+
+---
+
+## 10. Manual Steps & TODOs
+
+This section lists everything that requires manual implementation, external services, or cannot be automated through code generation.
+
+### Smart Contract Development
+
+| Task | Description | Estimated Effort |
+|------|-------------|------------------|
+| **ChessEscrow.sol** | Develop the main escrow contract with deposit, withdraw, dispute, and settlement logic | 2-3 weeks |
+| **GameRegistry.sol** | Immutable game result storage for dispute verification | 1 week |
+| **Contract Testing** | Comprehensive unit tests, integration tests, fuzz testing | 1-2 weeks |
+| **Gas Optimization** | Optimize for Polygon gas costs | 3-5 days |
+
+### Polygon Deployment
+
+| Task | Description | Dependencies |
+|------|-------------|--------------|
+| **Testnet Deployment** | Deploy to Polygon Mumbai testnet | Contracts complete |
+| **Testnet USDC** | Obtain test USDC for integration testing | Testnet deployed |
+| **Mainnet Deployment** | Deploy to Polygon mainnet after audit | Security audit passed |
+| **Contract Verification** | Verify source code on Polygonscan | Mainnet deployed |
+
+### Multi-Sig Wallet Setup (Gnosis Safe)
+
+| Task | Description | Notes |
+|------|-------------|-------|
+| **Create Gnosis Safe** | Set up 2-of-3 multi-sig wallet on Polygon | Requires 3 trusted signers |
+| **Define Signers** | Identify and onboard signing parties | Consider geographic/time zone distribution |
+| **Transfer Ownership** | Transfer contract ownership to Safe | After mainnet deployment |
+| **Document Procedures** | Create signing procedures and emergency protocols | Required for operations |
+
+### External Security Audit
+
+| Provider Type | Estimated Cost | Timeline |
+|---------------|----------------|----------|
+| **Tier 1 Audit Firm** (Trail of Bits, OpenZeppelin) | $50k-$150k | 4-8 weeks |
+| **Tier 2 Audit Firm** (Consensys Diligence, Quantstamp) | $20k-$50k | 3-6 weeks |
+| **Independent Auditors** (Code4rena, Sherlock) | $10k-$30k | 2-4 weeks |
+
+**Recommendation**: Start with a Tier 2 audit, then a Tier 1 audit before mainnet launch.
+
+### USDC Integration
+
+| Task | Description | Provider |
+|------|-------------|----------|
+| **Contract Integration** | Integrate USDC token contract on Polygon | Circle (USDC issuer) |
+| **Allowance Handling** | Implement proper ERC-20 approve/transferFrom flow | N/A |
+| **Decimal Handling** | Handle USDC's 6 decimals correctly | N/A |
+| **Error Handling** | Handle failed transfers, insufficient allowance | N/A |
+
+### Fiat On-Ramp Integration
+
+| Provider | Integration Type | Notes |
+|----------|------------------|-------|
+| **MoonPay** | Widget/SDK | Popular, good UX, higher fees (4-5%) |
+| **Transak** | Widget/SDK | Lower fees (1-3%), more countries |
+| **Coinbase Commerce** | API | Crypto-native users, lower friction |
+
+**Steps for each provider**:
+1. Create merchant account
+2. Complete KYB (Know Your Business) verification
+3. Integrate SDK/widget
+4. Test with sandbox/testnet
+5. Go live with production credentials
+
+---
+
+## 11. Jury UI Accessibility Ideas
+
+### How CS:GO Overwatch Works (Reference)
+
+Based on research from [Steam Community guides](https://steamcommunity.com/sharedfiles/filedetails/?id=3232423246) and [CS:GO documentation](https://blog.counter-strike.net/index.php/overwatch/):
+
+- **UI Location**: A **shield icon** appears in the main menu near the demos/settings area
+- **Visibility**: Only shown when the player is eligible AND cases are available
+- **Access**: Click the shield icon to view instructions and download available demos
+- **Availability**: A green "Download demo" button appears when cases are ready for review
+- **Requirements**: 350+ hours played, trusted account status, appropriate rank
+
+### Proposed Options for Chess App
+
+#### Option A: Main Menu Badge (CS:GO Style) - RECOMMENDED
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│                         OPTION A: MAIN MENU BADGE                                   │
+├─────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                     │
+│  ┌─────────────────────────────────────────────────────────────────────────────┐   │
+│  │                           MAIN MENU                                         │   │
+│  │                                                                             │   │
+│  │   [Play]   [Watch]   [Profile]   [Settings]   [⚖️ 3]                       │   │
+│  │                                                  ↑                          │   │
+│  │                                           Gavel/shield icon                 │   │
+│  │                                           Badge shows pending cases         │   │
+│  │                                                                             │   │
+│  └─────────────────────────────────────────────────────────────────────────────┘   │
+│                                                                                     │
+│  PROS:                                                                             │
+│  ────                                                                              │
+│  • Matches proven CS:GO Overwatch pattern (players already understand it)          │
+│  • Prominent without being intrusive                                               │
+│  • Badge count creates gentle urgency                                              │
+│  • Icon only appears when eligible AND cases available (no clutter)               │
+│  • One-click access to review interface                                            │
+│                                                                                     │
+│  CONS:                                                                             │
+│  ────                                                                              │
+│  • Takes up main menu real estate                                                  │
+│  • New users may wonder what it means before they're eligible                     │
+│  • Requires UI updates when eligibility changes                                    │
+│                                                                                     │
+└─────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+#### Option B: Profile Section
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│                           OPTION B: PROFILE SECTION                                 │
+├─────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                     │
+│  ┌─────────────────────────────────────────────────────────────────────────────┐   │
+│  │                           PROFILE PAGE                                      │   │
+│  │                                                                             │   │
+│  │   [Overview]  [Games]  [Stats]  [Jury Duty]  [Settings]                    │   │
+│  │                                       ↑                                     │   │
+│  │                              Tab in profile nav                             │   │
+│  │                                                                             │   │
+│  │   Jury Duty Tab Contents:                                                   │   │
+│  │   ┌─────────────────────────────────────────────────────────────────────┐   │   │
+│  │   │  Status: Eligible ✓                                                 │   │   │
+│  │   │  Cases Available: 3                                                 │   │   │
+│  │   │  Investigator Score: 0.847                                          │   │   │
+│  │   │  Cases Reviewed: 47                                                 │   │   │
+│  │   │  Accurate Verdicts: 89%                                             │   │   │
+│  │   │                                                                     │   │   │
+│  │   │  [Review Available Cases]                                           │   │   │
+│  │   └─────────────────────────────────────────────────────────────────────┘   │   │
+│  │                                                                             │   │
+│  └─────────────────────────────────────────────────────────────────────────────┘   │
+│                                                                                     │
+│  PROS:                                                                             │
+│  ────                                                                              │
+│  • Clean main menu (no additional icons)                                           │
+│  • Detailed stats and eligibility info in one place                                │
+│  • Natural home for juror achievements and badges                                  │
+│  • Doesn't pressure users who aren't interested                                    │
+│                                                                                     │
+│  CONS:                                                                             │
+│  ────                                                                              │
+│  • Low discoverability (users must navigate to profile)                            │
+│  • No passive notification of available cases                                      │
+│  • May result in fewer case reviews (out of sight, out of mind)                   │
+│  • Jurors might forget to check                                                    │
+│                                                                                     │
+└─────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+#### Option C: Dedicated "Community" Section
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│                       OPTION C: COMMUNITY NAVIGATION                                │
+├─────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                     │
+│  ┌─────────────────────────────────────────────────────────────────────────────┐   │
+│  │                           MAIN NAVIGATION                                   │   │
+│  │                                                                             │   │
+│  │   [Play]   [Watch]   [Community]   [Profile]   [Settings]                  │   │
+│  │                           ↑                                                 │   │
+│  │                    New top-level item                                       │   │
+│  │                                                                             │   │
+│  │   Community Section Contents:                                               │   │
+│  │   ┌─────────────────────────────────────────────────────────────────────┐   │   │
+│  │   │  • Jury System (review flagged games)                               │   │   │
+│  │   │  • Leaderboards (top players by rating, earnings)                   │   │   │
+│  │   │  • Tournaments (upcoming events)                                    │   │   │
+│  │   │  • Hall of Fame (notable games, achievements)                       │   │   │
+│  │   └─────────────────────────────────────────────────────────────────────┘   │   │
+│  │                                                                             │   │
+│  └─────────────────────────────────────────────────────────────────────────────┘   │
+│                                                                                     │
+│  PROS:                                                                             │
+│  ────                                                                              │
+│  • Groups related community features together                                      │
+│  • More discoverable for new users exploring the app                               │
+│  • Scales well as we add more community features                                   │
+│  • Positions jury duty as community service, not a chore                          │
+│                                                                                     │
+│  CONS:                                                                             │
+│  ────                                                                              │
+│  • Adds complexity to main navigation                                              │
+│  • Jury system buried one level deep                                               │
+│  • No badge/notification for pending cases at glance                              │
+│  • May feel like "more to learn" for new users                                    │
+│                                                                                     │
+└─────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+#### Option D: Notification-Driven
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│                        OPTION D: NOTIFICATION-DRIVEN                                │
+├─────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                     │
+│  No persistent UI element. Cases delivered via notifications.                       │
+│                                                                                     │
+│  ┌─────────────────────────────────────────────────────────────────────────────┐   │
+│  │                                                                             │   │
+│  │   Push Notification:                                                        │   │
+│  │   ┌─────────────────────────────────────────────────────────────┐           │   │
+│  │   │  ⚖️ Chess Gamble                                            │           │   │
+│  │   │  A case is available for your review. Help keep             │           │   │
+│  │   │  the community fair!                                        │           │   │
+│  │   │                                                             │           │   │
+│  │   │  [Review Now]  [Dismiss]                                    │           │   │
+│  │   └─────────────────────────────────────────────────────────────┘           │   │
+│  │                                                                             │   │
+│  │   In-App Notification (when case assigned):                                 │   │
+│  │   ┌─────────────────────────────────────────────────────────────┐           │   │
+│  │   │  You've been assigned a jury case. Review within 48h.       │           │   │
+│  │   │  [Start Review] [View Later]                                │           │   │
+│  │   └─────────────────────────────────────────────────────────────┘           │   │
+│  │                                                                             │   │
+│  └─────────────────────────────────────────────────────────────────────────────┘   │
+│                                                                                     │
+│  PROS:                                                                             │
+│  ────                                                                              │
+│  • Zero UI clutter (clean main menu)                                               │
+│  • Direct call to action when case is assigned                                     │
+│  • Users can't miss it (push notification)                                         │
+│  • Works well with mobile companion app (future)                                   │
+│                                                                                     │
+│  CONS:                                                                             │
+│  ────                                                                              │
+│  • No way to proactively browse for cases                                          │
+│  • Relies on notification permissions (users may disable)                          │
+│  • No visibility into juror stats without separate UI                             │
+│  • Feels more like an obligation than a feature                                    │
+│  • Can't "check in" on pending cases                                              │
+│                                                                                     │
+└─────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Recommendation
+
+**Option A (Main Menu Badge)** is recommended as the primary approach because:
+
+1. **Proven Pattern**: CS:GO Overwatch uses this exact pattern, and it works well
+2. **Discoverability**: Users immediately see when cases are available
+3. **Low Friction**: One click to start reviewing
+4. **Respectful**: Icon only appears when relevant (eligible + cases available)
+5. **Sense of Duty**: Badge count creates gentle social pressure to participate
+
+**Hybrid Approach** (Optional Enhancement):
+
+Combine Option A + Option D for best results:
+- Main menu badge for at-a-glance visibility
+- Push notification when cases are assigned (for users who have the app closed)
+- Profile section for detailed stats (Option B content, but not the primary access point)
+
+---
+
+## 12. Implementation Status
+
+This table tracks the implementation status of all components from the pre-release checklist.
+
+### Performance Components
+
+| Component | Status | Notes | Location |
+|-----------|--------|-------|----------|
+| Stockfish thread throttling | Implemented | N-1 threads, max 4 | `apps/desktop/src-tauri/src/engine/config.rs` |
+| Stockfish hash capping | Implemented | 128-256MB based on threads | `apps/desktop/src-tauri/src/engine/config.rs` |
+| Lazy loading (on-demand spawn) | Implemented | Engine spawns only when analysis requested | `apps/desktop/src-tauri/src/engine/engine_lifecycle.rs` |
+| Auto-shutdown (60s idle) | Implemented | Engine terminates after 60s without requests | `apps/desktop/src-tauri/src/engine/engine_lifecycle.rs` |
+| Platform-specific detection | Implemented | Detects M1/M2/M3/M4, Intel, Windows, Linux | `apps/desktop/src-tauri/src/engine/config.rs` |
+| Environment scan caching | Not Started | TTL cache for process scanning | Planned |
+| Input recording bounds | Not Started | Limit stored mouse points per move | Planned |
+
+### Smart Contracts
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| ChessEscrow.sol | Not Started | Requires manual Solidity development |
+| GameRegistry.sol | Not Started | Requires manual Solidity development |
+| Gnosis Safe integration | Not Started | Requires wallet setup and configuration |
+| Polygon testnet deployment | Not Started | Blocked by contract development |
+| Security audit | Not Started | Blocked by contract completion |
+| Mainnet deployment | Not Started | Blocked by security audit |
+
+### Anti-Cheat Engine
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| Environment scanning | Not Started | Client-side process detection |
+| Input pattern recording | Not Started | Mouse path, timing, hesitations |
+| Statistical move analysis | Not Started | Server-side Stockfish comparison |
+| Timing analysis | Not Started | Move time vs position complexity |
+| Suspicion score aggregation | Not Started | Weighted scoring formula |
+| Threshold tuning | Not Started | Requires real game data |
+
+### Settlement System
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| Auto-settlement for clean games | Not Started | Requires escrow contract |
+| Hold mechanism for flagged games | Not Started | Requires escrow contract |
+| Player notification system | Not Started | WebSocket + email/push |
+| Settlement status tracking | Not Started | Database + UI |
+
+### Jury System
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| Database schema | Documented | SQL schema in Section 7 |
+| Juror eligibility checking | Not Started | ELO + games + account age |
+| Case assignment algorithm | Not Started | Random selection with diversity |
+| Anonymized case presentation UI | Not Started | Frontend component |
+| Verdict submission | Not Started | API + UI |
+| Weighted verdict aggregation | Not Started | Backend calculation |
+| Juror scoring system | Not Started | Accuracy tracking |
+| Test case insertion | Not Started | Calibration system |
+
+### External Integrations
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| USDC contract integration | Not Started | Polygon USDC token |
+| MoonPay/Transak on-ramp | Not Started | Requires merchant accounts |
+| Wallet connection (RainbowKit) | Partial | Basic setup exists |
+
+### Testing
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| Unit tests for anti-cheat | Not Started | |
+| Integration tests for settlement | Not Started | |
+| Load testing for jury system | Not Started | |
+| E2E: clean game flow | Not Started | |
+| E2E: flagged game flow | Not Started | |
+| E2E: timeout safety valve | Not Started | |
 
 ---
 

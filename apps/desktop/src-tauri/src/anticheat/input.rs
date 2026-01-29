@@ -37,6 +37,45 @@
 use serde::{Deserialize, Serialize};
 
 // =============================================================================
+// Constants — Memory Safety Bounds
+// =============================================================================
+
+/// Maximum number of input points to record per move.
+///
+/// ## Why This Limit?
+///
+/// Without a limit, a long move (user hovers for 30+ seconds) could accumulate
+/// thousands of points, consuming significant memory. This is especially
+/// problematic if:
+/// - User forgets about the game and leaves mouse on board
+/// - Automated testing sends rapid mouse events
+/// - Malicious client tries to exhaust server memory with huge payloads
+///
+/// ## Chosen Value: 500 points
+///
+/// Typical move recording:
+/// - Average move duration: 2-10 seconds
+/// - Mouse event rate: ~60 Hz (60 events/second)
+/// - Average points per move: 120-600
+///
+/// 500 points covers:
+/// - ~8 seconds at 60 Hz (plenty for normal moves)
+/// - Sufficient data for path analysis (linearity, corrections)
+/// - ~20 KB maximum payload (500 * ~40 bytes per point)
+///
+/// ## Behavior When Limit Reached
+///
+/// Once we hit 500 points, new points are silently dropped.
+/// The analysis algorithms still work because:
+/// - Path linearity uses start/end + sampled middle points
+/// - Micro-corrections are detected in any 10+ point segment
+/// - Hesitations are detected by timestamp gaps, not point count
+///
+/// For very long hovers, we effectively capture the first 8 seconds,
+/// which is where meaningful human input patterns occur.
+const MAX_INPUT_POINTS: usize = 500;
+
+// =============================================================================
 // Core Data Structures
 // =============================================================================
 
@@ -106,8 +145,24 @@ impl MoveSource {
 
     /// Record a point along the mouse path.
     /// Call this on each mouse move event while tracking.
+    ///
+    /// ## Memory Safety
+    ///
+    /// Points are only recorded up to MAX_INPUT_POINTS (500).
+    /// Beyond that, new points are silently dropped to prevent
+    /// unbounded memory growth from very long moves or rapid events.
+    ///
+    /// This limit doesn't affect analysis quality because:
+    /// - 500 points covers ~8 seconds of movement at 60 Hz
+    /// - Path analysis only needs representative samples
+    /// - Most meaningful patterns occur in the first few seconds
     pub fn record_point(&mut self, point: InputPoint) {
-        self.input_path.push(point);
+        // Bounds check: Prevent unbounded memory growth
+        if self.input_path.len() < MAX_INPUT_POINTS {
+            self.input_path.push(point);
+        }
+        // If we're at the limit, silently drop new points.
+        // The existing 500 points are sufficient for analysis.
     }
 
     /// Complete the move tracking (called when destination is selected).
@@ -405,8 +460,15 @@ impl MoveInputRecorder {
 
     /// Record a point along the input path.
     /// Call this on each mouse move event while recording.
+    ///
+    /// ## Memory Safety
+    ///
+    /// Delegates to MoveSource::record_point which enforces the
+    /// MAX_INPUT_POINTS limit (500 points). This prevents memory
+    /// exhaustion from very long moves or rapid mouse events.
     pub fn record_point(&mut self, x: f32, y: f32) {
         if self.is_recording {
+            // MoveSource::record_point handles bounds checking internally
             self.current.record_point(InputPoint::new(x, y));
         }
     }
@@ -635,5 +697,39 @@ mod tests {
 
         let flags = analyze_input_patterns(&source);
         assert!(flags.contains(&"empty_input_path"));
+    }
+
+    #[test]
+    fn test_input_points_bounded() {
+        let mut source = MoveSource::new();
+
+        // Try to add more than MAX_INPUT_POINTS
+        for i in 0..1000 {
+            source.record_point(InputPoint::with_timestamp(
+                i as f32 * 0.001,
+                i as f32 * 0.001,
+                i as u64,
+            ));
+        }
+
+        // Should be capped at MAX_INPUT_POINTS
+        assert_eq!(source.input_path.len(), MAX_INPUT_POINTS);
+        assert_eq!(source.input_path.len(), 500);
+    }
+
+    #[test]
+    fn test_recorder_respects_bounds() {
+        let mut recorder = MoveInputRecorder::new();
+        recorder.start_recording(SelectionMethod::MouseClick { x: 0.0, y: 0.0 });
+
+        // Record more than MAX_INPUT_POINTS
+        for i in 0..1000 {
+            recorder.record_point(i as f32 * 0.001, i as f32 * 0.001);
+        }
+
+        let source = recorder.finish_recording(DestinationMethod::MouseClick { x: 1.0, y: 1.0 });
+
+        // Should be capped at MAX_INPUT_POINTS
+        assert_eq!(source.input_path.len(), MAX_INPUT_POINTS);
     }
 }

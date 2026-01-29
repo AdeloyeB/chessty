@@ -6,6 +6,8 @@ import { registerAchievementHandlers } from './achievements';
 import { registerOddsHandlers } from './odds';
 import { registerPredictionHandlers } from './predictions';
 import { registerAnticheatHandlers } from './anticheat';
+import { registerSettlementHandlers } from './settlement';
+import { registerJuryHandlers } from './jury';
 
 /**
  * Register all event handlers with the game event emitter.
@@ -17,7 +19,9 @@ import { registerAnticheatHandlers } from './anticheat';
  * 3. Odds (50) - Update betting odds
  * 4. Achievements (50) - Check for achievement unlocks
  * 5. Predictions (50) - Handle spectator predictions
- * 6. Anti-cheat (90) - Behavioral analysis (non-blocking)
+ * 6. Settlement (85) - Track settlements and create jury cases
+ * 7. Anti-cheat (90) - Behavioral analysis (non-blocking)
+ * 8. Jury (95) - Create jury cases for high-suspicion games
  */
 export function registerAllHandlers(events: GameEventEmitter, broadcast: BroadcastService) {
   // Core handlers - blocking, must complete
@@ -29,6 +33,12 @@ export function registerAllHandlers(events: GameEventEmitter, broadcast: Broadca
   registerAchievementHandlers(events);
   registerPredictionHandlers(events);
 
-  // Anti-cheat - non-blocking, runs last
+  // Settlement - tracks game settlements and creates jury cases for suspicious games
+  registerSettlementHandlers(events);
+
+  // Anti-cheat - non-blocking, runs after settlement
   registerAnticheatHandlers(events);
+
+  // Jury - creates community review cases for high-suspicion games
+  registerJuryHandlers(events);
 }

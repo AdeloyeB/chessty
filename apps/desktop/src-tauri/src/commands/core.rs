@@ -31,10 +31,12 @@ use tauri::{AppHandle, Emitter, State};
 use tauri_plugin_store::StoreExt;
 
 // Import our engine module types
-// Note: We import spawn_engine instead of StockfishEngine because commands.rs
-// now interacts with EngineHandle (via spawn_engine) rather than the engine directly.
-// This is the channel-based architecture that avoids long mutex locks.
-use crate::engine::{spawn_engine, EngineEvaluation, EngineInfo, EngineState};
+// Note: We import from engine_lifecycle now because we use LazyEngineState which
+// wraps the engine with lazy loading and automatic idle shutdown. This is the
+// channel-based architecture that avoids long mutex locks and spawns the engine
+// on-demand rather than at app startup.
+use crate::engine::{EngineEvaluation, EngineInfo};
+use crate::engine_lifecycle::LazyEngineState;
 
 /// The filename for our persistent key-value store on disk.
 /// This matches the Electron store name "chess-gamble-config" so migrating
@@ -197,14 +199,17 @@ pub async fn auth_open_external(
 
 /// Initialize the Stockfish engine.
 ///
-/// This spawns the Stockfish process and performs the UCI handshake.
-/// Should be called once on app startup. If already initialized, returns
-/// the existing engine info without restarting.
+/// With the LazyEngine architecture, this command is now optional — the engine
+/// is automatically spawned on first use (when analyze_position is called).
+/// However, calling init_engine explicitly can be useful for:
 ///
-/// The engine is spawned with a channel-based architecture:
-/// - spawn_engine() creates the engine and a background command processor
-/// - It returns an EngineHandle that can be cloned and used by any command
-/// - This avoids holding the mutex during long operations like analysis
+/// 1. **Pre-warming**: Spawn the engine before the user needs it
+/// 2. **Status check**: Verify the engine binary exists and works
+/// 3. **UI feedback**: Show "Engine ready" in the frontend
+///
+/// The lazy loading happens via get_or_spawn():
+/// - If engine is running: Returns immediately with cached info (~1μs)
+/// - If engine not running: Spawns it, does UCI handshake, returns info (~1-2s)
 ///
 /// Frontend usage:
 ///   const info = await invoke("init_engine");
@@ -212,29 +217,17 @@ pub async fn auth_open_external(
 #[tauri::command]
 pub async fn init_engine(
     app: AppHandle,
-    state: State<'_, EngineState>,
+    state: State<'_, LazyEngineState>,
 ) -> Result<EngineInfo, String> {
-    // Lock the mutex to access the handle
-    // `.lock().await` waits if another task is using the state
-    let mut guard = state.handle.lock().await;
+    // get_or_spawn() handles lazy loading:
+    // - If engine already running, returns immediately with cached handle
+    // - If not running, spawns it (takes 1-2 seconds for UCI handshake)
+    // - Updates the "last use" timestamp to prevent idle shutdown
+    let handle = state.get_or_spawn(&app).await?;
 
-    // Check if engine is already initialized
-    if let Some(handle) = guard.as_ref() {
-        // Already initialized — just return the cached info
-        // No channel communication needed because info is immutable
-        return Ok(handle.info().clone());
-    }
-
-    // Not initialized — spawn a new engine with channel-based architecture
-    // This creates the StockfishEngine, sets up command channels, and spawns
-    // a background task to process commands
-    let handle = spawn_engine(&app).await?;
-    let info = handle.info().clone();
-
-    // Store the handle in the state
-    *guard = Some(handle);
-
-    Ok(info)
+    // info() returns cached engine info (name, author, threads, hash)
+    // No channel round-trip needed — info is immutable after spawn
+    Ok(handle.info().clone())
 }
 
 /// Analyze a single chess position.
@@ -246,15 +239,15 @@ pub async fn init_engine(
 ///
 /// Returns the best move and evaluation.
 ///
-/// Channel-Based Pattern:
-/// ----------------------
-/// 1. Briefly lock the mutex to clone the EngineHandle
-/// 2. Release the lock immediately (before analysis starts)
-/// 3. Call handle.analyze() which sends a command through the channel
-/// 4. Wait for the result WITHOUT holding any mutex
+/// Lazy Loading Pattern:
+/// ---------------------
+/// 1. get_or_spawn() either returns existing engine or spawns new one
+/// 2. Call handle.analyze() which sends a command through the channel
+/// 3. Wait for the result WITHOUT holding any mutex
 ///
-/// This means other commands (like stop_analysis) can be processed while
-/// we're waiting for analysis to complete.
+/// If this is the first analysis request, Stockfish is spawned on-demand.
+/// This takes ~1-2 seconds for the UCI handshake, then analysis proceeds.
+/// Subsequent calls are instant because the engine is already running.
 ///
 /// Frontend usage:
 ///   const result = await invoke("analyze_position", {
@@ -264,27 +257,22 @@ pub async fn init_engine(
 ///   console.log(`Best move: ${result.best_move}, Score: ${result.score_cp}`);
 #[tauri::command]
 pub async fn analyze_position(
+    app: AppHandle,
     fen: String,
     depth: u8,
-    state: State<'_, EngineState>,
+    state: State<'_, LazyEngineState>,
 ) -> Result<EngineEvaluation, String> {
     // Validate depth — reasonable range is 1-30
     let clamped_depth = depth.clamp(1, 30);
 
-    // Quick lock just to clone the handle — this is the key improvement!
-    // Previously, we held the lock for the entire analysis duration (2-5 seconds).
-    // Now we hold it for microseconds, just to clone the handle.
-    let handle = {
-        let guard = state.handle.lock().await;
-        guard
-            .as_ref()
-            .ok_or("Engine not initialized. Call init_engine first.")?
-            .clone()
-    };
-    // Lock released here! The mutex is no longer held.
+    // get_or_spawn() handles lazy loading:
+    // - If engine running: Returns immediately (~1μs)
+    // - If engine not running: Spawns it (~1-2s for UCI handshake)
+    // Also updates "last use" timestamp to prevent idle shutdown
+    let handle = state.get_or_spawn(&app).await?;
 
-    // Analysis runs without holding any lock.
-    // The handle sends a command through the channel and waits for the response.
+    // Analysis runs via channel — no locks held during the actual computation.
+    // The handle sends a command to the background engine task and waits.
     // Other commands (stop, new analysis) can be queued while we wait.
     handle.analyze(fen, clamped_depth).await
 }
@@ -300,12 +288,12 @@ pub async fn analyze_position(
 ///
 /// Emits "analysis:progress" events with { current, total } payload.
 ///
-/// Channel-Based Pattern:
-/// ----------------------
-/// We clone the handle once at the start and use it for all positions.
+/// Lazy Loading Pattern:
+/// ---------------------
+/// get_or_spawn() is called once at the start. If the engine isn't running,
+/// it's spawned on-demand. Then we use the handle for all positions.
 /// Each analyze() call sends a command through the channel and waits for
-/// the result without holding any mutex. This allows stop commands to be
-/// processed between positions.
+/// the result without holding any mutex.
 ///
 /// Frontend usage:
 ///   // Listen for progress events
@@ -318,9 +306,10 @@ pub async fn analyze_position(
 ///   const results = await invoke("analyze_game", { fens: gameFens, depth: 15 });
 #[tauri::command]
 pub async fn analyze_game(
+    app: AppHandle,
     fens: Vec<String>,
     depth: u8,
-    state: State<'_, EngineState>,
+    state: State<'_, LazyEngineState>,
     window: tauri::Window,
 ) -> Result<Vec<EngineEvaluation>, String> {
     let clamped_depth = depth.clamp(1, 30);
@@ -330,16 +319,9 @@ pub async fn analyze_game(
         return Ok(vec![]);
     }
 
-    // Clone the handle once — we'll use it for all positions
-    // This brief lock is the only time we touch the mutex
-    let handle = {
-        let guard = state.handle.lock().await;
-        guard
-            .as_ref()
-            .ok_or("Engine not initialized. Call init_engine first.")?
-            .clone()
-    };
-    // Lock released here!
+    // get_or_spawn() handles lazy loading — spawns engine if not running
+    // This is the only potentially slow call (1-2s on first use)
+    let handle = state.get_or_spawn(&app).await?;
 
     let mut results = Vec::with_capacity(total);
 
@@ -382,19 +364,20 @@ pub async fn analyze_game(
 /// because we're using the channel-based architecture. The stop command
 /// is queued and processed by the background task.
 ///
+/// Note: If the engine isn't running (never spawned or idle-shutdown),
+/// this is a no-op. We don't spawn the engine just to stop it.
+///
 /// Frontend usage:
 ///   await invoke("stop_analysis");
 #[tauri::command]
-pub async fn stop_analysis(state: State<'_, EngineState>) -> Result<(), String> {
-    // Clone the handle (quick operation)
-    let handle = {
-        let guard = state.handle.lock().await;
-        guard.as_ref().cloned()
-    };
-    // Lock released here!
-
-    // Send stop command through the channel
-    if let Some(handle) = handle {
+pub async fn stop_analysis(
+    app: AppHandle,
+    state: State<'_, LazyEngineState>,
+) -> Result<(), String> {
+    // Only send stop if engine is actually running
+    // We don't want to spawn the engine just to stop it!
+    if state.is_spawned().await {
+        let handle = state.get_or_spawn(&app).await?;
         handle.stop().await?;
     }
     Ok(())
@@ -403,21 +386,31 @@ pub async fn stop_analysis(state: State<'_, EngineState>) -> Result<(), String> 
 /// Get information about the engine.
 ///
 /// Returns the engine name, author, and ready status.
-/// Fails if the engine hasn't been initialized.
 ///
-/// This is fast because the info is cached on the EngineHandle.
-/// No channel communication needed.
+/// With lazy loading, this command has two behaviors:
+/// - If engine is running: Returns cached info immediately
+/// - If engine not running: Returns an error (doesn't spawn just for info)
+///
+/// Use init_engine() to explicitly spawn the engine if you need info
+/// before the first analysis.
 ///
 /// Frontend usage:
 ///   const info = await invoke("get_engine_info");
 ///   console.log(`Engine: ${info.name}`);
 #[tauri::command]
-pub async fn get_engine_info(state: State<'_, EngineState>) -> Result<EngineInfo, String> {
-    let guard = state.handle.lock().await;
-    let handle = guard
-        .as_ref()
-        .ok_or("Engine not initialized. Call init_engine first.")?;
-    // info() returns a reference to cached data — no channel round-trip needed
+pub async fn get_engine_info(
+    app: AppHandle,
+    state: State<'_, LazyEngineState>,
+) -> Result<EngineInfo, String> {
+    // Check if engine is already running
+    if !state.is_spawned().await {
+        return Err(
+            "Engine not running. Call init_engine or analyze_position to start it.".to_string(),
+        );
+    }
+
+    // Engine is running — get the handle and return cached info
+    let handle = state.get_or_spawn(&app).await?;
     Ok(handle.info().clone())
 }
 
@@ -443,7 +436,6 @@ pub async fn get_engine_info(state: State<'_, EngineState>) -> Result<EngineInfo
 // - Database migrations
 // =============================================================================
 
-use std::sync::Arc;
 use tokio::time::Duration;
 
 /// Analyze multiple positions (entire game) with cancellation support.
@@ -461,6 +453,11 @@ use tokio::time::Duration;
 /// - "analysis:progress" { analysisId, current, total }
 /// - "analysis:result" { analysisId, results, cancelled } on completion
 /// - "analysis:result" { analysisId, error, cancelled, partial_results } on error/cancel
+///
+/// Lazy Loading:
+/// -------------
+/// If the engine isn't running, it's spawned on-demand before analysis starts.
+/// This may add 1-2 seconds to the first analysis request.
 ///
 /// Frontend usage:
 ///   const analysisId = await invoke("analyze_game_async", { fens, depth: 15 });
@@ -488,7 +485,7 @@ pub async fn analyze_game_async(
     app: AppHandle,
     fens: Vec<String>,
     depth: u8,
-    state: State<'_, EngineState>,
+    state: State<'_, LazyEngineState>,
 ) -> Result<String, String> {
     let clamped_depth = depth.clamp(1, 30);
     let total = fens.len();
@@ -500,26 +497,16 @@ pub async fn analyze_game_async(
     // Register this analysis with the tracker to get a unique ID and cancel token
     // The cancel token is shared between the tracker and our analysis task —
     // when cancel_analysis is called, the tracker signals the token, and we stop.
-    let (analysis_id, cancel_token) = {
-        let mut tracker = state.tracker.lock().await;
-        tracker.register()
-    };
+    let (analysis_id, cancel_token) = state
+        .with_tracker(|tracker| tracker.register())
+        .await;
 
-    // Clone the handle once — this is the key improvement!
-    // Previously we cloned state.engine (Arc<Mutex<Option<StockfishEngine>>>)
-    // and locked it for each position. Now we clone the lightweight handle
-    // and use it without any locking during analysis.
-    let handle = {
-        let guard = state.handle.lock().await;
-        guard
-            .as_ref()
-            .ok_or("Engine not initialized. Call init_engine first.")?
-            .clone()
-    };
-    // Lock released here! No more locking needed for the entire analysis.
+    // get_or_spawn() handles lazy loading — spawns engine if not running
+    let handle = state.get_or_spawn(&app).await?;
 
     let id_clone = analysis_id.clone();
-    let tracker_arc = Arc::clone(&state.tracker);
+    // Clone the Arc<Mutex<AnalysisTracker>> so it can be moved into the spawned task
+    let tracker = state.tracker_arc();
 
     // Spawn the analysis as a background task
     // tokio::spawn creates a new async task that runs concurrently
@@ -545,8 +532,8 @@ pub async fn analyze_game_async(
                 );
 
                 // Cleanup: remove from tracker
-                let mut tracker = tracker_arc.lock().await;
-                tracker.remove(&id_clone);
+                let mut tracker_guard = tracker.lock().await;
+                tracker_guard.remove(&id_clone);
                 return;
             }
 
@@ -579,8 +566,8 @@ pub async fn analyze_game_async(
                     );
 
                     // Cleanup
-                    let mut tracker = tracker_arc.lock().await;
-                    tracker.remove(&id_clone);
+                    let mut tracker_guard = tracker.lock().await;
+                    tracker_guard.remove(&id_clone);
                     return;
                 }
             }
@@ -597,8 +584,8 @@ pub async fn analyze_game_async(
         );
 
         // Cleanup: remove from tracker
-        let mut tracker = tracker_arc.lock().await;
-        tracker.remove(&id_clone);
+        let mut tracker_guard = tracker.lock().await;
+        tracker_guard.remove(&id_clone);
     });
 
     // Return immediately — analysis continues in background
@@ -618,10 +605,11 @@ pub async fn analyze_game_async(
 #[tauri::command]
 pub async fn cancel_analysis(
     analysis_id: String,
-    state: State<'_, EngineState>,
+    state: State<'_, LazyEngineState>,
 ) -> Result<bool, String> {
-    let mut tracker = state.tracker.lock().await;
-    Ok(tracker.cancel(&analysis_id))
+    Ok(state
+        .with_tracker(|tracker| tracker.cancel(&analysis_id))
+        .await)
 }
 
 /// Analyze a single position with timeout and cancellation support.
@@ -640,11 +628,11 @@ pub async fn cancel_analysis(
 /// - "analysis:result" { analysisId, result, cancelled: false } on success
 /// - "analysis:result" { analysisId, error, cancelled: true/false } on error/timeout/cancel
 ///
-/// Channel-Based Pattern:
-/// ----------------------
-/// We clone the handle before spawning the background task. The handle's
-/// analyze() method sends commands through a channel, so no mutex locking
-/// is needed during the actual analysis.
+/// Lazy Loading:
+/// -------------
+/// If the engine isn't running, it's spawned on-demand before analysis starts.
+/// The handle's analyze() method sends commands through a channel, so no mutex
+/// locking is needed during the actual analysis.
 ///
 /// Frontend usage:
 ///   const analysisId = await invoke("analyze_position_async", {
@@ -665,29 +653,22 @@ pub async fn analyze_position_async(
     fen: String,
     depth: u8,
     timeout_secs: Option<u64>,
-    state: State<'_, EngineState>,
+    state: State<'_, LazyEngineState>,
 ) -> Result<String, String> {
     let clamped_depth = depth.clamp(1, 30);
     let timeout_duration = Duration::from_secs(timeout_secs.unwrap_or(60));
 
     // Register this analysis
-    let (analysis_id, cancel_token) = {
-        let mut tracker = state.tracker.lock().await;
-        tracker.register()
-    };
+    let (analysis_id, cancel_token) = state
+        .with_tracker(|tracker| tracker.register())
+        .await;
 
-    // Clone the handle — no locking needed during analysis!
-    let handle = {
-        let guard = state.handle.lock().await;
-        guard
-            .as_ref()
-            .ok_or("Engine not initialized. Call init_engine first.")?
-            .clone()
-    };
-    // Lock released here!
+    // get_or_spawn() handles lazy loading — spawns engine if not running
+    let handle = state.get_or_spawn(&app).await?;
 
     let id_clone = analysis_id.clone();
-    let tracker_arc = Arc::clone(&state.tracker);
+    // Clone the Arc<Mutex<AnalysisTracker>> so it can be moved into the spawned task
+    let tracker = state.tracker_arc();
 
     tokio::spawn(async move {
         // Use tokio::select! to race between:
@@ -743,8 +724,8 @@ pub async fn analyze_position_async(
         let _ = app.emit("analysis:result", result);
 
         // Cleanup
-        let mut tracker = tracker_arc.lock().await;
-        tracker.remove(&id_clone);
+        let mut tracker_guard = tracker.lock().await;
+        tracker_guard.remove(&id_clone);
     });
 
     Ok(analysis_id)

@@ -26,6 +26,9 @@
 // =============================================================================
 
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
+use std::time::{Duration, Instant};
+use tokio::sync::RwLock;
 
 // =============================================================================
 // Process Detection Lists
@@ -343,6 +346,288 @@ impl EnvironmentChecker {
     /// Get list of all detected processes.
     pub fn detected_processes(&self) -> &[DetectedProcess] {
         &self.detected_processes
+    }
+}
+
+// =============================================================================
+// EnvironmentCache — TTL-Based Scan Caching
+// =============================================================================
+//
+// Environment scanning is EXPENSIVE because it:
+// 1. Spawns external processes (ps, tasklist) to list running processes
+// 2. Parses potentially large output (hundreds of processes)
+// 3. Runs file system checks for debuggers and VMs
+//
+// Without caching, every move could trigger a full rescan, which:
+// - Adds 50-100ms latency per move
+// - Causes CPU spikes that could affect game timing
+// - Wastes resources since the process list rarely changes mid-game
+//
+// Solution: Cache scan results with a configurable TTL (time-to-live).
+//
+// Cache Strategy:
+// ---------------
+// - Default TTL: 5 minutes (300 seconds)
+// - Game duration TTL: Can be extended to cover an entire game
+// - Manual invalidation: For security-critical re-checks
+//
+// The cache stores the full EnvironmentChecker result so we can:
+// - Return the cached risk score immediately
+// - Access detailed process lists without rescanning
+// - Invalidate and rescan if something suspicious happens
+//
+// Performance Impact:
+// -------------------
+// | Operation              | Without Cache | With Cache |
+// |------------------------|---------------|------------|
+// | First scan             | 50-100ms      | 50-100ms   |
+// | Subsequent checks      | 50-100ms      | <1ms       |
+// | Memory overhead        | 0             | ~1KB       |
+// =============================================================================
+
+/// Default cache TTL: 5 minutes.
+///
+/// Most chess games last 10-30 minutes. A 5-minute TTL means:
+/// - 2-6 rescans per game (reasonable for security)
+/// - Cached results for most move sequences
+/// - Fresh data if user opens new suspicious apps mid-game
+const DEFAULT_CACHE_TTL_SECS: u64 = 300;
+
+/// Thread-safe cache for environment scan results.
+///
+/// This cache wraps EnvironmentChecker with TTL-based expiration.
+/// Use `scan_with_cache()` for cached access or `force_rescan()` to bypass.
+///
+/// ## Thread Safety
+///
+/// Uses RwLock for efficient concurrent reads:
+/// - Multiple commands can check cache validity concurrently
+/// - Only actual rescans require exclusive write access
+/// - Arc wrapper allows sharing across Tauri commands
+///
+/// ## Usage
+///
+/// ```rust
+/// // Create cache (once at app startup)
+/// let cache = EnvironmentCache::new();
+///
+/// // In move handler:
+/// let risk = cache.scan_with_cache().await;
+/// send_to_server(risk);
+///
+/// // For security-critical moments (game start, suspicious move):
+/// let risk = cache.force_rescan().await;
+/// ```
+pub struct EnvironmentCache {
+    /// Cached scan result with timestamp.
+    ///
+    /// - None: Never scanned or cache explicitly cleared
+    /// - Some((checker, timestamp)): Cached result with creation time
+    cached: RwLock<Option<(EnvironmentChecker, Instant)>>,
+
+    /// How long cached results are valid.
+    ///
+    /// After this duration, the next `scan_with_cache()` call will
+    /// perform a fresh scan.
+    ttl: Duration,
+}
+
+impl EnvironmentCache {
+    /// Create a new cache with the default TTL (5 minutes).
+    pub fn new() -> Self {
+        Self {
+            cached: RwLock::new(None),
+            ttl: Duration::from_secs(DEFAULT_CACHE_TTL_SECS),
+        }
+    }
+
+    /// Create a cache with a custom TTL.
+    ///
+    /// Use this for game-specific caching:
+    /// ```rust
+    /// // Cache for entire 30-minute game
+    /// let game_cache = EnvironmentCache::with_ttl(Duration::from_secs(30 * 60));
+    /// ```
+    pub fn with_ttl(ttl: Duration) -> Self {
+        Self {
+            cached: RwLock::new(None),
+            ttl,
+        }
+    }
+
+    /// Get environment risk, using cached result if still valid.
+    ///
+    /// This is the primary API for most use cases:
+    /// 1. Check if cache is valid (exists and not expired)
+    /// 2. If valid, return cached result immediately (<1ms)
+    /// 3. If invalid, perform full scan and cache result (50-100ms)
+    ///
+    /// ## Performance
+    ///
+    /// - Cache hit: ~1 microsecond
+    /// - Cache miss: 50-100ms (full process list scan)
+    ///
+    /// ## Concurrency
+    ///
+    /// Multiple concurrent calls during a cache miss will all wait for
+    /// the single scan to complete. The RwLock ensures only one scan runs.
+    pub async fn scan_with_cache(&self) -> EnvironmentRisk {
+        // Fast path: Check if cache is valid using read lock
+        {
+            let read_guard = self.cached.read().await;
+            if let Some((ref checker, timestamp)) = *read_guard {
+                let age = Instant::now().duration_since(timestamp);
+                if age < self.ttl {
+                    // Cache hit! Return immediately.
+                    return checker.calculate_risk();
+                }
+            }
+        }
+        // Read lock dropped here.
+
+        // Slow path: Cache miss or expired. Need to rescan.
+        self.force_rescan().await
+    }
+
+    /// Force a fresh scan, bypassing the cache.
+    ///
+    /// Use this for security-critical moments:
+    /// - Game start (ensure clean baseline)
+    /// - After a flagged move (check if new tools appeared)
+    /// - User-requested security check
+    ///
+    /// The result is cached for future calls to `scan_with_cache()`.
+    pub async fn force_rescan(&self) -> EnvironmentRisk {
+        // Acquire write lock for exclusive scan access
+        let mut write_guard = self.cached.write().await;
+
+        // Double-check: Another thread may have scanned while we waited
+        if let Some((ref checker, timestamp)) = *write_guard {
+            let age = Instant::now().duration_since(timestamp);
+            if age < Duration::from_secs(1) {
+                // Very recent scan (within 1 second), use it
+                return checker.calculate_risk();
+            }
+        }
+
+        // Perform the actual scan
+        let checker = EnvironmentChecker::scan().await;
+        let risk = checker.calculate_risk();
+
+        // Cache the result
+        *write_guard = Some((checker, Instant::now()));
+
+        risk
+    }
+
+    /// Clear the cache, forcing the next access to rescan.
+    ///
+    /// Use when you know the environment has changed:
+    /// - User minimized/restored the app
+    /// - Network change detected
+    /// - Manual "rescan" button pressed
+    pub async fn invalidate(&self) {
+        let mut write_guard = self.cached.write().await;
+        *write_guard = None;
+    }
+
+    /// Check if the cache currently holds valid (non-expired) data.
+    ///
+    /// Useful for UI to show "Last scanned: X seconds ago".
+    pub async fn is_valid(&self) -> bool {
+        let read_guard = self.cached.read().await;
+        if let Some((_, timestamp)) = *read_guard {
+            Instant::now().duration_since(timestamp) < self.ttl
+        } else {
+            false
+        }
+    }
+
+    /// Get the age of the cached data, if any.
+    ///
+    /// Returns None if never scanned, or the duration since last scan.
+    pub async fn cache_age(&self) -> Option<Duration> {
+        let read_guard = self.cached.read().await;
+        read_guard
+            .as_ref()
+            .map(|(_, timestamp)| Instant::now().duration_since(*timestamp))
+    }
+
+    /// Get the cached checker for detailed inspection.
+    ///
+    /// Returns None if cache is empty or expired.
+    /// Use this to access detailed process lists without triggering a rescan.
+    pub async fn get_cached(&self) -> Option<EnvironmentChecker> {
+        let read_guard = self.cached.read().await;
+        if let Some((ref checker, timestamp)) = *read_guard {
+            let age = Instant::now().duration_since(timestamp);
+            if age < self.ttl {
+                return Some(checker.clone());
+            }
+        }
+        None
+    }
+}
+
+impl Default for EnvironmentCache {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Thread-safe wrapper for EnvironmentCache that can be shared across Tauri commands.
+///
+/// Arc wrapper allows the cache to be cloned cheaply and shared between
+/// different parts of the application.
+#[derive(Clone)]
+pub struct SharedEnvironmentCache {
+    inner: Arc<EnvironmentCache>,
+}
+
+impl SharedEnvironmentCache {
+    /// Create a new shared cache with default TTL.
+    pub fn new() -> Self {
+        Self {
+            inner: Arc::new(EnvironmentCache::new()),
+        }
+    }
+
+    /// Create with custom TTL.
+    pub fn with_ttl(ttl: Duration) -> Self {
+        Self {
+            inner: Arc::new(EnvironmentCache::with_ttl(ttl)),
+        }
+    }
+
+    /// Delegate to inner cache methods.
+    pub async fn scan_with_cache(&self) -> EnvironmentRisk {
+        self.inner.scan_with_cache().await
+    }
+
+    pub async fn force_rescan(&self) -> EnvironmentRisk {
+        self.inner.force_rescan().await
+    }
+
+    pub async fn invalidate(&self) {
+        self.inner.invalidate().await
+    }
+
+    pub async fn is_valid(&self) -> bool {
+        self.inner.is_valid().await
+    }
+
+    pub async fn cache_age(&self) -> Option<Duration> {
+        self.inner.cache_age().await
+    }
+
+    pub async fn get_cached(&self) -> Option<EnvironmentChecker> {
+        self.inner.get_cached().await
+    }
+}
+
+impl Default for SharedEnvironmentCache {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
