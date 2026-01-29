@@ -79,6 +79,26 @@ const SUSPICION_THRESHOLDS = {
 const TIMEOUT_HOURS = 48;
 
 // ---------------------------------------------------------------------------
+// Helper Functions (Score Normalization)
+// ---------------------------------------------------------------------------
+
+/**
+ * Normalize suspicion score for database storage.
+ * Input: 0-100 scale (from anti-cheat system)
+ * Output: "0.XXXX" string (0-1 scale for DB)
+ *
+ * WHY: The anti-cheat system uses 0-100 scale (e.g., 95 = 95% suspicious)
+ * but the database stores scores as 0-1 scale (0.95) for consistency with
+ * probability conventions used elsewhere in the codebase.
+ *
+ * @param score - Suspicion score on 0-100 scale
+ * @returns String representation on 0-1 scale with 4 decimal places
+ */
+function normalizeScore(score: number): string {
+  return (score / 100).toFixed(4);
+}
+
+// ---------------------------------------------------------------------------
 // Core Settlement Functions
 // ---------------------------------------------------------------------------
 
@@ -349,11 +369,8 @@ export async function holdForReview(
     .values({
       gameId: settlement.gameId,
       suspectPlayerId: flaggedPlayerId,
-      // SCALE CONVERSION: Anti-cheat system uses 0-100 scale (e.g., 95 means 95% suspicious)
-      // but juryCases table stores as 0-1 scale (e.g., 0.95) for consistency with
-      // probability/percentage conventions elsewhere in the codebase.
-      // Division by 100 converts: 95 -> 0.95, 98 -> 0.98, etc.
-      suspicionScore: (suspicionScore / 100).toFixed(4),
+      // Use normalizeScore() for consistent 0-100 to 0-1 scale conversion
+      suspicionScore: normalizeScore(suspicionScore),
       priority,
       deadline,
       status: 'pending_assignment',
@@ -434,11 +451,20 @@ export async function resolveDispute(
 
     const settlement = mapSettlementRecord(lockedSettlement);
 
-    if (settlement.status !== 'disputed') {
-      throw new Error('Settlement cannot be resolved');
+    // Check for 'resolving' status - another process already started resolving
+    // This is a race condition guard: if timeout and verdict race, one will win
+    if (settlement.status === 'resolving') {
+      console.log(`[Settlement] Verdict skipped for ${settlementId} - already resolving`);
+      return;
     }
 
-    // Mark as 'resolving' to prevent concurrent processing attempts
+    // Only proceed if status is 'disputed' (normal case)
+    if (settlement.status !== 'disputed') {
+      console.log(`[Settlement] Verdict skipped for ${settlementId} - status is ${settlement.status}`);
+      return;
+    }
+
+    // Mark as 'resolving' BEFORE doing wallet operations to prevent race
     // This is an intermediate status that blocks other resolution attempts
     await tx
       .update(settlements)

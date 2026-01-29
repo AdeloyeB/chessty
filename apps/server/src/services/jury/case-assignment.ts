@@ -33,7 +33,7 @@ import {
   type JuryCase,
   type JuryCaseAssignment,
 } from '../../drizzle';
-import { canReceiveAssignments } from './eligibility';
+import { canReceiveAssignments, MAX_PENDING_ASSIGNMENTS } from './eligibility';
 import { anonymizePlayerId } from '../../utils/anonymize';
 
 // ---------------------------------------------------------------------------
@@ -62,9 +62,6 @@ export const ELO_RANGES = [
   { min: 1800, max: 1999, target: 1 },
   { min: 2000, max: 9999, target: 1 },
 ] as const;
-
-/** Maximum pending assignments per juror (to prevent overload) */
-export const MAX_PENDING_ASSIGNMENTS = 3;
 
 // ---------------------------------------------------------------------------
 // Types
@@ -339,20 +336,27 @@ export async function getJurorCases(
     orderBy: [desc(juryCaseAssignments.assignedAt)],
   });
 
-  // Fetch case details for each assignment
-  const results: Array<JuryCaseAssignment & { case: JuryCase }> = [];
-
-  for (const assignment of assignments) {
-    const caseData = await db.query.juryCases.findFirst({
-      where: eq(juryCases.id, assignment.caseId),
-    });
-
-    if (caseData) {
-      results.push({ ...assignment, case: caseData });
-    }
+  // Handle empty assignments case
+  if (assignments.length === 0) {
+    return [];
   }
 
-  return results;
+  // BATCH QUERY: Fetch all cases in one query instead of N queries (fixes N+1 problem)
+  const caseIds = assignments.map(a => a.caseId);
+  const cases = await db.query.juryCases.findMany({
+    where: inArray(juryCases.id, caseIds),
+  });
+
+  // Create lookup map for O(1) access
+  const caseMap = new Map(cases.map(c => [c.id, c]));
+
+  // Join in memory
+  return assignments
+    .map(assignment => {
+      const caseData = caseMap.get(assignment.caseId);
+      return caseData ? { ...assignment, case: caseData } : null;
+    })
+    .filter((item): item is NonNullable<typeof item> => item !== null);
 }
 
 /**

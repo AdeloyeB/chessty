@@ -10,9 +10,9 @@
  */
 import { describe, test, expect, mock, beforeEach, spyOn } from 'bun:test';
 import * as gameService from './game';
-import * as walletService from './wallet';
 import * as eloService from './elo';
 import * as bettingService from './betting';
+import * as settlementService from './settlement';
 import { db } from '../drizzle';
 
 // Mock the drizzle database
@@ -69,6 +69,16 @@ mock.module('./elo', () => ({
 
 mock.module('./betting', () => ({
   settleBetsForGame: mock(() => Promise.resolve()),
+}));
+
+// Mock settlement service (game.ts now delegates fund distribution to settlement)
+mock.module('./settlement', () => ({
+  processSettlement: mock(() => Promise.resolve()),
+}));
+
+// Mock spectator prediction service
+mock.module('./spectatorPrediction', () => ({
+  settlePredictionsForGame: mock(() => Promise.resolve()),
 }));
 
 describe('Game Service', () => {
@@ -249,8 +259,8 @@ describe('Game Service - endGame', () => {
     const findFirstMock = mock(() => Promise.resolve(mockGame));
     (db.query.games.findFirst as any) = findFirstMock;
 
-    // Track if awardWinnings was called
-    const awardWinningsSpy = spyOn(walletService, 'awardWinnings').mockResolvedValue(100);
+    // Track if settlement service was called (fund distribution now delegated to settlement)
+    const processSettlementSpy = spyOn(settlementService, 'processSettlement').mockResolvedValue(undefined);
     const updateEloSpy = spyOn(eloService, 'updateEloRatings').mockResolvedValue({
       whiteChange: 10,
       blackChange: -10,
@@ -276,8 +286,9 @@ describe('Game Service - endGame', () => {
 
     const _result = await gameService.endGame('test-game-1', 'white_wins', 'user-white');
 
-    // Verify wallet service was called to award winnings
-    expect(awardWinningsSpy).toHaveBeenCalledWith('user-white', 100, 'test-game-1');
+    // Verify settlement service was called to handle fund distribution
+    // (previously wallet service was called directly, now delegated to settlement for anti-cheat evaluation)
+    expect(processSettlementSpy).toHaveBeenCalledWith('test-game-1', 'user-white', 'user-black', 100);
 
     // Verify ELO was updated
     expect(updateEloSpy).toHaveBeenCalled();
@@ -286,7 +297,7 @@ describe('Game Service - endGame', () => {
     expect(settleBetsSpy).toHaveBeenCalledWith('test-game-1', 'user-white');
   });
 
-  test('should refund both players on draw', async () => {
+  test('should delegate draw handling to settlement service', async () => {
     const mockGame = {
       id: 'test-game-1',
       whitePlayerId: 'user-white',
@@ -302,13 +313,8 @@ describe('Game Service - endGame', () => {
     const findFirstMock = mock(() => Promise.resolve(mockGame));
     (db.query.games.findFirst as any) = findFirstMock;
 
-    const awardWinningsCalls: any[] = [];
-    const _awardWinningsSpy = spyOn(walletService, 'awardWinnings').mockImplementation(
-      async (userId, amount, gameId) => {
-        awardWinningsCalls.push({ userId, amount, gameId });
-        return 50;
-      }
-    );
+    // Settlement service handles draw refunds (fund distribution delegated to settlement)
+    const processSettlementSpy = spyOn(settlementService, 'processSettlement').mockResolvedValue(undefined);
 
     spyOn(eloService, 'updateEloRatings').mockResolvedValue({
       whiteChange: 0,
@@ -335,18 +341,9 @@ describe('Game Service - endGame', () => {
 
     await gameService.endGame('test-game-1', 'draw', null);
 
-    // Both players should get their wager back
-    expect(awardWinningsCalls).toHaveLength(2);
-    expect(awardWinningsCalls).toContainEqual({
-      userId: 'user-white',
-      amount: 50,
-      gameId: 'test-game-1',
-    });
-    expect(awardWinningsCalls).toContainEqual({
-      userId: 'user-black',
-      amount: 50,
-      gameId: 'test-game-1',
-    });
+    // Settlement service should be called with null winnerId and loserId for draws
+    // The settlement service handles refunding both players
+    expect(processSettlementSpy).toHaveBeenCalledWith('test-game-1', null, null, 100);
   });
 });
 

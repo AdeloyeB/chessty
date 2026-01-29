@@ -17,7 +17,7 @@
  */
 
 import { eq, and, or, isNull, gt } from 'drizzle-orm';
-import { db, users, juryInvestigators, playerSanctions } from '../../drizzle';
+import { db, users, juryInvestigators, playerSanctions, juryCaseAssignments } from '../../drizzle';
 
 // ---------------------------------------------------------------------------
 // Configuration Constants
@@ -34,6 +34,9 @@ export const JURY_SUSPENSION_THRESHOLD = 0.250;
 
 /** Default suspension duration in days */
 export const JURY_SUSPENSION_DAYS = 30;
+
+/** Maximum number of pending cases a juror can have at once */
+export const MAX_PENDING_ASSIGNMENTS = 5;
 
 // ---------------------------------------------------------------------------
 // Types
@@ -120,6 +123,8 @@ export async function checkEligibility(userId: string): Promise<EligibilityResul
   const blockingSanction = await db.query.playerSanctions.findFirst({
     where: and(
       eq(playerSanctions.playerId, userId),
+      // Only consider non-appealed sanctions (successfully appealed sanctions don't block)
+      eq(playerSanctions.appealed, false),
       or(
         isNull(playerSanctions.endsAt),        // Permanent ban
         gt(playerSanctions.endsAt, now),       // Temp ban still active
@@ -279,6 +284,18 @@ export async function canReceiveAssignments(userId: string): Promise<boolean> {
   const score = parseFloat(juror.investigatorScore);
   if (score < JURY_SUSPENSION_THRESHOLD) {
     return false;
+  }
+
+  // Check pending assignment count - jurors shouldn't be overloaded
+  const pendingAssignments = await db.query.juryCaseAssignments.findMany({
+    where: and(
+      eq(juryCaseAssignments.investigatorId, userId),
+      eq(juryCaseAssignments.status, 'pending')
+    ),
+  });
+
+  if (pendingAssignments.length >= MAX_PENDING_ASSIGNMENTS) {
+    return false; // Juror has too many pending cases
   }
 
   return true;

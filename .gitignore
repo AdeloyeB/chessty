@@ -54,3 +54,8 @@ log/
 
 # Claude local settings
 .claude/settings.local.json
+
+# Drizzle SQL migrations - schema is sensitive
+# Use `drizzle-kit push` for deployments instead of committed SQL files
+apps/server/src/drizzle/migrations/*.sql
+apps/server/src/drizzle/migrations/meta/

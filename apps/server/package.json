@@ -9,6 +9,8 @@
     "start": "bun run dist/index.js",
     "lint": "eslint src/",
     "test": "bun test",
+    "test:wallet-service": "bun test src/services/walletAuth.service.test.ts",
+    "test:wallet-routes": "bun test src/routes/walletAuth.routes.test.ts",
     "test:redis": "bun test src/redis/",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
