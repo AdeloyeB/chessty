@@ -27,7 +27,12 @@
  * - Each job runs independently
  */
 
-import { findTimedOutSettlements, handleTimeout } from './settlement.service';
+import {
+  findTimedOutSettlements,
+  handleTimeout,
+  findStuckResolvingSettlements,
+  recoverStuckSettlement,
+} from './settlement.service';
 import { notifyTimeoutRelease } from './notification.service';
 
 // ---------------------------------------------------------------------------
@@ -41,6 +46,12 @@ import { notifyTimeoutRelease } from './notification.service';
 const TIMEOUT_CHECK_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
 
 /**
+ * How often to check for stuck 'resolving' settlements (in milliseconds).
+ * Default: 5 minutes (more frequent because stuck settlements block payouts)
+ */
+const RECOVERY_CHECK_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+
+/**
  * Whether the scheduler is currently running.
  */
 let isRunning = false;
@@ -49,6 +60,11 @@ let isRunning = false;
  * Reference to the interval timer for cleanup.
  */
 let timeoutCheckInterval: ReturnType<typeof setInterval> | null = null;
+
+/**
+ * Reference to the recovery check interval timer.
+ */
+let recoveryCheckInterval: ReturnType<typeof setInterval> | null = null;
 
 // ---------------------------------------------------------------------------
 // Scheduler Control
@@ -79,9 +95,20 @@ export function startScheduler(): void {
     });
   }, TIMEOUT_CHECK_INTERVAL_MS);
 
+  // Start recovery check (runs more frequently)
+  runRecoveryCheck().catch((err) => {
+    console.error('[Settlement:Scheduler] Initial recovery check failed:', err);
+  });
+
+  recoveryCheckInterval = setInterval(() => {
+    runRecoveryCheck().catch((err) => {
+      console.error('[Settlement:Scheduler] Recovery check failed:', err);
+    });
+  }, RECOVERY_CHECK_INTERVAL_MS);
+
   isRunning = true;
   console.log(
-    `[Settlement:Scheduler] Started. Timeout check runs every ${TIMEOUT_CHECK_INTERVAL_MS / 60000} minutes.`
+    `[Settlement:Scheduler] Started. Timeout check: ${TIMEOUT_CHECK_INTERVAL_MS / 60000}min, Recovery check: ${RECOVERY_CHECK_INTERVAL_MS / 60000}min.`
   );
 }
 
@@ -102,6 +129,11 @@ export function stopScheduler(): void {
   if (timeoutCheckInterval) {
     clearInterval(timeoutCheckInterval);
     timeoutCheckInterval = null;
+  }
+
+  if (recoveryCheckInterval) {
+    clearInterval(recoveryCheckInterval);
+    recoveryCheckInterval = null;
   }
 
   isRunning = false;
@@ -187,6 +219,58 @@ async function runTimeoutCheck(): Promise<void> {
   }
 }
 
+/**
+ * Check for and recover stuck 'resolving' settlements.
+ *
+ * Settlements can get stuck in 'resolving' state if the process crashes
+ * mid-payment. This recovery job finds settlements that have been
+ * 'resolving' for too long (>10 minutes) and resets them to 'disputed'
+ * so the normal resolution flow can retry.
+ */
+async function runRecoveryCheck(): Promise<void> {
+  console.log('[Settlement:Scheduler] Running recovery check...');
+
+  try {
+    const stuck = await findStuckResolvingSettlements();
+
+    if (stuck.length === 0) {
+      console.log('[Settlement:Scheduler] No stuck settlements found');
+      return;
+    }
+
+    console.log(
+      `[Settlement:Scheduler] Found ${stuck.length} stuck settlement(s)`
+    );
+
+    let recovered = 0;
+    let failed = 0;
+
+    for (const settlement of stuck) {
+      try {
+        await recoverStuckSettlement(settlement.id);
+        recovered++;
+      } catch (err) {
+        console.error(
+          `[Settlement:Scheduler] Failed to recover ${settlement.id}:`,
+          err instanceof Error ? err.message : err
+        );
+        failed++;
+      }
+    }
+
+    console.log(
+      `[Settlement:Scheduler] Recovery check complete. ` +
+      `Recovered: ${recovered}, Failed: ${failed}`
+    );
+  } catch (err) {
+    console.error(
+      '[Settlement:Scheduler] Recovery check failed:',
+      err instanceof Error ? err.message : err
+    );
+    throw err;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Manual Triggers (for testing and admin)
 // ---------------------------------------------------------------------------
@@ -231,6 +315,37 @@ export async function triggerTimeoutCheck(): Promise<{
   return { processed, failed };
 }
 
+/**
+ * Manually trigger the recovery check for stuck settlements.
+ *
+ * Useful for testing or admin-triggered cleanup.
+ */
+export async function triggerRecoveryCheck(): Promise<{
+  recovered: number;
+  failed: number;
+}> {
+  console.log('[Settlement:Scheduler] Manual recovery check triggered');
+
+  const stuck = await findStuckResolvingSettlements();
+  let recovered = 0;
+  let failed = 0;
+
+  for (const settlement of stuck) {
+    try {
+      await recoverStuckSettlement(settlement.id);
+      recovered++;
+    } catch (err) {
+      console.error(
+        `[Settlement:Scheduler] Failed to recover ${settlement.id}:`,
+        err instanceof Error ? err.message : err
+      );
+      failed++;
+    }
+  }
+
+  return { recovered, failed };
+}
+
 // ---------------------------------------------------------------------------
 // Health Check
 // ---------------------------------------------------------------------------
@@ -241,9 +356,11 @@ export async function triggerTimeoutCheck(): Promise<{
 export function getSchedulerStatus(): {
   running: boolean;
   timeoutCheckIntervalMs: number;
+  recoveryCheckIntervalMs: number;
 } {
   return {
     running: isRunning,
     timeoutCheckIntervalMs: TIMEOUT_CHECK_INTERVAL_MS,
+    recoveryCheckIntervalMs: RECOVERY_CHECK_INTERVAL_MS,
   };
 }

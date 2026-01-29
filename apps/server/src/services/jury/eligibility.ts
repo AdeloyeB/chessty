@@ -123,8 +123,16 @@ export async function checkEligibility(userId: string): Promise<EligibilityResul
   const blockingSanction = await db.query.playerSanctions.findFirst({
     where: and(
       eq(playerSanctions.playerId, userId),
-      // Only consider non-appealed sanctions (successfully appealed sanctions don't block)
-      eq(playerSanctions.appealed, false),
+      // Sanctions that block jury eligibility:
+      // - Not appealed at all (appealed = false), OR
+      // - Appealed but upheld (appeal failed - sanction remains in effect)
+      // Successfully appealed sanctions (reduced/overturned) DON'T block
+      or(
+        // Not appealed at all
+        eq(playerSanctions.appealed, false),
+        // Appealed but upheld (appeal failed)
+        eq(playerSanctions.appealOutcome, 'upheld')
+      ),
       or(
         isNull(playerSanctions.endsAt),        // Permanent ban
         gt(playerSanctions.endsAt, now),       // Temp ban still active

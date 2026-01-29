@@ -92,6 +92,10 @@ export {
   getSettlementByGame,
   findTimedOutSettlements,
   findPendingSettlements,
+
+  // Recovery functions (for stuck settlements)
+  findStuckResolvingSettlements,
+  recoverStuckSettlement,
 } from './settlement.service';
 
 // ---------------------------------------------------------------------------
@@ -119,5 +123,6 @@ export {
   stopScheduler,
   isSchedulerRunning,
   triggerTimeoutCheck,
+  triggerRecoveryCheck,
   getSchedulerStatus,
 } from './scheduler';

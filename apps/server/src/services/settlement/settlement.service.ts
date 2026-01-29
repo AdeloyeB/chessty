@@ -78,6 +78,13 @@ const SUSPICION_THRESHOLDS = {
  */
 const TIMEOUT_HOURS = 48;
 
+/**
+ * How long (in minutes) a settlement can stay in 'resolving' status before
+ * being considered stuck. If a process crashes mid-resolution, this allows
+ * recovery without human intervention.
+ */
+const RESOLVING_STALENESS_MINUTES = 10;
+
 // ---------------------------------------------------------------------------
 // Helper Functions (Score Normalization)
 // ---------------------------------------------------------------------------
@@ -91,11 +98,24 @@ const TIMEOUT_HOURS = 48;
  * but the database stores scores as 0-1 scale (0.95) for consistency with
  * probability conventions used elsewhere in the codebase.
  *
+ * DEFENSIVE GUARDS:
+ * - NaN/undefined → 0 (assume clean if no data)
+ * - Negative → 0 (clamp to valid range)
+ * - >100 → 1.0000 (clamp to max)
+ *
  * @param score - Suspicion score on 0-100 scale
  * @returns String representation on 0-1 scale with 4 decimal places
  */
 function normalizeScore(score: number): string {
-  return (score / 100).toFixed(4);
+  // Guard against NaN, undefined, or non-finite values
+  if (!Number.isFinite(score)) {
+    console.warn(`[Settlement] normalizeScore received invalid value: ${score}, defaulting to 0`);
+    return '0.0000';
+  }
+
+  // Clamp to valid 0-100 range before normalizing
+  const clamped = Math.max(0, Math.min(100, score));
+  return (clamped / 100).toFixed(4);
 }
 
 // ---------------------------------------------------------------------------
@@ -663,6 +683,91 @@ export async function findTimedOutSettlements(): Promise<Settlement[]> {
   });
 
   return records.map(mapSettlementRecord);
+}
+
+/**
+ * Find settlements stuck in 'resolving' status.
+ *
+ * WHY: The 'resolving' status is a transient lock state used to prevent
+ * double-payment races. A settlement should only be in this state for
+ * a few seconds while wallet operations complete. If a process crashes
+ * mid-resolution, the settlement gets stuck.
+ *
+ * RECOVERY: If a settlement has been 'resolving' for longer than the
+ * staleness threshold (10 minutes), we reset it to 'disputed' so the
+ * normal timeout or verdict process can retry.
+ *
+ * @returns Array of stuck settlements
+ */
+export async function findStuckResolvingSettlements(): Promise<Settlement[]> {
+  const cutoffTime = new Date();
+  cutoffTime.setMinutes(cutoffTime.getMinutes() - RESOLVING_STALENESS_MINUTES);
+
+  const records = await db.query.settlements.findMany({
+    where: and(
+      eq(settlements.status, 'resolving'),
+      lt(settlements.updatedAt, cutoffTime)
+    ),
+  });
+
+  return records.map(mapSettlementRecord);
+}
+
+/**
+ * Recover a stuck 'resolving' settlement by resetting it to 'disputed'.
+ *
+ * This allows the normal resolution flow (verdict or timeout) to retry.
+ * We log the recovery for auditing purposes.
+ *
+ * @param settlementId - The stuck settlement to recover
+ */
+export async function recoverStuckSettlement(settlementId: string): Promise<void> {
+  await withTransaction(async (tx) => {
+    const [lockedSettlement] = await tx
+      .select()
+      .from(settlements)
+      .where(eq(settlements.id, settlementId))
+      .for('update');
+
+    if (!lockedSettlement) {
+      throw new Error('Settlement not found');
+    }
+
+    const settlement = mapSettlementRecord(lockedSettlement);
+
+    // Only recover if still in 'resolving' state
+    if (settlement.status !== 'resolving') {
+      console.log(
+        `[Settlement] Recovery skipped for ${settlementId} - status is now ${settlement.status}`
+      );
+      return;
+    }
+
+    // Reset to 'disputed' to allow retry
+    await tx
+      .update(settlements)
+      .set({
+        status: 'disputed' as SettlementStatus,
+        updatedAt: new Date(),
+      })
+      .where(eq(settlements.id, settlementId));
+
+    // Record in history for auditing
+    await tx.insert(settlementHistory).values({
+      settlementId,
+      previousStatus: 'resolving',
+      newStatus: 'disputed',
+      trigger: 'recovery',
+      details: {
+        reason: 'Stuck in resolving state, reset for retry',
+        stalenessMinutes: RESOLVING_STALENESS_MINUTES,
+      },
+    });
+
+    console.log(
+      `[Settlement] Recovered stuck settlement ${settlementId} - reset to disputed`
+    );
+  });
 }
 
 /**
