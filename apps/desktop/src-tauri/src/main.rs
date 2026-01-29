@@ -39,6 +39,10 @@ use tauri::Emitter;
 // This allows our engine commands to access the Stockfish instance.
 use engine::EngineState;
 
+// Import the AntiCheatState for anti-cheat command state management.
+// This holds the MoveInputRecorder and NetworkMonitor instances.
+use commands::AntiCheatState;
+
 fn main() {
     tauri::Builder::default()
         // =====================================================================
@@ -80,6 +84,9 @@ fn main() {
         // The EngineState holds our Stockfish instance, wrapped in Arc<Mutex<>>
         // for thread-safe access. Commands can access it via State<'_, EngineState>.
         .manage(EngineState::new())
+        // AntiCheatState holds the MoveInputRecorder and NetworkMonitor instances
+        // for tracking input patterns and network activity during games.
+        .manage(AntiCheatState::new())
 
         // =====================================================================
         // IPC Command Registration
@@ -108,6 +115,18 @@ fn main() {
             commands::analyze_position_async,
             commands::analyze_game_async,
             commands::cancel_analysis,
+            // Anti-cheat commands (environment scanning, input tracking, network monitoring)
+            commands::scan_environment,
+            commands::start_move_recording,
+            commands::record_input_point,
+            commands::finish_move_recording,
+            commands::mark_focus_lost,
+            commands::cancel_move_recording,
+            commands::get_network_summary,
+            commands::start_network_monitoring,
+            commands::stop_network_monitoring,
+            commands::analyze_network_patterns,
+            commands::analyze_input_patterns_cmd,
         ])
 
         // =====================================================================

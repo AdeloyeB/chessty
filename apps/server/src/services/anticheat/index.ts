@@ -125,9 +125,16 @@ export {
   // Anomaly detection
   calculatePerformanceAnomaly,
 
-  // Stockfish integration (placeholder)
+  // Stockfish integration
   createStockfishAnalyzer,
+  createStockfishAnalyzerSync,
   validateStockfishSetup,
+  checkStockfishHealth,
+
+  // Convenience functions for move analysis
+  calculateCentipawnLossForMove,
+  getMoveRankInEvaluation,
+  isPositionCritical,
 } from './engine-analysis';
 
 // ---------------------------------------------------------------------------
@@ -167,6 +174,35 @@ export {
   isSkillShiftSuspicious,
   describeSkillShift,
 } from './skill-shift';
+
+// ---------------------------------------------------------------------------
+// Real-Time Monitoring Exports
+// ---------------------------------------------------------------------------
+
+export {
+  // Singleton instance
+  liveGameMonitor,
+
+  // Classes
+  LiveGameMonitor,
+
+  // Constants
+  SUSPICION_THRESHOLDS,
+
+  // Convenience functions
+  startGameMonitoring,
+  monitorMove,
+  endGameMonitoring,
+  getPlayerSuspicionScore,
+  getPlayerFlags,
+} from './realtime';
+
+// Re-export types from realtime
+export type {
+  PlayerGameMonitorState,
+  MoveBehaviorData,
+  MoveAnalysisResult,
+} from './realtime';
 
 // ---------------------------------------------------------------------------
 // Aggregate Analysis (TODO: Implement)
@@ -286,25 +322,69 @@ export function aggregateSuspicionScore(
 // Service Initialization
 // ---------------------------------------------------------------------------
 
+import { shutdownStockfishPool } from '../stockfish';
+import { validateStockfishSetup } from './engine-analysis';
+
+// Track initialization state
+let serviceInitialized = false;
+let stockfishAvailable = false;
+
 /**
  * Initialize the anti-cheat service.
  *
  * This should be called during server startup to:
  * - Validate Stockfish is available (if using engine analysis)
+ * - Initialize the real-time monitoring system
  * - Load any ML models (future)
  * - Connect to any external services (future)
  *
+ * @param options Configuration options
+ * @param options.skipStockfish If true, skip Stockfish initialization (useful for testing)
  * @returns true if initialization succeeded
  */
-export async function initializeAnticheatService(): Promise<boolean> {
+export async function initializeAnticheatService(options?: {
+  skipStockfish?: boolean;
+}): Promise<boolean> {
   console.log('[AntiCheat] Initializing anti-cheat service...');
 
-  // TODO: Add actual initialization logic when Stockfish is integrated
-  // const stockfish = createStockfishAnalyzer();
-  // const stockfishReady = await validateStockfishSetup(stockfish);
+  // Initialize Stockfish unless skipped
+  if (!options?.skipStockfish) {
+    try {
+      stockfishAvailable = await validateStockfishSetup();
+      if (stockfishAvailable) {
+        console.log('[AntiCheat] Stockfish engine initialized successfully');
+      } else {
+        console.warn('[AntiCheat] Stockfish unavailable - engine analysis disabled');
+        console.warn('[AntiCheat] Set STOCKFISH_PATH environment variable or install Stockfish');
+      }
+    } catch (error) {
+      console.error('[AntiCheat] Failed to initialize Stockfish:', error);
+      stockfishAvailable = false;
+    }
+  } else {
+    console.log('[AntiCheat] Stockfish initialization skipped');
+  }
 
-  console.log('[AntiCheat] Anti-cheat service initialized (Stockfish integration pending)');
+  serviceInitialized = true;
+  console.log('[AntiCheat] Anti-cheat service initialized');
   return true;
+}
+
+/**
+ * Shut down the anti-cheat service.
+ *
+ * This should be called during server shutdown to clean up resources.
+ */
+export async function shutdownAnticheatService(): Promise<void> {
+  console.log('[AntiCheat] Shutting down anti-cheat service...');
+
+  // Shut down Stockfish worker pool
+  await shutdownStockfishPool();
+
+  serviceInitialized = false;
+  stockfishAvailable = false;
+
+  console.log('[AntiCheat] Anti-cheat service shut down');
 }
 
 /**
@@ -318,8 +398,17 @@ export function getAnticheatServiceStatus(): {
   analysisEnabled: boolean;
 } {
   return {
-    initialized: true,
-    stockfishAvailable: false, // TODO: Check actual Stockfish status
-    analysisEnabled: false, // Disabled until Stockfish is integrated
+    initialized: serviceInitialized,
+    stockfishAvailable,
+    analysisEnabled: serviceInitialized && stockfishAvailable,
   };
+}
+
+/**
+ * Check if engine analysis is available.
+ *
+ * @returns true if Stockfish is initialized and can analyze positions
+ */
+export function isEngineAnalysisAvailable(): boolean {
+  return serviceInitialized && stockfishAvailable;
 }

@@ -51,3 +51,5 @@ pub mod network;
 //   use anticheat::{EnvironmentChecker, MoveSource, NetworkMonitor};
 // instead of:
 //   use anticheat::environment::EnvironmentChecker;
+
+// Re-export for easy access from commands module

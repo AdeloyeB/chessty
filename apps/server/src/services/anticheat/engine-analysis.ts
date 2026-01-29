@@ -496,55 +496,112 @@ export function calculatePerformanceAnomaly(
 }
 
 // ---------------------------------------------------------------------------
-// Stockfish Integration Placeholder
+// Stockfish Integration
 // ---------------------------------------------------------------------------
 
+import {
+  StockfishWorkerPool,
+  StockfishWorker,
+  getStockfishPool,
+  calculateCentipawnLoss as calcCPL,
+  getMoveRank as getRank,
+  isPositionCritical,
+} from '../stockfish';
+
 /**
- * Create a placeholder Stockfish analyzer.
+ * Create a real Stockfish analyzer.
  *
- * This returns a mock implementation that should be replaced with
- * actual Stockfish integration when available.
+ * This creates a StockfishAnalyzer backed by a worker pool or single worker.
+ * The analyzer uses the Stockfish chess engine to evaluate positions.
  *
- * TODO: Implement actual Stockfish communication via:
- * - UCI protocol over stdin/stdout
- * - Or WebSocket connection to Stockfish WASM/server
+ * HOW IT WORKS:
+ * 1. Uses a pool of Stockfish child processes for parallel analysis
+ * 2. Communicates via UCI (Universal Chess Interface) protocol
+ * 3. Returns structured evaluation data with top N moves and scores
  *
- * @returns A placeholder StockfishAnalyzer that throws on use
+ * USAGE:
+ * ```typescript
+ * const analyzer = await createStockfishAnalyzer();
+ * const evaluation = await analyzer.analyzePosition(fen, 20);
+ * console.log(evaluation.bestMove); // e.g., "e2e4"
+ * console.log(evaluation.scoreCp);  // e.g., 32 (0.32 pawns advantage)
+ * ```
+ *
+ * CONFIGURATION:
+ * - STOCKFISH_PATH: Path to Stockfish binary (default: "stockfish" in PATH)
+ * - STOCKFISH_POOL_SIZE: Number of worker processes (default: 2)
+ * - STOCKFISH_THREADS: Threads per worker (default: 2)
+ * - STOCKFISH_HASH_MB: Hash table size per worker (default: 128)
+ *
+ * @param usePool - If true, uses a shared worker pool (better for batch analysis).
+ *                  If false, creates a single dedicated worker.
+ * @returns A StockfishAnalyzer instance
  */
-export function createStockfishAnalyzer(): StockfishAnalyzer {
+export async function createStockfishAnalyzer(usePool: boolean = true): Promise<StockfishAnalyzer> {
+  if (usePool) {
+    // Use the global worker pool for batch analysis
+    const pool = await getStockfishPool();
+    return pool;
+  } else {
+    // Create a single dedicated worker
+    const worker = new StockfishWorker();
+    await worker.initialize();
+    return worker;
+  }
+}
+
+/**
+ * Create a Stockfish analyzer synchronously (returns promise-based interface).
+ *
+ * This is a convenience wrapper that creates an uninitialized analyzer.
+ * The analyzer will be initialized on first use, which may cause a delay.
+ *
+ * For production use, prefer createStockfishAnalyzer() which initializes
+ * the engine upfront.
+ *
+ * @returns A StockfishAnalyzer that initializes lazily
+ */
+export function createStockfishAnalyzerSync(): StockfishAnalyzer {
+  let poolPromise: Promise<StockfishWorkerPool> | null = null;
+
   return {
-    async analyzePosition(_fen: string, _depth: number = 20): Promise<StockfishEvaluation> {
-      // TODO: Implement actual Stockfish integration
-      // This will need to:
-      // 1. Send "position fen <fen>" command
-      // 2. Send "go depth <depth>" command
-      // 3. Parse the "bestmove" and "info" lines
-      // 4. Extract score, PV, nodes, etc.
-      throw new Error(
-        'Stockfish analyzer not implemented. ' +
-          'Server-side engine analysis requires Stockfish integration.'
-      );
+    async analyzePosition(fen: string, depth: number = 20): Promise<StockfishEvaluation> {
+      if (!poolPromise) {
+        poolPromise = getStockfishPool();
+      }
+      const pool = await poolPromise;
+      return pool.analyzePosition(fen, depth);
     },
 
     async analyzeBatch(positions: string[], depth: number = 20): Promise<StockfishEvaluation[]> {
-      // Batch analysis - could be parallelized or use multipv
-      const results: StockfishEvaluation[] = [];
-      for (const fen of positions) {
-        results.push(await this.analyzePosition(fen, depth));
+      if (!poolPromise) {
+        poolPromise = getStockfishPool();
       }
-      return results;
+      const pool = await poolPromise;
+      return pool.analyzeBatch(positions, depth);
     },
 
     async isReady(): Promise<boolean> {
-      // TODO: Check if Stockfish process is running and responsive
-      return false;
+      if (!poolPromise) {
+        return false;
+      }
+      const pool = await poolPromise;
+      return pool.isReady();
     },
 
     async stop(): Promise<void> {
-      // TODO: Send "stop" command to Stockfish
+      if (poolPromise) {
+        const pool = await poolPromise;
+        await pool.stop();
+      }
     },
   };
 }
+
+// Re-export convenience functions for anti-cheat analysis
+export { calcCPL as calculateCentipawnLossForMove };
+export { getRank as getMoveRankInEvaluation };
+export { isPositionCritical };
 
 /**
  * Validate that Stockfish is available and working.
@@ -552,25 +609,53 @@ export function createStockfishAnalyzer(): StockfishAnalyzer {
  * This should be called during server startup to ensure
  * the anti-cheat analysis system is functional.
  *
- * @param stockfish - Stockfish analyzer instance
+ * @param stockfish - Stockfish analyzer instance (optional, creates one if not provided)
  * @returns true if Stockfish is ready, false otherwise
  */
-export async function validateStockfishSetup(stockfish: StockfishAnalyzer): Promise<boolean> {
+export async function validateStockfishSetup(stockfish?: StockfishAnalyzer): Promise<boolean> {
   try {
-    const ready = await stockfish.isReady();
+    // Get or create analyzer
+    const analyzer = stockfish || await createStockfishAnalyzer();
+
+    const ready = await analyzer.isReady();
     if (!ready) {
       console.warn('[AntiCheat] Stockfish is not ready - engine analysis disabled');
       return false;
     }
 
-    // Test with a simple position
+    // Test with a simple position (e4 opening)
+    // FEN: After 1. e4, black to move
     const testFen = 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1';
-    await stockfish.analyzePosition(testFen, 10);
+    const evaluation = await analyzer.analyzePosition(testFen, 10);
+
+    // Validate the response has the expected structure
+    if (!evaluation.bestMove || evaluation.moves.length === 0) {
+      console.warn('[AntiCheat] Stockfish returned invalid evaluation');
+      return false;
+    }
 
     console.log('[AntiCheat] Stockfish validation passed');
+    console.log(`[AntiCheat] Engine: Stockfish, Test position eval: ${evaluation.scoreCp} cp, best: ${evaluation.bestMove}`);
     return true;
   } catch (error) {
     console.error('[AntiCheat] Stockfish validation failed:', error);
+    return false;
+  }
+}
+
+/**
+ * Perform a quick health check on the Stockfish service.
+ *
+ * This is a lighter weight check than validateStockfishSetup,
+ * suitable for periodic health monitoring.
+ *
+ * @returns true if Stockfish is responsive
+ */
+export async function checkStockfishHealth(): Promise<boolean> {
+  try {
+    const pool = await getStockfishPool();
+    return await pool.isReady();
+  } catch {
     return false;
   }
 }
