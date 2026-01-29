@@ -27,12 +27,13 @@
  * 3. Manually curated edge cases for training
  */
 
-import { eq, and, desc } from 'drizzle-orm';
+import { eq, and, desc, gte } from 'drizzle-orm';
 import {
   db,
   games,
   juryCases,
   playerSanctions,
+  users,
   type JuryCase,
 } from '../../drizzle';
 import { createCase } from './case-assignment';
@@ -225,26 +226,23 @@ async function getHighSuspicionCase(): Promise<TestCaseSource | null> {
  * @returns A test case source or null
  */
 async function getKnownInnocentCase(): Promise<TestCaseSource | null> {
-  // Find high-rated players
+  // Find high-rated, experienced players
+  // Filter directly in the query instead of fetching all users
   const trustedPlayers = await db.query.users.findMany({
     where: and(
-      // For now, just check they have many games and high ELO
-      // In production, you'd also filter by sanction history
+      gte(users.eloRating, 2000),
+      gte(users.gamesPlayed, 200)
     ),
     limit: 100,
+    orderBy: [desc(users.eloRating)], // Get highest rated first
   });
 
-  // Filter to experienced, high-rated players
-  const eligible = trustedPlayers.filter(
-    u => u.eloRating >= 2000 && u.gamesPlayed >= 200
-  );
-
-  if (eligible.length === 0) {
+  if (trustedPlayers.length === 0) {
     return null;
   }
 
   // Pick a random player
-  const randomPlayer = eligible[Math.floor(Math.random() * eligible.length)];
+  const randomPlayer = trustedPlayers[Math.floor(Math.random() * trustedPlayers.length)];
 
   // Find a recent game of theirs
   const playerGames = await db.query.games.findMany({
@@ -289,6 +287,7 @@ export async function createTestCase(source: TestCaseSource): Promise<JuryCase> 
     `(game: ${source.gameId}, player: ${source.playerId})`
   );
 
+  // DON'T expose testCaseReason to jurors - it reveals this is a test case
   return createCase({
     gameId: source.gameId,
     suspectPlayerId: source.playerId,
@@ -296,9 +295,11 @@ export async function createTestCase(source: TestCaseSource): Promise<JuryCase> 
     priority: 'normal',
     isTestCase: true,
     knownOutcome: source.outcome,
+    // Only include non-identifying metadata
     anticheatMetadata: {
-      testCaseReason: source.reason,
-      insertedAt: new Date().toISOString(),
+      // testCaseReason is NOT included - would reveal this is a test case
+      // insertedAt is NOT included - timing correlation
+      source: 'calibration', // Generic marker for internal use only
     },
   });
 }

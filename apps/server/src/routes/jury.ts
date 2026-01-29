@@ -34,6 +34,7 @@ import {
   getJurorStats,
 } from '../services/jury';
 import type { VerdictOption } from '../drizzle/jury-schema';
+import { JURY_RATE_LIMITERS, rateLimitResponse } from '../middleware/rate-limiter';
 
 // ---------------------------------------------------------------------------
 // Validation Schemas
@@ -107,6 +108,12 @@ export async function handleEnroll(req: Request): Promise<Response> {
       );
     }
 
+    // Rate limit check
+    const rateResult = JURY_RATE_LIMITERS.enroll.check(auth.userId);
+    if (!rateResult.allowed) {
+      return rateLimitResponse(rateResult);
+    }
+
     const result = await enrollAsJuror(auth.userId);
 
     if (!result.success) {
@@ -160,6 +167,12 @@ export async function handleGetCases(req: Request): Promise<Response> {
         } satisfies ApiResponse<never>,
         { status: 401 }
       );
+    }
+
+    // Rate limit check
+    const rateResult = JURY_RATE_LIMITERS.getCases.check(auth.userId);
+    if (!rateResult.allowed) {
+      return rateLimitResponse(rateResult);
     }
 
     // Check if user is a juror
@@ -233,6 +246,12 @@ export async function handleGetCase(req: Request, caseId: string): Promise<Respo
       );
     }
 
+    // Rate limit check
+    const rateResult = JURY_RATE_LIMITERS.getCase.check(auth.userId);
+    if (!rateResult.allowed) {
+      return rateLimitResponse(rateResult);
+    }
+
     // Get case for review (this also checks assignment and marks as in_progress)
     const reviewData = await getCaseForReview(caseId, auth.userId);
 
@@ -251,6 +270,16 @@ export async function handleGetCase(req: Request, caseId: string): Promise<Respo
 
     // Determine which player is the suspect
     const suspectIsWhite = juryCase.suspectPlayerId === game.whitePlayerId;
+
+    // Sanitize metadata to strip test case identifying info
+    // This prevents jurors from identifying test cases injected for calibration
+    const sanitizedMetadata = juryCase.anticheatMetadata ? {
+      ...juryCase.anticheatMetadata,
+      // Strip fields that could identify test cases
+      testCaseReason: undefined,
+      insertedAt: undefined,
+      source: undefined,
+    } : undefined;
 
     return Response.json({
       success: true,
@@ -282,8 +311,8 @@ export async function handleGetCase(req: Request, caseId: string): Promise<Respo
           blackMistakes: game.blackMistakes,
         },
 
-        // Anti-cheat metadata (what flagged this game)
-        anticheatMetadata: juryCase.anticheatMetadata,
+        // Anti-cheat metadata (what flagged this game) - sanitized
+        anticheatMetadata: sanitizedMetadata,
 
         // Review instructions
         instructions: {
@@ -349,6 +378,12 @@ export async function handleSubmitVerdict(req: Request, caseId: string): Promise
         } satisfies ApiResponse<never>,
         { status: 401 }
       );
+    }
+
+    // Rate limit check
+    const rateResult = JURY_RATE_LIMITERS.verdict.check(auth.userId);
+    if (!rateResult.allowed) {
+      return rateLimitResponse(rateResult);
     }
 
     const body = await req.json();

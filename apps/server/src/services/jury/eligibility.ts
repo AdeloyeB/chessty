@@ -16,7 +16,7 @@
  * - Good standing: Prevents bad actors from influencing verdicts
  */
 
-import { eq, and } from 'drizzle-orm';
+import { eq, and, or, isNull, gt } from 'drizzle-orm';
 import { db, users, juryInvestigators, playerSanctions } from '../../drizzle';
 
 // ---------------------------------------------------------------------------
@@ -108,20 +108,28 @@ export async function checkEligibility(userId: string): Promise<EligibilityResul
   const meetsEloRequirement = user.eloRating >= JURY_MIN_ELO;
   const meetsGamesRequirement = user.gamesPlayed >= JURY_MIN_GAMES;
 
-  // Check for active sanctions (bans, restrictions)
-  const activeSanction = await db.query.playerSanctions.findFirst({
+  // Check for active sanctions OR recent sanctions (1-year cooldown after ban ends)
+  // A user cannot be a juror if:
+  // 1. They have a permanent ban (endsAt is null)
+  // 2. They have a temp ban that hasn't ended yet (endsAt > now)
+  // 3. They had a ban that ended less than 1 year ago (cooldown period)
+  const now = new Date();
+  const oneYearAgo = new Date();
+  oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+
+  const blockingSanction = await db.query.playerSanctions.findFirst({
     where: and(
       eq(playerSanctions.playerId, userId),
-      // Sanction is active if endsAt is null (permanent) or in the future
-      // We need to check if there's any active sanction
+      or(
+        isNull(playerSanctions.endsAt),        // Permanent ban
+        gt(playerSanctions.endsAt, now),       // Temp ban still active
+        gt(playerSanctions.endsAt, oneYearAgo) // Ban ended within last year (cooldown)
+      )
     ),
   });
 
-  // A user has good standing if they have no active sanctions
-  // For simplicity, we check if they have any sanction that hasn't ended
-  const now = new Date();
-  const hasGoodStanding = !activeSanction ||
-    (activeSanction.endsAt !== null && activeSanction.endsAt < now);
+  // A user has good standing if they have no blocking sanctions
+  const hasGoodStanding = !blockingSanction;
 
   const reasons: string[] = [];
   if (!meetsEloRequirement) {
@@ -131,7 +139,21 @@ export async function checkEligibility(userId: string): Promise<EligibilityResul
     reasons.push(`Must have played at least ${JURY_MIN_GAMES} games (current: ${user.gamesPlayed})`);
   }
   if (!hasGoodStanding) {
-    reasons.push('Must be in good standing (no active sanctions)');
+    // Provide more specific feedback about why they're not eligible
+    if (blockingSanction) {
+      if (blockingSanction.endsAt === null) {
+        reasons.push('Must be in good standing (currently under permanent sanction)');
+      } else if (blockingSanction.endsAt > now) {
+        reasons.push(`Must be in good standing (active sanction until ${blockingSanction.endsAt.toISOString().split('T')[0]})`);
+      } else {
+        // Ban ended but within 1-year cooldown
+        const cooldownEnds = new Date(blockingSanction.endsAt);
+        cooldownEnds.setFullYear(cooldownEnds.getFullYear() + 1);
+        reasons.push(`Must be in good standing (1-year cooldown after sanction ends, eligible ${cooldownEnds.toISOString().split('T')[0]})`);
+      }
+    } else {
+      reasons.push('Must be in good standing (no active sanctions)');
+    }
   }
 
   const eligible = meetsEloRequirement && meetsGamesRequirement && hasGoodStanding;

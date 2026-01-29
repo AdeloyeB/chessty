@@ -21,7 +21,7 @@
  * - Players currently under investigation themselves
  */
 
-import { eq, and, lt, notInArray, inArray, desc } from 'drizzle-orm';
+import { eq, and, lt, notInArray, inArray, desc, gte, lte, or, isNull } from 'drizzle-orm';
 // nanoid will be used when we need to generate unique IDs for assignments
 import {
   db,
@@ -34,6 +34,7 @@ import {
   type JuryCaseAssignment,
 } from '../../drizzle';
 import { canReceiveAssignments } from './eligibility';
+import { anonymizePlayerId } from '../../utils/anonymize';
 
 // ---------------------------------------------------------------------------
 // Configuration
@@ -238,54 +239,66 @@ export async function assignJurorsToCase(caseId: string): Promise<AssignmentResu
 /**
  * Find eligible jurors within a specific ELO range.
  *
+ * Uses batch queries to avoid N+1 database calls:
+ * 1. Single query to get all active, non-suspended jurors
+ * 2. Single query to get all users in the ELO range
+ * 3. In-memory join using a Map for O(1) lookups
+ *
  * @param minElo - Minimum ELO for this range
  * @param maxElo - Maximum ELO for this range
  * @param count - How many jurors to find
  * @param excludeIds - User IDs to exclude
- * @returns Array of eligible jurors
+ * @returns Array of eligible jurors sorted by investigator score
  */
 async function findEligibleJurorsInRange(
   minElo: number,
   maxElo: number,
   count: number,
   excludeIds: string[]
-): Promise<Array<typeof juryInvestigators.$inferSelect & { user: typeof users.$inferSelect }>> {
-  // Build the query for eligible jurors
+): Promise<Array<typeof juryInvestigators.$inferSelect & { user: typeof users.$inferSelect; parsedScore: number }>> {
   const now = new Date();
 
-  // We need to join with users to get current ELO
-  // Since Drizzle doesn't support complex joins easily, we'll do this in steps
-
-  // First, get all active jurors not in the exclude list
+  // Step 1: Get all active, non-suspended jurors not in the exclude list (single query)
   const activeJurors = await db.query.juryInvestigators.findMany({
     where: and(
       eq(juryInvestigators.isActive, true),
-      excludeIds.length > 0 ? notInArray(juryInvestigators.userId, excludeIds) : undefined
+      excludeIds.length > 0 ? notInArray(juryInvestigators.userId, excludeIds) : undefined,
+      // Filter out suspended jurors at the database level
+      or(
+        isNull(juryInvestigators.suspendedUntil),
+        lt(juryInvestigators.suspendedUntil, now)
+      )
     ),
   });
 
-  // Filter by suspension and get user data
-  const eligibleJurors: Array<typeof juryInvestigators.$inferSelect & { user: typeof users.$inferSelect }> = [];
+  if (activeJurors.length === 0) return [];
 
-  for (const juror of activeJurors) {
-    // Skip if suspended
-    if (juror.suspendedUntil && juror.suspendedUntil > now) continue;
+  // Step 2: Batch fetch ALL users in ONE query, filtered by ELO range
+  const userIds = activeJurors.map(j => j.userId);
+  const usersInRange = await db.query.users.findMany({
+    where: and(
+      inArray(users.id, userIds),
+      gte(users.eloRating, minElo),
+      lte(users.eloRating, maxElo)
+    ),
+  });
 
-    // Get user data for ELO check
-    const user = await db.query.users.findFirst({
-      where: eq(users.id, juror.userId),
-    });
+  if (usersInRange.length === 0) return [];
 
-    if (!user) continue;
+  // Step 3: Join in memory using Map for O(1) lookups
+  const userMap = new Map(usersInRange.map(u => [u.id, u]));
 
-    // Check ELO range
-    if (user.eloRating >= minElo && user.eloRating <= maxElo) {
-      eligibleJurors.push({ ...juror, user });
-    }
-  }
+  // Step 4: Pre-parse scores ONCE before sorting (avoids repeated parseFloat in sort comparator)
+  const eligibleJurors = activeJurors
+    .filter(j => userMap.has(j.userId))
+    .map(j => ({
+      ...j,
+      user: userMap.get(j.userId)!,
+      parsedScore: parseFloat(j.investigatorScore),
+    }));
 
-  // Sort by investigator score (higher score = more trusted) and take top N
-  eligibleJurors.sort((a, b) => parseFloat(b.investigatorScore) - parseFloat(a.investigatorScore));
+  // Sort by pre-parsed investigator score (higher score = more trusted)
+  eligibleJurors.sort((a, b) => b.parsedScore - a.parsedScore);
 
   return eligibleJurors.slice(0, count);
 }
@@ -396,14 +409,14 @@ export async function getCaseForReview(
       .where(eq(juryCaseAssignments.id, assignment.id));
   }
 
-  // Generate anonymized player ID (consistent for this case)
-  // We use a hash of the case ID + suspect ID to generate a consistent anonymous name
-  const anonymizedPlayerId = `Player_${caseId.slice(-6).toUpperCase()}`;
+  // Generate anonymized player ID using secure HMAC-based anonymization
+  // This is deterministic (same inputs = same output) but irreversible
+  const anonymizedPlayer = anonymizePlayerId(caseId, caseData.suspectPlayerId);
 
   return {
     case: caseData,
     game,
-    anonymizedPlayerId,
+    anonymizedPlayerId: anonymizedPlayer,
   };
 }
 

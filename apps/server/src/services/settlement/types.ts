@@ -33,9 +33,14 @@
  * pending:   Settlement created, awaiting suspicion evaluation
  * settled:   Funds distributed to winner (clean game or cleared after review)
  * disputed:  Funds held, awaiting jury verdict
+ * resolving: Intermediate state during resolution (prevents concurrent processing)
  * resolved:  Dispute resolved (after jury verdict or timeout)
+ *
+ * NOTE: 'resolving' is a transient state that should only exist during an
+ * active transaction. If a settlement is stuck in 'resolving' state, it
+ * indicates a crashed transaction that needs manual recovery.
  */
-export type SettlementStatus = 'pending' | 'settled' | 'disputed' | 'resolved';
+export type SettlementStatus = 'pending' | 'settled' | 'disputed' | 'resolving' | 'resolved';
 
 /**
  * Who or what triggered the final settlement.

@@ -33,7 +33,7 @@ import {
   settlementHistory,
   juryCases,
 } from '../../drizzle';
-import type { SettlementRecord } from '../../drizzle';
+import type { SettlementRecord, CheatFlag } from '../../drizzle';
 import type {
   Settlement,
   SettlementStatus,
@@ -46,6 +46,7 @@ import {
   getPlayerSuspicionScore,
   getPlayerFlags,
 } from '../anticheat';
+import { withTransaction } from '../../utils/transaction';
 // Future use: liveGameMonitor, aggregateSuspicionScore - for real-time monitoring
 
 // ---------------------------------------------------------------------------
@@ -244,6 +245,9 @@ export function decideSettlement(suspicionScore: number): SettlementDecision {
  * This is called for games with low suspicion scores.
  * The winner receives the pot (minus platform fee) immediately.
  *
+ * SECURITY: Wrapped in a transaction to prevent race conditions.
+ * Uses row locking to ensure only one process can settle at a time.
+ *
  * @param settlementId - The settlement to finalize
  * @param winnerId - Who to pay
  */
@@ -251,52 +255,63 @@ export async function settleGame(
   settlementId: string,
   winnerId: string
 ): Promise<void> {
-  const settlement = await getSettlement(settlementId);
-  if (!settlement) {
-    throw new Error(`Settlement ${settlementId} not found`);
-  }
+  await withTransaction(async (tx) => {
+    // Lock the settlement row to prevent concurrent modifications
+    // .for('update') acquires a row-level lock - other transactions will wait
+    const [lockedSettlement] = await tx
+      .select()
+      .from(settlements)
+      .where(eq(settlements.id, settlementId))
+      .for('update');
 
-  if (settlement.status !== 'pending') {
-    throw new Error(`Settlement ${settlementId} is not pending (status: ${settlement.status})`);
-  }
+    if (!lockedSettlement) {
+      throw new Error('Settlement not found');
+    }
 
-  const payout = settlement.winnerPayout;
-  if (payout === null) {
-    throw new Error(`Settlement ${settlementId} has no winner payout`);
-  }
+    const settlement = mapSettlementRecord(lockedSettlement);
 
-  // Update settlement to settled
-  await db
-    .update(settlements)
-    .set({
-      status: 'settled',
-      settledAt: new Date(),
-      settledBy: 'auto',
-      updatedAt: new Date(),
-    })
-    .where(eq(settlements.id, settlementId));
+    if (settlement.status !== 'pending') {
+      throw new Error('Settlement cannot be processed');
+    }
 
-  // Record in history
-  await db.insert(settlementHistory).values({
-    settlementId,
-    previousStatus: 'pending',
-    newStatus: 'settled',
-    trigger: 'auto_settle',
-    details: {
-      winnerId,
-      payout,
-      suspicionScore: settlement.suspicionScore,
-    },
+    const payout = settlement.winnerPayout;
+    if (payout === null) {
+      throw new Error('Settlement has no winner payout');
+    }
+
+    // Update settlement to settled
+    await tx
+      .update(settlements)
+      .set({
+        status: 'settled',
+        settledAt: new Date(),
+        settledBy: 'auto',
+        updatedAt: new Date(),
+      })
+      .where(eq(settlements.id, settlementId));
+
+    // Record in history
+    await tx.insert(settlementHistory).values({
+      settlementId,
+      previousStatus: 'pending',
+      newStatus: 'settled',
+      trigger: 'auto_settle',
+      details: {
+        winnerId,
+        payout,
+        suspicionScore: settlement.suspicionScore,
+      },
+    });
+
+    console.log(
+      `[Settlement] Auto-settled ${settlementId} for game ${settlement.gameId} ` +
+      `(winner: ${winnerId}, payout: ${payout})`
+    );
+
+    // Note: Actual fund transfer already happened in game.ts endGame()
+    // This service tracks the settlement state, not the wallet operations
+    // TODO: When blockchain integration is added, trigger on-chain settlement here
   });
-
-  console.log(
-    `[Settlement] Auto-settled ${settlementId} for game ${settlement.gameId} ` +
-    `(winner: ${winnerId}, payout: ${payout})`
-  );
-
-  // Note: Actual fund transfer already happened in game.ts endGame()
-  // This service tracks the settlement state, not the wallet operations
-  // TODO: When blockchain integration is added, trigger on-chain settlement here
 }
 
 /**
@@ -334,7 +349,11 @@ export async function holdForReview(
     .values({
       gameId: settlement.gameId,
       suspectPlayerId: flaggedPlayerId,
-      suspicionScore: (suspicionScore / 100).toFixed(4), // Convert to 0-1 scale
+      // SCALE CONVERSION: Anti-cheat system uses 0-100 scale (e.g., 95 means 95% suspicious)
+      // but juryCases table stores as 0-1 scale (e.g., 0.95) for consistency with
+      // probability/percentage conventions elsewhere in the codebase.
+      // Division by 100 converts: 95 -> 0.95, 98 -> 0.98, etc.
+      suspicionScore: (suspicionScore / 100).toFixed(4),
       priority,
       deadline,
       status: 'pending_assignment',
@@ -385,6 +404,11 @@ export async function holdForReview(
  * - 'not_guilty': Pay the original winner
  * - 'guilty': Compensate the victim (opponent of cheater)
  *
+ * SECURITY: Wrapped in a transaction with row locking to prevent:
+ * - Double-payment if verdict and timeout race
+ * - Inconsistent state if process crashes mid-operation
+ * - Concurrent resolution attempts
+ *
  * @param settlementId - The disputed settlement
  * @param verdict - The jury's decision
  * @param victimId - If guilty, who should receive compensation
@@ -394,70 +418,92 @@ export async function resolveDispute(
   verdict: 'guilty' | 'not_guilty',
   victimId?: string
 ): Promise<void> {
-  const settlement = await getSettlement(settlementId);
-  if (!settlement) {
-    throw new Error(`Settlement ${settlementId} not found`);
-  }
+  await withTransaction(async (tx) => {
+    // Lock the settlement row to prevent concurrent modifications
+    // This ensures only one process can resolve this dispute at a time
+    // .for('update') acquires a row-level lock - other transactions will wait
+    const [lockedSettlement] = await tx
+      .select()
+      .from(settlements)
+      .where(eq(settlements.id, settlementId))
+      .for('update');
 
-  if (settlement.status !== 'disputed') {
-    throw new Error(`Settlement ${settlementId} is not disputed`);
-  }
+    if (!lockedSettlement) {
+      throw new Error('Settlement not found');
+    }
 
-  const payout = settlement.totalPot - settlement.platformFee;
+    const settlement = mapSettlementRecord(lockedSettlement);
 
-  if (verdict === 'not_guilty') {
-    // Original winner was not cheating - pay them
-    if (settlement.winnerId) {
+    if (settlement.status !== 'disputed') {
+      throw new Error('Settlement cannot be resolved');
+    }
+
+    // Mark as 'resolving' to prevent concurrent processing attempts
+    // This is an intermediate status that blocks other resolution attempts
+    await tx
+      .update(settlements)
+      .set({
+        status: 'resolving' as SettlementStatus,
+        updatedAt: new Date(),
+      })
+      .where(eq(settlements.id, settlementId));
+
+    const payout = settlement.totalPot - settlement.platformFee;
+
+    if (verdict === 'not_guilty') {
+      // Original winner was not cheating - pay them
+      if (settlement.winnerId) {
+        await walletService.awardWinnings(
+          settlement.winnerId,
+          payout,
+          settlement.gameId
+        );
+      }
+    } else {
+      // Cheater found guilty - compensate the victim
+      if (!victimId) {
+        throw new Error('Missing required data for resolution');
+      }
+
       await walletService.awardWinnings(
-        settlement.winnerId,
+        victimId,
         payout,
         settlement.gameId
       );
     }
-  } else {
-    // Cheater found guilty - compensate the victim
-    if (!victimId) {
-      throw new Error('Victim ID required for guilty verdict');
-    }
 
-    await walletService.awardWinnings(
-      victimId,
-      payout,
-      settlement.gameId
+    // Update settlement to resolved
+    await tx
+      .update(settlements)
+      .set({
+        status: 'resolved',
+        settledAt: new Date(),
+        settledBy: 'jury',
+        // Update winner if verdict changed the outcome
+        winnerId: verdict === 'guilty' && victimId ? victimId : settlement.winnerId,
+        winnerPayout: payout.toString(),
+        updatedAt: new Date(),
+      })
+      .where(eq(settlements.id, settlementId));
+
+    // Record in history
+    await tx.insert(settlementHistory).values({
+      settlementId,
+      previousStatus: 'disputed',
+      newStatus: 'resolved',
+      trigger: 'verdict',
+      details: {
+        verdict,
+        victimId,
+        payout,
+      },
+    });
+
+    console.log(
+      `[Settlement] Resolved ${settlementId} with verdict: ${verdict} ` +
+      `(payout: ${payout} to ${verdict === 'guilty' ? victimId : settlement.winnerId})`
     );
-  }
-
-  // Update settlement to resolved
-  await db
-    .update(settlements)
-    .set({
-      status: 'resolved',
-      settledAt: new Date(),
-      settledBy: 'jury',
-      // Update winner if verdict changed the outcome
-      winnerId: verdict === 'guilty' && victimId ? victimId : settlement.winnerId,
-      winnerPayout: payout.toString(),
-      updatedAt: new Date(),
-    })
-    .where(eq(settlements.id, settlementId));
-
-  // Record in history
-  await db.insert(settlementHistory).values({
-    settlementId,
-    previousStatus: 'disputed',
-    newStatus: 'resolved',
-    trigger: 'verdict',
-    details: {
-      verdict,
-      victimId,
-      payout,
-    },
   });
-
-  console.log(
-    `[Settlement] Resolved ${settlementId} with verdict: ${verdict} ` +
-    `(payout: ${payout} to ${verdict === 'guilty' ? victimId : settlement.winnerId})`
-  );
 }
 
 /**
@@ -467,58 +513,87 @@ export async function resolveDispute(
  * funds are released to the original winner. This prevents funds from being
  * locked indefinitely.
  *
+ * SECURITY: Wrapped in a transaction with row locking to prevent:
+ * - Double-payment if timeout and verdict race
+ * - Processing already-resolved settlements
+ *
  * @param settlementId - The timed-out settlement
  */
 export async function handleTimeout(settlementId: string): Promise<void> {
-  const settlement = await getSettlement(settlementId);
-  if (!settlement) {
-    throw new Error(`Settlement ${settlementId} not found`);
-  }
+  await withTransaction(async (tx) => {
+    // Lock the settlement row to prevent concurrent modifications
+    // .for('update') acquires a row-level lock - other transactions will wait
+    const [lockedSettlement] = await tx
+      .select()
+      .from(settlements)
+      .where(eq(settlements.id, settlementId))
+      .for('update');
 
-  if (settlement.status !== 'disputed') {
-    throw new Error(`Settlement ${settlementId} is not disputed`);
-  }
+    if (!lockedSettlement) {
+      throw new Error('Settlement not found');
+    }
 
-  const payout = settlement.totalPot - settlement.platformFee;
+    const settlement = mapSettlementRecord(lockedSettlement);
 
-  // Release funds to original winner
-  if (settlement.winnerId) {
-    await walletService.awardWinnings(
-      settlement.winnerId,
-      payout,
-      settlement.gameId
+    if (settlement.status !== 'disputed') {
+      // Already resolved by jury verdict - skip silently
+      // This is not an error; it's expected in race conditions
+      console.log(
+        `[Settlement] Timeout skipped for ${settlementId} - already ${settlement.status}`
+      );
+      return;
+    }
+
+    // Mark as 'resolving' to prevent concurrent processing
+    await tx
+      .update(settlements)
+      .set({
+        status: 'resolving' as SettlementStatus,
+        updatedAt: new Date(),
+      })
+      .where(eq(settlements.id, settlementId));
+
+    const payout = settlement.totalPot - settlement.platformFee;
+
+    // Release funds to original winner
+    if (settlement.winnerId) {
+      await walletService.awardWinnings(
+        settlement.winnerId,
+        payout,
+        settlement.gameId
+      );
+    }
+
+    // Update settlement
+    await tx
+      .update(settlements)
+      .set({
+        status: 'resolved',
+        settledAt: new Date(),
+        settledBy: 'timeout',
+        winnerPayout: payout.toString(),
+        updatedAt: new Date(),
+      })
+      .where(eq(settlements.id, settlementId));
+
+    // Record in history
+    await tx.insert(settlementHistory).values({
+      settlementId,
+      previousStatus: 'disputed',
+      newStatus: 'resolved',
+      trigger: 'timeout',
+      details: {
+        timeoutHours: TIMEOUT_HOURS,
+        winnerId: settlement.winnerId,
+        payout,
+      },
+    });
+
+    console.log(
+      `[Settlement] Timeout release for ${settlementId} ` +
+      `(winner: ${settlement.winnerId}, payout: ${payout})`
     );
-  }
-
-  // Update settlement
-  await db
-    .update(settlements)
-    .set({
-      status: 'resolved',
-      settledAt: new Date(),
-      settledBy: 'timeout',
-      winnerPayout: payout.toString(),
-      updatedAt: new Date(),
-    })
-    .where(eq(settlements.id, settlementId));
-
-  // Record in history
-  await db.insert(settlementHistory).values({
-    settlementId,
-    previousStatus: 'disputed',
-    newStatus: 'resolved',
-    trigger: 'timeout',
-    details: {
-      timeoutHours: TIMEOUT_HOURS,
-      winnerId: settlement.winnerId,
-      payout,
-    },
   });
-
-  console.log(
-    `[Settlement] Timeout release for ${settlementId} ` +
-    `(winner: ${settlement.winnerId}, payout: ${payout})`
-  );
 }
 
 // ---------------------------------------------------------------------------
@@ -688,7 +763,7 @@ function mapSettlementRecord(record: SettlementRecord): Settlement {
 /**
  * Map CheatFlag from anticheat to EvaluationFlag.
  */
-function mapCheatFlag(flag: any): EvaluationFlag {
+function mapCheatFlag(flag: CheatFlag): EvaluationFlag {
   return {
     type: flag.type,
     severity: flag.severity,

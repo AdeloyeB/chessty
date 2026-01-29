@@ -36,7 +36,8 @@ import {
   type VerdictOption,
 } from '../../drizzle';
 import { updateJurorScores } from './scoring';
-import { nanoid } from 'nanoid';
+import { sanitizeText } from '../../utils/sanitize';
+import { withTransaction } from '../../utils/transaction';
 
 // ---------------------------------------------------------------------------
 // Configuration
@@ -107,90 +108,99 @@ export async function submitVerdict(input: VerdictInput): Promise<{
   error?: string;
   caseResolved?: boolean;
 }> {
-  // Verify the juror is assigned to this case
-  const assignment = await db.query.juryCaseAssignments.findFirst({
-    where: and(
-      eq(juryCaseAssignments.caseId, input.caseId),
-      eq(juryCaseAssignments.investigatorId, input.investigatorId)
-    ),
+  // Sanitize user input (notes field can contain user-provided text)
+  const sanitizedNotes = input.notes ? sanitizeText(input.notes, 2000) : undefined;
+
+  // Wrap the multi-step operation in a transaction for consistency
+  // This ensures all database operations succeed or fail together
+  return await withTransaction(async (tx) => {
+    // Verify the juror is assigned to this case
+    const assignment = await tx.query.juryCaseAssignments.findFirst({
+      where: and(
+        eq(juryCaseAssignments.caseId, input.caseId),
+        eq(juryCaseAssignments.investigatorId, input.investigatorId)
+      ),
+    });
+
+    if (!assignment) {
+      return { success: false, error: 'Not assigned to this case' };
+    }
+
+    if (assignment.status === 'completed') {
+      return { success: false, error: 'Already submitted verdict for this case' };
+    }
+
+    if (assignment.status === 'expired' || assignment.status === 'recused') {
+      return { success: false, error: `Cannot submit verdict: assignment is ${assignment.status}` };
+    }
+
+    // Get the case
+    const juryCase = await tx.query.juryCases.findFirst({
+      where: eq(juryCases.id, input.caseId),
+    });
+
+    if (!juryCase) {
+      return { success: false, error: 'Case not found' };
+    }
+
+    if (juryCase.status === 'resolved' || juryCase.status === 'expired') {
+      return { success: false, error: `Case is already ${juryCase.status}` };
+    }
+
+    // Create the verdict with sanitized notes
+    const [newVerdict] = await tx
+      .insert(juryVerdicts)
+      .values({
+        caseId: input.caseId,
+        investigatorId: input.investigatorId,
+        engineAssistance: input.engineAssistance,
+        inputAutomation: input.inputAutomation,
+        externalAssistance: input.externalAssistance,
+        notes: sanitizedNotes,
+        confidence: input.confidence || 3,
+      })
+      .returning();
+
+    // Update the assignment status
+    await tx
+      .update(juryCaseAssignments)
+      .set({
+        status: 'completed',
+        completedAt: new Date(),
+      })
+      .where(eq(juryCaseAssignments.id, assignment.id));
+
+    // Update juror stats
+    await tx
+      .update(juryInvestigators)
+      .set({
+        casesReviewed: sql`${juryInvestigators.casesReviewed} + 1`,
+        updatedAt: new Date(),
+      })
+      .where(eq(juryInvestigators.userId, input.investigatorId));
+
+    console.log(
+      `[Jury] Verdict submitted for case ${input.caseId} by ${input.investigatorId}: ` +
+      `engine=${input.engineAssistance}, automation=${input.inputAutomation}, external=${input.externalAssistance}`
+    );
+
+    // Check if we should resolve the case
+    // NOTE: aggregateVerdicts uses db directly, but this is acceptable because
+    // it only reads data, and the transaction has already committed the verdict
+    const aggregation = await aggregateVerdicts(input.caseId);
+
+    let caseResolved = false;
+    if (aggregation.shouldResolve) {
+      await resolveCase(input.caseId, aggregation);
+      caseResolved = true;
+    }
+
+    return {
+      success: true,
+      verdict: newVerdict,
+      caseResolved,
+    };
   });
-
-  if (!assignment) {
-    return { success: false, error: 'Not assigned to this case' };
-  }
-
-  if (assignment.status === 'completed') {
-    return { success: false, error: 'Already submitted verdict for this case' };
-  }
-
-  if (assignment.status === 'expired' || assignment.status === 'recused') {
-    return { success: false, error: `Cannot submit verdict: assignment is ${assignment.status}` };
-  }
-
-  // Get the case
-  const juryCase = await db.query.juryCases.findFirst({
-    where: eq(juryCases.id, input.caseId),
-  });
-
-  if (!juryCase) {
-    return { success: false, error: 'Case not found' };
-  }
-
-  if (juryCase.status === 'resolved' || juryCase.status === 'expired') {
-    return { success: false, error: `Case is already ${juryCase.status}` };
-  }
-
-  // Create the verdict
-  const [newVerdict] = await db
-    .insert(juryVerdicts)
-    .values({
-      caseId: input.caseId,
-      investigatorId: input.investigatorId,
-      engineAssistance: input.engineAssistance,
-      inputAutomation: input.inputAutomation,
-      externalAssistance: input.externalAssistance,
-      notes: input.notes,
-      confidence: input.confidence || 3,
-    })
-    .returning();
-
-  // Update the assignment status
-  await db
-    .update(juryCaseAssignments)
-    .set({
-      status: 'completed',
-      completedAt: new Date(),
-    })
-    .where(eq(juryCaseAssignments.id, assignment.id));
-
-  // Update juror stats
-  await db
-    .update(juryInvestigators)
-    .set({
-      casesReviewed: sql`${juryInvestigators.casesReviewed} + 1`,
-      updatedAt: new Date(),
-    })
-    .where(eq(juryInvestigators.userId, input.investigatorId));
-
-  console.log(
-    `[Jury] Verdict submitted for case ${input.caseId} by ${input.investigatorId}: ` +
-    `engine=${input.engineAssistance}, automation=${input.inputAutomation}, external=${input.externalAssistance}`
-  );
-
-  // Check if we should resolve the case
-  const aggregation = await aggregateVerdicts(input.caseId);
-
-  let caseResolved = false;
-  if (aggregation.shouldResolve) {
-    await resolveCase(input.caseId, aggregation);
-    caseResolved = true;
-  }
-
-  return {
-    success: true,
-    verdict: newVerdict,
-    caseResolved,
-  };
 }
 
 // ---------------------------------------------------------------------------
@@ -460,7 +470,6 @@ async function applySanctionForGuiltyVerdict(
   }
 
   await db.insert(playerSanctions).values({
-    id: nanoid(),
     playerId,
     sanctionType,
     reason: `Found guilty of cheating by community jury (Case: ${caseId})`,
