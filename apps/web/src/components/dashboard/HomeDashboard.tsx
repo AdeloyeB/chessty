@@ -18,7 +18,6 @@ import { USDCAmount } from '../wallet/USDCAmount';
 import { WalletButton } from '../wallet/WalletButton';
 import { BalanceDisplay } from '../wallet/BalanceDisplay';
 import { RankBadge, RankBadgeCompact } from '../profile/RankBadge';
-import { AchievementBadge } from '../profile/AchievementBadge';
 import { TitleBar } from '../desktop/TitleBar';
 import { TickerBar } from '../desktop/TickerBar';
 import { getRankTier, getProgressToNextRank, getNextRankTier } from '@chess-game/shared';
@@ -154,11 +153,11 @@ function HomeContent({ onNavigate }: { onNavigate: (tab: Tab) => void }) {
   }, [isDevMode, isConnected, initDevMode]);
 
   return (
-    <div className="border border-white/15">
+    <div className="border border-white/15 h-full flex flex-col">
       {/* Main Bento Grid - no gaps, shared borders */}
-      <div className="grid grid-cols-1 lg:grid-cols-12">
+      <div className="grid grid-cols-1 lg:grid-cols-12 flex-1 min-h-0">
         {/* Left Column - Player Profile */}
-        <div className="lg:col-span-3 border-r border-white/15">
+        <div className="lg:col-span-3 border-r border-white/15 overflow-y-auto">
           {/* Profile Card */}
           <Link href="/profile" className="block">
             <div className="bg-black hover:bg-white/5 transition-colors">
@@ -263,7 +262,7 @@ function HomeContent({ onNavigate }: { onNavigate: (tab: Tab) => void }) {
         </div>
 
         {/* Center Column - Quick Play & Featured */}
-        <div className="lg:col-span-6 border-r border-white/15">
+        <div className="lg:col-span-6 border-r border-white/15 overflow-y-auto">
           {/* Quick Play Actions - side by side with shared border */}
           <div className="grid grid-cols-2 border-b border-white/15">
             <button
@@ -352,7 +351,7 @@ function HomeContent({ onNavigate }: { onNavigate: (tab: Tab) => void }) {
         </div>
 
         {/* Right Column - Rankings */}
-        <div className="lg:col-span-3">
+        <div className="lg:col-span-3 overflow-y-auto">
           {/* Top Players */}
           <div className="bg-black border-b border-white/15">
             <div className="flex items-center justify-between p-4 border-b border-white/15">
@@ -421,22 +420,22 @@ export function HomeDashboard() {
   const isInGame = status === 'queuing' || status === 'matched' || status === 'playing';
   const isGameEnded = status === 'ended';
 
-  // Auto-switch to live_game tab when a game starts
+  // Sync tab state with external game state changes
+  // This effect intentionally calls setState to react to game status changes
+  // from the Zustand store (external system), which is a valid effect pattern.
   const prevStatusRef = useRef(status);
   useEffect(() => {
+    // Auto-switch to live_game tab when a game starts
     if (isInGame && prevStatusRef.current === 'idle') {
-      setActiveTab('live_game');
+      setActiveTab('live_game'); // eslint-disable-line react-hooks/set-state-in-effect -- Syncing with external game state
+    }
+    // When game ends and user dismisses the dialog (reset → idle),
+    // return to home tab and remove the live_game tab
+    else if (status === 'idle' && activeTab === 'live_game') {
+      setActiveTab('home');  
     }
     prevStatusRef.current = status;
-  }, [isInGame, status]);
-
-  // When game ends and user dismisses the dialog (reset → idle),
-  // return to home tab and remove the live_game tab
-  useEffect(() => {
-    if (status === 'idle' && activeTab === 'live_game') {
-      setActiveTab('home');
-    }
-  }, [status, activeTab]);
+  }, [isInGame, status, activeTab]);
 
   // Build tabs array — live_game appears dynamically when in a game or game just ended
   // spectate tab is behind the spectator_mode feature flag
@@ -452,7 +451,7 @@ export function HomeDashboard() {
   ];
 
   return (
-    <div className="min-h-screen bg-black">
+    <div className="h-dvh bg-black flex flex-col overflow-hidden">
       {/* Desktop Titlebar — only renders inside Tauri (not in browser) */}
       <TitleBar
         activeTab={activeTab}
@@ -462,7 +461,7 @@ export function HomeDashboard() {
       />
 
       {/* Top Navigation Bar — shown in browser, hidden when TitleBar is active */}
-      <nav className="border-b border-white/15 bg-black sticky top-0 z-50 tauri-hidden">
+      <nav className="border-b border-white/15 bg-black z-50 tauri-hidden flex-shrink-0">
         <div className="container mx-auto px-6">
           <div className="flex items-center justify-between h-16">
             {/* Left: Logo & Nav */}
@@ -548,22 +547,22 @@ export function HomeDashboard() {
         </div>
       </nav>
 
-      {/* Main Content */}
+      {/* Main Content - fills remaining viewport height */}
       {activeTab === 'live_game' ? (
-        <main className="h-[calc(100vh-64px)]">
+        <main className="flex-1 min-h-0">
           <LiveGame />
         </main>
       ) : activeTab === 'practice' ? (
-        <main className="h-[calc(100vh-64px)]">
+        <main className="flex-1 min-h-0">
           <LocalGame />
         </main>
       ) : activeTab === 'watch' && multiGameEnabled ? (
         // Multi-game spectator: sub-nav + content managed by SpectatorViewManager
-        <main>
+        <main className="flex-1 min-h-0 overflow-y-auto">
           <SpectatorViewManager />
         </main>
       ) : (
-        <main className="container mx-auto px-6 py-6">
+        <main className="flex-1 min-h-0 container mx-auto px-6 py-4 overflow-y-auto">
           {activeTab === 'home' && <HomeContent onNavigate={setActiveTab} />}
           {activeTab === 'play' && <ChallengeMarketplace />}
           {activeTab === 'watch' && <ActiveGamesLobby />}

@@ -283,28 +283,30 @@ export function LoginScreen() {
   };
 
   return (
-    <div className="min-h-screen flex bg-black">
+    <div className="h-dvh flex bg-black overflow-hidden">
       {/* Left Sidebar - Login Form */}
-      <div className="w-full lg:w-[420px] bg-black border-r border-white/15 flex flex-col justify-center p-8 lg:p-12 relative z-10">
-        <div className="max-w-sm mx-auto w-full">
+      <div className="w-full lg:w-[420px] bg-black border-r border-white/15 relative z-10 overflow-y-auto">
+        {/* Inner wrapper: min-h-full ensures it fills viewport, flex centers content when there's room */}
+        <div className="min-h-full flex flex-col justify-center px-6 lg:px-8 py-6">
+          <div className="max-w-sm mx-auto w-full">
           {/* Logo */}
-          <div className="mb-12">
+          <div className="mb-6">
             <div className="flex items-center gap-3 mb-2">
-              <span className="text-5xl text-white/80">♔</span>
+              <span className="text-4xl text-white/80">♔</span>
             </div>
-            <p className="text-white/50 font-mono text-sm mt-4 lowercase">
+            <p className="text-white/50 font-mono text-sm mt-2 lowercase">
               play • predict • win
             </p>
           </div>
 
           {/* OAuth Buttons */}
-          <div className="flex justify-center gap-3 mb-4">
+          <div className="flex justify-center gap-3 mb-3">
             <OAuthButton provider="google" />
             <OAuthButton provider="twitter" />
           </div>
 
           {/* Wallet Connection Section */}
-          <div className="mb-6">
+          <div className="mb-4">
             <div className="flex items-center justify-center gap-2 mb-3">
               <div className="h-px flex-1 bg-white/10" />
               <span className="text-[10px] font-mono text-white/30 uppercase tracking-widest px-2 flex items-center gap-1.5">
@@ -323,7 +325,7 @@ export function LoginScreen() {
           <OAuthDivider />
 
           {/* Tab Navigation */}
-          <div className="flex mb-8 border-b border-white/15">
+          <div className="flex mb-5 border-b border-white/15">
             <button
               className={`flex-1 pb-2 text-sm transition-all duration-150 lowercase tracking-wide ${
                 isLogin ? 'text-white border-b border-white' : 'text-white/30 hover:text-white/60 border-b border-transparent'
@@ -343,16 +345,16 @@ export function LoginScreen() {
           </div>
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <form onSubmit={handleSubmit} className="space-y-3">
             <div>
-              <label className="block text-xs font-mono text-white/50 mb-2 lowercase">
+              <label className="block text-xs font-mono text-white/50 mb-1 lowercase">
                 email
               </label>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-3 py-2.5 bg-black border border-white/15 text-white placeholder-white/30 lowercase tracking-wide focus:outline-none focus:border-white transition-colors duration-150 font-mono"
+                className="w-full px-3 py-2 bg-black border border-white/15 text-white placeholder-white/30 lowercase tracking-wide focus:outline-none focus:border-white transition-colors duration-150 font-mono"
                 placeholder="you@example.com"
                 required
               />
@@ -360,14 +362,14 @@ export function LoginScreen() {
 
             {!isLogin && (
               <div>
-                <label className="block text-xs font-mono text-white/50 mb-2 lowercase">
+                <label className="block text-xs font-mono text-white/50 mb-1 lowercase">
                   username
                 </label>
                 <input
                   type="text"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  className="w-full px-3 py-2.5 bg-black border border-white/15 text-white placeholder-white/30 lowercase tracking-wide focus:outline-none focus:border-white transition-colors duration-150 font-mono"
+                  className="w-full px-3 py-2 bg-black border border-white/15 text-white placeholder-white/30 lowercase tracking-wide focus:outline-none focus:border-white transition-colors duration-150 font-mono"
                   placeholder="your_name"
                   required
                   minLength={3}
@@ -377,14 +379,14 @@ export function LoginScreen() {
             )}
 
             <div>
-              <label className="block text-xs font-mono text-white/50 mb-2 lowercase">
+              <label className="block text-xs font-mono text-white/50 mb-1 lowercase">
                 password
               </label>
               <input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-3 py-2.5 bg-black border border-white/15 text-white placeholder-white/30 lowercase tracking-wide focus:outline-none focus:border-white transition-colors duration-150 font-mono"
+                className="w-full px-3 py-2 bg-black border border-white/15 text-white placeholder-white/30 lowercase tracking-wide focus:outline-none focus:border-white transition-colors duration-150 font-mono"
                 placeholder="••••••••"
                 required
                 minLength={8}
@@ -400,7 +402,7 @@ export function LoginScreen() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full px-5 py-2.5 text-sm font-mono bg-white text-black border border-white hover:bg-white/90 transition-all duration-150 lowercase tracking-wide disabled:opacity-50"
+              className="w-full px-4 py-2 text-sm font-mono bg-white text-black border border-white hover:bg-white/90 transition-all duration-150 lowercase tracking-wide disabled:opacity-50"
             >
               {loading ? (
                 <span className="flex items-center justify-center gap-2">
@@ -417,11 +419,11 @@ export function LoginScreen() {
 
           {/* Dev Login */}
           {process.env.NODE_ENV === 'development' && (
-            <div className="mt-6 pt-6 border-t border-white/15">
+            <div className="mt-4 pt-4 border-t border-white/15">
               <button
                 type="button"
                 onClick={handleDevLogin}
-                className="w-full px-5 py-2.5 text-xs font-mono bg-black border border-white/15 text-white/50 hover:border-white hover:text-white transition-all duration-150 lowercase"
+                className="w-full px-5 py-2 text-xs font-mono bg-black border border-white/15 text-white/50 hover:border-white hover:text-white transition-all duration-150 lowercase"
               >
                 dev_login (skip auth)
               </button>
@@ -429,7 +431,7 @@ export function LoginScreen() {
           )}
 
           {/* Footer */}
-          <div className="mt-6 pt-6 border-t border-white/15">
+          <div className="mt-4 pt-4 border-t border-white/15">
             <p className="text-white/30 text-xs font-mono text-center lowercase">
               predict • play chess • win rewards
             </p>
@@ -439,24 +441,25 @@ export function LoginScreen() {
               MOCK DATA - See MOCK_DATA.md for all mock data locations
               Replace with: GET /api/platform/stats
               ============================================================================ */}
-          {/* Stats Preview - Bento grid style */}
-          <div className="mt-8 border border-white/15">
+          {/* Stats Preview - Compact bento grid */}
+          <div className="mt-4 border border-white/15">
             <div className="grid grid-cols-3">
-              <div className="text-center p-4 border-r border-white/15">
-                <p className="text-2xl font-mono text-white">2.4k</p>
-                <p className="text-xs font-mono text-white/30 lowercase">players</p>
+              <div className="text-center py-2.5 px-2 border-r border-white/15">
+                <p className="text-lg font-mono text-white">2.4k</p>
+                <p className="text-[10px] font-mono text-white/30 lowercase">players</p>
               </div>
-              <div className="text-center p-4 border-r border-white/15">
-                <p className="text-2xl font-mono text-white">847</p>
-                <p className="text-xs font-mono text-white/30 lowercase">live</p>
+              <div className="text-center py-2.5 px-2 border-r border-white/15">
+                <p className="text-lg font-mono text-white">847</p>
+                <p className="text-[10px] font-mono text-white/30 lowercase">live</p>
               </div>
-              <div className="text-center p-4">
-                <p className="text-2xl font-mono text-white">12.5k</p>
-                <p className="text-xs font-mono text-white/30 lowercase">games</p>
+              <div className="text-center py-2.5 px-2">
+                <p className="text-lg font-mono text-white">12.5k</p>
+                <p className="text-[10px] font-mono text-white/30 lowercase">games</p>
               </div>
             </div>
           </div>
           {/* ============================================================================ */}
+        </div>
         </div>
       </div>
 
