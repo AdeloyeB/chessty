@@ -5,8 +5,8 @@
  * Comprehensive tests for the settlement service which handles:
  * - Creating pending settlements when games end
  * - Evaluating games for cheating using anti-cheat scores
- * - Auto-settling clean games (low suspicion) or holding suspicious games for jury review
- * - Resolving disputes after jury verdicts
+ * - Auto-settling clean games (low suspicion) or holding suspicious games for overwatch review
+ * - Resolving disputes after overwatch verdicts
  * - Handling timeouts (48-hour safety release)
  * - Recovering stuck settlements
  *
@@ -29,7 +29,7 @@ import { describe, test, expect, mock, beforeEach } from 'bun:test';
 import {
   createTestSettlement,
   createTestGame,
-  createTestJuryCase,
+  createTestOverwatchCase,
 } from '../../__tests__/utils/fixtures';
 
 // ---------------------------------------------------------------------------
@@ -119,7 +119,7 @@ mock.module('../../drizzle', () => ({
   games: { id: 'id', whitePlayerId: 'whitePlayerId', blackPlayerId: 'blackPlayerId' },
   settlements: { id: 'id', gameId: 'gameId', status: 'status', updatedAt: 'updatedAt', createdAt: 'createdAt' },
   settlementHistory: { id: 'id', settlementId: 'settlementId' },
-  juryCases: { id: 'id', gameId: 'gameId' },
+  overwatchCases: { id: 'id', gameId: 'gameId' },
 }));
 
 // Mock wallet service
@@ -544,7 +544,7 @@ describe('Settlement Service', () => {
   // holdForReview() Tests
   // =========================================================================
   describe('holdForReview()', () => {
-    test('should create jury case with correct deadline (48 hours)', async () => {
+    test('should create overwatch case with correct deadline (48 hours)', async () => {
       const settlement = createTestSettlement({
         id: 'hold-1',
         gameId: 'game-hold-1',
@@ -552,19 +552,19 @@ describe('Settlement Service', () => {
       });
 
       mockSettlementsFind = mock(() => Promise.resolve(settlement));
-      transactionSettlement = createTestJuryCase({
-        id: 'jury-case-1',
+      transactionSettlement = createTestOverwatchCase({
+        id: 'overwatch-case-1',
         gameId: 'game-hold-1',
       }) as unknown as ReturnType<typeof createTestSettlement>;
 
-      const juryCaseId = await settlementService.holdForReview(
+      const overwatchCaseId = await settlementService.holdForReview(
         'hold-1',
         'flagged-player-1',
         96,
         'high'
       );
 
-      expect(juryCaseId).toBe('jury-case-1');
+      expect(overwatchCaseId).toBe('overwatch-case-1');
     });
 
     test('should update settlement to disputed status', async () => {
@@ -575,7 +575,7 @@ describe('Settlement Service', () => {
       });
 
       mockSettlementsFind = mock(() => Promise.resolve(settlement));
-      transactionSettlement = createTestJuryCase({ id: 'jury-case-2' }) as unknown as ReturnType<typeof createTestSettlement>;
+      transactionSettlement = createTestOverwatchCase({ id: 'overwatch-case-2' }) as unknown as ReturnType<typeof createTestSettlement>;
 
       await settlementService.holdForReview('hold-2', 'player-1', 97, 'high');
 
@@ -606,15 +606,15 @@ describe('Settlement Service', () => {
       ).rejects.toThrow('Settlement non-existent not found');
     });
 
-    test('should return jury case ID', async () => {
+    test('should return overwatch case ID', async () => {
       const settlement = createTestSettlement({
         id: 'hold-return-id',
         status: 'pending',
       });
 
       mockSettlementsFind = mock(() => Promise.resolve(settlement));
-      const expectedJuryCaseId = 'returned-jury-case-id';
-      transactionSettlement = createTestJuryCase({ id: expectedJuryCaseId }) as unknown as ReturnType<typeof createTestSettlement>;
+      const expectedOverwatchCaseId = 'returned-overwatch-case-id';
+      transactionSettlement = createTestOverwatchCase({ id: expectedOverwatchCaseId }) as unknown as ReturnType<typeof createTestSettlement>;
 
       const result = await settlementService.holdForReview(
         'hold-return-id',
@@ -623,7 +623,7 @@ describe('Settlement Service', () => {
         'high'
       );
 
-      expect(result).toBe(expectedJuryCaseId);
+      expect(result).toBe(expectedOverwatchCaseId);
     });
   });
 

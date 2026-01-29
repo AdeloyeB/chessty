@@ -15,12 +15,12 @@ This document covers the complete architecture for cheat detection, game settlem
 3. [Performance Architecture](#3-performance-architecture)
 4. [Anti-Cheat Detection Layers](#4-anti-cheat-detection-layers)
 5. [Settlement & Escrow Flow](#5-settlement--escrow-flow)
-6. [Community Review System (Jury)](#6-community-review-system-jury)
+6. [Community Review System (Arbiter Overwatch)](#6-community-review-system-arbiter-overwatch)
 7. [Technical Implementation](#7-technical-implementation)
 8. [Pre-Release Must-Haves](#8-pre-release-must-haves)
 9. [Future Considerations](#9-future-considerations)
 10. [Manual Steps & TODOs](#10-manual-steps--todos)
-11. [Jury UI Accessibility Ideas](#11-jury-ui-accessibility-ideas)
+11. [Arbiter Overwatch UI Accessibility Ideas](#11-arbiter-overwatch-ui-accessibility-ideas)
 12. [Implementation Status](#12-implementation-status)
 
 ---
@@ -82,7 +82,7 @@ A **multi-layered defense system** combining:
 │  │                              GAME SERVER (Hono.js)                          │   │
 │  │                                                                             │   │
 │  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐ │   │
-│  │  │    Game     │  │  Anti-Cheat │  │  Settlement │  │      Jury           │ │   │
+│  │  │    Game     │  │  Anti-Cheat │  │  Settlement │  │  Arbiter Overwatch │ │   │
 │  │  │  Coordinator│  │   Engine    │  │   Service   │  │    Coordinator      │ │   │
 │  │  │             │  │             │  │             │  │                     │ │   │
 │  │  │ Move valid  │  │ Statistical │  │ Suspicion   │  │  Case assignment    │ │   │
@@ -114,7 +114,7 @@ A **multi-layered defense system** combining:
 │  │  │                    ┌────────────────────┴────────────────────┐        │ │   │
 │  │  │                    ▼                                         ▼        │ │   │
 │  │  │          resolveDispute()                          claimAfterTimeout()│ │   │
-│  │  │          (jury verdict)                            (48h safety valve) │ │   │
+│  │  │          (arbiter overwatch verdict)                            (48h safety valve) │ │   │
 │  │  │                                                                       │ │   │
 │  │  └───────────────────────────────────────────────────────────────────────┘ │   │
 │  │                                                                             │   │
@@ -364,8 +364,8 @@ pub fn auto_detect() -> EngineConfig {
 │  │    NORMAL (0-50%):   Auto-settle, no action                                │   │
 │  │    WATCH (50-70%):   Auto-settle, add to watchlist                         │   │
 │  │    MONITOR (70-90%): Auto-settle, flag for background review               │   │
-│  │    FLAG (90-95%):    Auto-settle, mandatory spot-check by jury             │   │
-│  │    HOLD (95-100%):   HOLD FUNDS, mandatory jury review                     │   │
+│  │    FLAG (90-95%):    Auto-settle, mandatory spot-check by arbiter overwatch             │   │
+│  │    HOLD (95-100%):   HOLD FUNDS, mandatory arbiter overwatch review                     │   │
 │  │                                                                             │   │
 │  └─────────────────────────────────────────────────────────────────────────────┘   │
 │                                                                                     │
@@ -448,7 +448,7 @@ pub fn auto_detect() -> EngineConfig {
 │    │  < 95%      │     │  95-98%     │     │  > 98%      │                        │
 │    │             │     │             │     │             │                        │
 │    │ AUTO-SETTLE │     │ HOLD +      │     │ HOLD +      │                        │
-│    │             │     │ JURY REVIEW │     │ PRIORITY    │                        │
+│    │             │     │ ARBITER OVERWATCH REVIEW │     │ PRIORITY    │                        │
 │    │ Winner gets │     │             │     │ REVIEW      │                        │
 │    │ $100 - fees │     │ Funds locked│     │             │                        │
 │    └─────────────┘     │ 48h max     │     │ Funds locked│                        │
@@ -459,7 +459,7 @@ pub fn auto_detect() -> EngineConfig {
 │           │                             │                                          │
 │           │                             ▼                                          │
 │           │                    ┌─────────────────┐                                 │
-│           │                    │   JURY REVIEW   │                                 │
+│           │                    │   ARBITER OVERWATCH REVIEW   │                                 │
 │           │                    │   (Community)   │                                 │
 │           │                    └────────┬────────┘                                 │
 │           │                             │                                          │
@@ -511,7 +511,7 @@ enum GameState {
 
 ---
 
-## 6. Community Review System (Jury)
+## 6. Community Review System (Arbiter Overwatch)
 
 ### Inspiration: CS:GO Overwatch
 
@@ -519,11 +519,11 @@ Based on [CS:GO's Overwatch system](https://blog.counter-strike.net/index.php/ov
 
 > "The Overwatch system allows the CS:GO community to independently self-police their gaming environment. Investigators are selected based on their activity (competitive wins, account age, hours played, Skill Group, low report count) and their accuracy as investigators."
 
-### Jury System Design
+### Arbiter Overwatch System Design
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────────┐
-│                              JURY SYSTEM ARCHITECTURE                               │
+│                              ARBITER OVERWATCH SYSTEM ARCHITECTURE                               │
 ├─────────────────────────────────────────────────────────────────────────────────────┤
 │                                                                                     │
 │  WHO CAN BE A JUROR?                                                               │
@@ -546,7 +546,7 @@ Based on [CS:GO's Overwatch system](https://blog.counter-strike.net/index.php/ov
 │  │   • Higher ELO (better at recognizing skill vs cheating)                    │   │
 │  │   • Active player (plays regularly)                                         │   │
 │  │   • Good standing (positive community interactions)                         │   │
-│  │   • Previous accurate verdicts (if returning juror)                         │   │
+│  │   • Previous accurate verdicts (if returning arbiter)                         │   │
 │  │                                                                             │   │
 │  └─────────────────────────────────────────────────────────────────────────────┘   │
 │                                                                                     │
@@ -561,11 +561,11 @@ Based on [CS:GO's Overwatch system](https://blog.counter-strike.net/index.php/ov
 │    │   Flagged game enters queue                                             │     │
 │    │            │                                                            │     │
 │    │            ▼                                                            │     │
-│    │   System selects 5-7 eligible jurors                                    │     │
+│    │   System selects 5-7 eligible arbiters                                    │     │
 │    │   (different ELO ranges for diverse perspective)                        │     │
 │    │            │                                                            │     │
 │    │            ▼                                                            │     │
-│    │   Jurors receive notification: "A case is available for review"         │     │
+│    │   Arbiters receive notification: "A case is available for review"         │     │
 │    │                                                                         │     │
 │    └─────────────────────────────────────────────────────────────────────────┘     │
 │                                                                                     │
@@ -574,7 +574,7 @@ Based on [CS:GO's Overwatch system](https://blog.counter-strike.net/index.php/ov
 │    │   2. EVIDENCE PRESENTED                                                 │     │
 │    │   ─────────────────────                                                 │     │
 │    │                                                                         │     │
-│    │   Juror sees ANONYMIZED data:                                           │     │
+│    │   Arbiter sees ANONYMIZED data:                                           │     │
 │    │                                                                         │     │
 │    │   ┌─────────────────────────────────────────────────────────────────┐   │     │
 │    │   │  CASE #48291                                                    │   │     │
@@ -619,7 +619,7 @@ Based on [CS:GO's Overwatch system](https://blog.counter-strike.net/index.php/ov
 │    │   3. VERDICT OPTIONS                                                    │     │
 │    │   ──────────────────                                                    │     │
 │    │                                                                         │     │
-│    │   For each charge, juror selects:                                       │     │
+│    │   For each charge, arbiter selects:                                       │     │
 │    │                                                                         │     │
 │    │   ┌─────────────────────────────────────────────────────────────────┐   │     │
 │    │   │                                                                 │   │     │
@@ -656,17 +656,17 @@ Based on [CS:GO's Overwatch system](https://blog.counter-strike.net/index.php/ov
 │    │   4. VERDICT AGGREGATION                                                │     │
 │    │   ──────────────────────                                                │     │
 │    │                                                                         │     │
-│    │   Verdicts are weighted by juror score:                                 │     │
+│    │   Verdicts are weighted by arbiter score:                                 │     │
 │    │                                                                         │     │
-│    │   Juror Score = f(accuracy_history, agreement_rate, experience)         │     │
+│    │   Arbiter Score = f(accuracy_history, agreement_rate, experience)         │     │
 │    │                                                                         │     │
 │    │   ┌─────────────────────────────────────────────────────────────────┐   │     │
 │    │   │                                                                 │   │     │
-│    │   │   Juror A (Score: 0.92):  GUILTY      → Weight: 0.92           │   │     │
-│    │   │   Juror B (Score: 0.85):  GUILTY      → Weight: 0.85           │   │     │
-│    │   │   Juror C (Score: 0.78):  GUILTY      → Weight: 0.78           │   │     │
-│    │   │   Juror D (Score: 0.71):  NOT GUILTY  → Weight: 0.71           │   │     │
-│    │   │   Juror E (Score: 0.65):  GUILTY      → Weight: 0.65           │   │     │
+│    │   │   Arbiter A (Score: 0.92):  GUILTY      → Weight: 0.92           │   │     │
+│    │   │   Arbiter B (Score: 0.85):  GUILTY      → Weight: 0.85           │   │     │
+│    │   │   Arbiter C (Score: 0.78):  GUILTY      → Weight: 0.78           │   │     │
+│    │   │   Arbiter D (Score: 0.71):  NOT GUILTY  → Weight: 0.71           │   │     │
+│    │   │   Arbiter E (Score: 0.65):  GUILTY      → Weight: 0.65           │   │     │
 │    │   │                                                                 │   │     │
 │    │   │   Weighted GUILTY:      0.92 + 0.85 + 0.78 + 0.65 = 3.20       │   │     │
 │    │   │   Weighted NOT GUILTY:  0.71 = 0.71                            │   │     │
@@ -693,10 +693,10 @@ Based on [CS:GO's Overwatch system](https://blog.counter-strike.net/index.php/ov
 │  │   Score Update Formula:                                                     │   │
 │  │   ─────────────────────                                                     │   │
 │  │                                                                             │   │
-│  │   If juror agrees with final verdict:                                       │   │
+│  │   If arbiter agrees with final verdict:                                       │   │
 │  │      score_delta = +0.02 * consensus_strength                              │   │
 │  │                                                                             │   │
-│  │   If juror disagrees with final verdict:                                    │   │
+│  │   If arbiter disagrees with final verdict:                                    │   │
 │  │      score_delta = -0.05 * consensus_strength                              │   │
 │  │                                                                             │   │
 │  │   Where consensus_strength = |guilty_ratio - 0.5| * 2                      │   │
@@ -707,13 +707,13 @@ Based on [CS:GO's Overwatch system](https://blog.counter-strike.net/index.php/ov
 │  │   TEST CASES                                                                │   │
 │  │   ──────────                                                                │   │
 │  │                                                                             │   │
-│  │   Randomly insert known cases (previously resolved) to calibrate jurors.    │   │
-│  │   These don't affect actual players but DO affect juror scores.             │   │
+│  │   Randomly insert known cases (previously resolved) to calibrate arbiters.    │   │
+│  │   These don't affect actual players but DO affect arbiter scores.             │   │
 │  │                                                                             │   │
 │  │   Example:                                                                  │   │
 │  │   • 1 in 5 cases is a "test case" with known outcome                       │   │
-│  │   • If juror consistently fails test cases, their score drops              │   │
-│  │   • Low-scoring jurors' votes count less                                   │   │
+│  │   • If arbiter consistently fails test cases, their score drops              │   │
+│  │   • Low-scoring arbiters' votes count less                                   │   │
 │  │                                                                             │   │
 │  └─────────────────────────────────────────────────────────────────────────────┘   │
 │                                                                                     │
@@ -723,7 +723,7 @@ Based on [CS:GO's Overwatch system](https://blog.counter-strike.net/index.php/ov
 │  ┌─────────────────────────────────────────────────────────────────────────────┐   │
 │  │                                                                             │   │
 │  │   • XP bonus for accurate verdicts (CS:GO model)                           │   │
-│  │   • "Trusted Juror" badge after 50+ accurate cases                         │   │
+│  │   • "Trusted Arbiter" badge after 50+ accurate cases                         │   │
 │  │   • Priority matchmaking or reduced fees (optional)                        │   │
 │  │   • Leaderboard recognition                                                │   │
 │  │   • Sense of community contribution                                        │   │
@@ -740,8 +740,8 @@ Based on [CS:GO's Overwatch system](https://blog.counter-strike.net/index.php/ov
 ### Database Schema (New Tables)
 
 ```sql
--- Jury eligibility tracking
-CREATE TABLE jury_investigators (
+-- Arbiter eligibility tracking
+CREATE TABLE overwatch_investigators (
     id UUID PRIMARY KEY,
     user_id UUID REFERENCES users(id),
 
@@ -765,7 +765,7 @@ CREATE TABLE jury_investigators (
 );
 
 -- Cases pending review
-CREATE TABLE jury_cases (
+CREATE TABLE overwatch_cases (
     id UUID PRIMARY KEY,
     game_id UUID REFERENCES games(id),
 
@@ -788,11 +788,11 @@ CREATE TABLE jury_cases (
     known_outcome TEXT -- Only set for test cases
 );
 
--- Individual juror verdicts
-CREATE TABLE jury_verdicts (
+-- Individual arbiter verdicts
+CREATE TABLE overwatch_verdicts (
     id UUID PRIMARY KEY,
-    case_id UUID REFERENCES jury_cases(id),
-    investigator_id UUID REFERENCES jury_investigators(id),
+    case_id UUID REFERENCES overwatch_cases(id),
+    investigator_id UUID REFERENCES overwatch_investigators(id),
 
     -- Verdicts per charge
     engine_assistance TEXT NOT NULL, -- 'insufficient', 'guilty'
@@ -826,11 +826,11 @@ CREATE TABLE game_settlements (
     -- Anti-cheat
     suspicion_score INTEGER,
     flagged_player_id UUID REFERENCES users(id),
-    jury_case_id UUID REFERENCES jury_cases(id),
+    overwatch_case_id UUID REFERENCES overwatch_cases(id),
 
     -- Resolution
     settled_at TIMESTAMP,
-    settled_by TEXT, -- 'auto', 'jury', 'timeout', 'admin'
+    settled_by TEXT, -- 'auto', 'overwatch', 'timeout', 'admin'
 
     -- Blockchain
     escrow_tx_hash TEXT,
@@ -847,19 +847,19 @@ CREATE TABLE game_settlements (
 POST   /api/games/:id/settle           // Submit game result + suspicion score
 GET    /api/games/:id/settlement       // Get settlement status
 
-// Jury endpoints
-GET    /api/jury/eligibility           // Check if current user can be juror
-POST   /api/jury/enroll                // Enroll as juror
-GET    /api/jury/cases                 // Get available cases for review
-GET    /api/jury/cases/:id             // Get case details (anonymized)
-POST   /api/jury/cases/:id/verdict     // Submit verdict
-GET    /api/jury/stats                 // Get juror's stats and score
+// Arbiter Overwatch endpoints
+GET    /api/overwatch/eligibility           // Check if current user can be arbiter
+POST   /api/overwatch/enroll                // Enroll as arbiter
+GET    /api/overwatch/cases                 // Get available cases for review
+GET    /api/overwatch/cases/:id             // Get case details (anonymized)
+POST   /api/overwatch/cases/:id/verdict     // Submit verdict
+GET    /api/overwatch/stats                 // Get arbiter's stats and score
 
 // Admin endpoints
 GET    /api/admin/settlements/pending  // List pending settlements
 POST   /api/admin/settlements/:id/resolve // Manual resolution (fallback)
-GET    /api/admin/jury/investigators   // List all investigators
-POST   /api/admin/jury/investigators/:id/suspend // Suspend investigator
+GET    /api/admin/overwatch/investigators   // List all investigators
+POST   /api/admin/overwatch/investigators/:id/suspend // Suspend investigator
 ```
 
 ### Event Flow
@@ -878,21 +878,21 @@ gameEvents.on('game:ended', async (game) => {
         // Auto-settle
         await settleGame(settlement, game.winnerId);
     } else {
-        // Create jury case
-        const juryCase = await createJuryCase(game, suspicionScore);
+        // Create overwatch case
+        const overwatchCase = await createOverwatchCase(game, suspicionScore);
         settlement.status = 'disputed';
-        settlement.jury_case_id = juryCase.id;
+        settlement.overwatch_case_id = overwatchCase.id;
 
-        // Assign jurors
-        await assignJurors(juryCase, 5);
+        // Assign arbiters
+        await assignArbiters(overwatchCase, 5);
 
         // Notify players
         await notifyPlayers(game, 'Game under review');
     }
 });
 
-// When jury case gets enough verdicts
-juryEvents.on('case:quorum_reached', async (caseId) => {
+// When overwatch case gets enough verdicts
+overwatchEvents.on('case:quorum_reached', async (caseId) => {
     const verdicts = await getVerdicts(caseId);
 
     // Calculate weighted verdict
@@ -901,8 +901,8 @@ juryEvents.on('case:quorum_reached', async (caseId) => {
     // Update case
     await resolveCase(caseId, result);
 
-    // Update juror scores
-    await updateJurorScores(verdicts, result);
+    // Update arbiter scores
+    await updateArbiterScores(verdicts, result);
 
     // Settle the game
     const settlement = await getSettlementByCase(caseId);
@@ -952,21 +952,21 @@ juryEvents.on('case:quorum_reached', async (caseId) => {
 │  [ ] Player notification system                                          TODO      │
 │  [ ] Settlement status tracking                                          TODO      │
 │                                                                                     │
-│  JURY SYSTEM                                                                       │
+│  ARBITER OVERWATCH SYSTEM                                                                       │
 │  ═══════════                                                                       │
-│  [ ] Juror eligibility checking                                          TODO      │
+│  [ ] Arbiter eligibility checking                                          TODO      │
 │  [ ] Case assignment algorithm                                           TODO      │
 │  [ ] Anonymized case presentation UI                                     TODO      │
 │  [ ] Verdict submission                                                  TODO      │
 │  [ ] Weighted verdict aggregation                                        TODO      │
-│  [ ] Juror scoring system                                                TODO      │
+│  [ ] Arbiter scoring system                                                TODO      │
 │  [ ] Test case insertion                                                 TODO      │
 │                                                                                     │
 │  ADMIN TOOLS                                                                       │
 │  ═══════════                                                                       │
 │  [ ] Settlement dashboard                                                TODO      │
 │  [ ] Manual resolution capability                                        TODO      │
-│  [ ] Juror management                                                    TODO      │
+│  [ ] Arbiter management                                                    TODO      │
 │  [ ] Audit logs                                                          TODO      │
 │                                                                                     │
 │  PERFORMANCE                                                                       │
@@ -981,9 +981,9 @@ juryEvents.on('case:quorum_reached', async (caseId) => {
 │  ═══════                                                                           │
 │  [ ] Unit tests for anti-cheat scoring                                   TODO      │
 │  [ ] Integration tests for settlement flow                               TODO      │
-│  [ ] Load testing for jury system                                        TODO      │
+│  [ ] Load testing for Arbiter Overwatch system                                        TODO      │
 │  [ ] End-to-end test: clean game → auto-settle                          TODO      │
-│  [ ] End-to-end test: flagged game → jury → resolution                  TODO      │
+│  [ ] End-to-end test: flagged game → arbiter overwatch → resolution                  TODO      │
 │  [ ] End-to-end test: timeout → safety valve release                    TODO      │
 │                                                                                     │
 └─────────────────────────────────────────────────────────────────────────────────────┘
@@ -996,11 +996,11 @@ juryEvents.on('case:quorum_reached', async (caseId) => {
 | **P0** | Basic escrow + auto-settlement | Can't launch without this |
 | **P0** | Statistical anti-cheat (server) | Core cheat detection |
 | **P0** | Hold mechanism | Protect against obvious cheaters |
-| **P1** | Jury system (basic) | Community review for held games |
+| **P1** | Arbiter Overwatch system (basic) | Community review for held games |
 | **P1** | Client anti-cheat | Additional detection signal |
 | **P1** | Performance optimization | User experience |
-| **P2** | Jury scoring system | Quality control for jurors |
-| **P2** | Test case insertion | Juror calibration |
+| **P2** | Arbiter Overwatch scoring system | Quality control for arbiters |
+| **P2** | Test case insertion | Arbiter calibration |
 | **P2** | Admin dashboard | Operations tooling |
 | **P3** | Appeal process | Post-launch enhancement |
 
@@ -1027,13 +1027,13 @@ juryEvents.on('case:quorum_reached', async (caseId) => {
 │  APPEAL PROCESS                                                                    │
 │  ──────────────                                                                    │
 │  1. Player submits appeal with explanation                                         │
-│  2. Case reviewed by senior jurors (top 10% by score)                              │
-│  3. If 60%+ senior jurors disagree with original verdict → overturned             │
+│  2. Case reviewed by senior arbiters (top 10% by score)                              │
+│  3. If 60%+ senior arbiters disagree with original verdict → overturned             │
 │  4. If upheld → deposit forfeited, ban stands                                     │
 │                                                                                     │
 │  SAFEGUARDS                                                                        │
 │  ──────────                                                                        │
-│  • Senior jurors can't have reviewed the original case                            │
+│  • Senior arbiters can't have reviewed the original case                            │
 │  • Appeal deposit prevents frivolous appeals                                       │
 │  • Limited to one appeal (no infinite loops)                                      │
 │                                                                                     │
@@ -1047,16 +1047,16 @@ juryEvents.on('case:quorum_reached', async (caseId) => {
 │                         ML ENHANCEMENT (FUTURE)                                     │
 ├─────────────────────────────────────────────────────────────────────────────────────┤
 │                                                                                     │
-│  Once we have sufficient labeled data from jury verdicts:                          │
+│  Once we have sufficient labeled data from arbiter overwatch verdicts:                          │
 │                                                                                     │
 │  1. Train model on features → verdict mapping                                      │
-│  2. Use model as additional signal (not replacement for jury)                      │
-│  3. Reduce jury load by auto-clearing obvious non-cheaters                        │
+│  2. Use model as additional signal (not replacement for arbiter overwatch)                      │
+│  3. Reduce arbiter overwatch case load by auto-clearing obvious non-cheaters                        │
 │  4. Prioritize cases where model is uncertain                                      │
 │                                                                                     │
 │  Features for ML:                                                                  │
 │  • All existing anti-cheat metrics                                                 │
-│  • Historical jury verdicts                                                        │
+│  • Historical arbiter overwatch verdicts                                                        │
 │  • Account patterns                                                                │
 │  • Time series of improvement                                                      │
 │                                                                                     │
@@ -1132,7 +1132,7 @@ This section lists everything that requires manual implementation, external serv
 
 ---
 
-## 11. Jury UI Accessibility Ideas
+## 11. Arbiter Overwatch UI Accessibility Ideas
 
 ### How CS:GO Overwatch Works (Reference)
 
@@ -1190,11 +1190,11 @@ Based on research from [Steam Community guides](https://steamcommunity.com/share
 │  ┌─────────────────────────────────────────────────────────────────────────────┐   │
 │  │                           PROFILE PAGE                                      │   │
 │  │                                                                             │   │
-│  │   [Overview]  [Games]  [Stats]  [Jury Duty]  [Settings]                    │   │
+│  │   [Overview]  [Games]  [Stats]  [Arbiter Overwatch Duty]  [Settings]                    │   │
 │  │                                       ↑                                     │   │
 │  │                              Tab in profile nav                             │   │
 │  │                                                                             │   │
-│  │   Jury Duty Tab Contents:                                                   │   │
+│  │   Arbiter Overwatch Duty Tab Contents:                                                   │   │
 │  │   ┌─────────────────────────────────────────────────────────────────────┐   │   │
 │  │   │  Status: Eligible ✓                                                 │   │   │
 │  │   │  Cases Available: 3                                                 │   │   │
@@ -1211,7 +1211,7 @@ Based on research from [Steam Community guides](https://steamcommunity.com/share
 │  ────                                                                              │
 │  • Clean main menu (no additional icons)                                           │
 │  • Detailed stats and eligibility info in one place                                │
-│  • Natural home for juror achievements and badges                                  │
+│  • Natural home for arbiter achievements and badges                                  │
 │  • Doesn't pressure users who aren't interested                                    │
 │                                                                                     │
 │  CONS:                                                                             │
@@ -1219,7 +1219,7 @@ Based on research from [Steam Community guides](https://steamcommunity.com/share
 │  • Low discoverability (users must navigate to profile)                            │
 │  • No passive notification of available cases                                      │
 │  • May result in fewer case reviews (out of sight, out of mind)                   │
-│  • Jurors might forget to check                                                    │
+│  • Arbiters might forget to check                                                    │
 │                                                                                     │
 └─────────────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -1240,7 +1240,7 @@ Based on research from [Steam Community guides](https://steamcommunity.com/share
 │  │                                                                             │   │
 │  │   Community Section Contents:                                               │   │
 │  │   ┌─────────────────────────────────────────────────────────────────────┐   │   │
-│  │   │  • Jury System (review flagged games)                               │   │   │
+│  │   │  • Arbiter Overwatch System (review flagged games)                               │   │   │
 │  │   │  • Leaderboards (top players by rating, earnings)                   │   │   │
 │  │   │  • Tournaments (upcoming events)                                    │   │   │
 │  │   │  • Hall of Fame (notable games, achievements)                       │   │   │
@@ -1253,12 +1253,12 @@ Based on research from [Steam Community guides](https://steamcommunity.com/share
 │  • Groups related community features together                                      │
 │  • More discoverable for new users exploring the app                               │
 │  • Scales well as we add more community features                                   │
-│  • Positions jury duty as community service, not a chore                          │
+│  • Positions arbiter overwatch duty as community service, not a chore                          │
 │                                                                                     │
 │  CONS:                                                                             │
 │  ────                                                                              │
 │  • Adds complexity to main navigation                                              │
-│  • Jury system buried one level deep                                               │
+│  • Arbiter Overwatch system buried one level deep                                               │
 │  • No badge/notification for pending cases at glance                              │
 │  • May feel like "more to learn" for new users                                    │
 │                                                                                     │
@@ -1287,7 +1287,7 @@ Based on research from [Steam Community guides](https://steamcommunity.com/share
 │  │                                                                             │   │
 │  │   In-App Notification (when case assigned):                                 │   │
 │  │   ┌─────────────────────────────────────────────────────────────┐           │   │
-│  │   │  You've been assigned a jury case. Review within 48h.       │           │   │
+│  │   │  You've been assigned a overwatch case. Review within 48h.       │           │   │
 │  │   │  [Start Review] [View Later]                                │           │   │
 │  │   └─────────────────────────────────────────────────────────────┘           │   │
 │  │                                                                             │   │
@@ -1304,7 +1304,7 @@ Based on research from [Steam Community guides](https://steamcommunity.com/share
 │  ────                                                                              │
 │  • No way to proactively browse for cases                                          │
 │  • Relies on notification permissions (users may disable)                          │
-│  • No visibility into juror stats without separate UI                             │
+│  • No visibility into arbiter stats without separate UI                             │
 │  • Feels more like an obligation than a feature                                    │
 │  • Can't "check in" on pending cases                                              │
 │                                                                                     │
@@ -1377,17 +1377,17 @@ This table tracks the implementation status of all components from the pre-relea
 | Player notification system | Not Started | WebSocket + email/push |
 | Settlement status tracking | Not Started | Database + UI |
 
-### Jury System
+### Arbiter Overwatch System
 
 | Component | Status | Notes |
 |-----------|--------|-------|
 | Database schema | Documented | SQL schema in Section 7 |
-| Juror eligibility checking | Not Started | ELO + games + account age |
+| Arbiter eligibility checking | Not Started | ELO + games + account age |
 | Case assignment algorithm | Not Started | Random selection with diversity |
 | Anonymized case presentation UI | Not Started | Frontend component |
 | Verdict submission | Not Started | API + UI |
 | Weighted verdict aggregation | Not Started | Backend calculation |
-| Juror scoring system | Not Started | Accuracy tracking |
+| Arbiter scoring system | Not Started | Accuracy tracking |
 | Test case insertion | Not Started | Calibration system |
 
 ### External Integrations
@@ -1404,7 +1404,7 @@ This table tracks the implementation status of all components from the pre-relea
 |-----------|--------|-------|
 | Unit tests for anti-cheat | Not Started | |
 | Integration tests for settlement | Not Started | |
-| Load testing for jury system | Not Started | |
+| Load testing for Arbiter Overwatch system | Not Started | |
 | E2E: clean game flow | Not Started | |
 | E2E: flagged game flow | Not Started | |
 | E2E: timeout safety valve | Not Started | |

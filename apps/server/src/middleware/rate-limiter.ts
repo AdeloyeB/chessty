@@ -126,8 +126,8 @@ export class RateLimiter {
   }
 }
 
-// Pre-configured limiters for jury endpoints
-export const JURY_RATE_LIMITERS = {
+// Pre-configured limiters for Arbiter Overwatch endpoints
+export const OVERWATCH_RATE_LIMITERS = {
   /** Verdict submission: 10 per minute */
   verdict: new RateLimiter({ windowMs: 60_000, maxRequests: 10 }),
   /** Enrollment: 3 per hour */

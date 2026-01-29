@@ -1,29 +1,29 @@
 'use client';
 
 /**
- * JuryDevPanel Component
+ * OverwatchDevPanel Component
  *
- * The main wrapper for the Jury System in dev tools.
+ * The main wrapper for the Arbiter Overwatch System in dev tools.
  * Provides a tabbed interface for:
  * - Available Cases: List of pending cases to review
  * - Review: Active case review interface
- * - My Stats: Personal juror statistics
+ * - My Stats: Personal arbiter statistics
  *
  * HOW TO ACCESS:
  * This panel is rendered inside the DevDebugPanel when the
- * "Jury System" section is opened. Only visible in dev mode.
+ * "Arbiter Overwatch" section is opened. Only visible in dev mode.
  */
 
 import { useState, useCallback, useMemo } from 'react';
-import { JuryCaseList } from './JuryCaseList';
-import { JuryCaseReview } from './JuryCaseReview';
-import { JuryStats } from './JuryStats';
+import { OverwatchCaseList } from './OverwatchCaseList';
+import { OverwatchCaseReview } from './OverwatchCaseReview';
+import { OverwatchStats } from './OverwatchStats';
 import {
-  MOCK_JURY_CASES,
-  MOCK_JUROR_STATS,
+  MOCK_OVERWATCH_CASES,
+  MOCK_ARBITER_STATS,
   type ChargeType,
   type VerdictOption,
-} from './mockJuryData';
+} from './mockOverwatchData';
 
 type TabId = 'cases' | 'review' | 'stats';
 
@@ -33,7 +33,7 @@ interface Tab {
   disabled?: boolean;
 }
 
-export function JuryDevPanel() {
+export function OverwatchDevPanel() {
   // State
   const [activeTab, setActiveTab] = useState<TabId>('cases');
   const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
@@ -41,13 +41,13 @@ export function JuryDevPanel() {
 
   // Filter out submitted cases
   const availableCases = useMemo(() => {
-    return MOCK_JURY_CASES.filter(c => !submittedCases.has(c.id));
+    return MOCK_OVERWATCH_CASES.filter(c => !submittedCases.has(c.id));
   }, [submittedCases]);
 
   // Get selected case
   const selectedCase = useMemo(() => {
     if (!selectedCaseId) return null;
-    return MOCK_JURY_CASES.find(c => c.id === selectedCaseId) || null;
+    return MOCK_OVERWATCH_CASES.find(c => c.id === selectedCaseId) || null;
   }, [selectedCaseId]);
 
   // Tab definitions
@@ -67,14 +67,14 @@ export function JuryDevPanel() {
     caseId: string,
     verdicts: Record<ChargeType, VerdictOption>
   ) => {
-    console.log('[Jury] Verdict submitted:', { caseId, verdicts });
+    console.log('[Overwatch] Verdict submitted:', { caseId, verdicts });
     setSubmittedCases(prev => new Set([...prev, caseId]));
     setSelectedCaseId(null);
     setActiveTab('cases');
   }, []);
 
   const handleSkipCase = useCallback((caseId: string) => {
-    console.log('[Jury] Case skipped:', caseId);
+    console.log('[Overwatch] Case skipped:', caseId);
     setSelectedCaseId(null);
     setActiveTab('cases');
   }, []);
@@ -114,7 +114,7 @@ export function JuryDevPanel() {
       <div className="flex-1 min-h-0 overflow-hidden">
         {activeTab === 'cases' && (
           <div className="h-full overflow-y-auto p-4">
-            <JuryCaseList
+            <OverwatchCaseList
               cases={availableCases}
               onSelectCase={handleSelectCase}
             />
@@ -122,8 +122,8 @@ export function JuryDevPanel() {
         )}
 
         {activeTab === 'review' && selectedCase && (
-          <JuryCaseReview
-            juryCase={selectedCase}
+          <OverwatchCaseReview
+            overwatchCase={selectedCase}
             onSubmitVerdict={handleSubmitVerdict}
             onSkipCase={handleSkipCase}
             onBack={handleBackToList}
@@ -132,7 +132,7 @@ export function JuryDevPanel() {
 
         {activeTab === 'stats' && (
           <div className="h-full overflow-y-auto p-4">
-            <JuryStats stats={MOCK_JUROR_STATS} />
+            <OverwatchStats stats={MOCK_ARBITER_STATS} />
           </div>
         )}
       </div>
@@ -140,4 +140,4 @@ export function JuryDevPanel() {
   );
 }
 
-export default JuryDevPanel;
+export default OverwatchDevPanel;

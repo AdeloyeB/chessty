@@ -1,28 +1,28 @@
 /**
- * Jury System Database Schema
+ * Arbiter Overwatch Database Schema
  *
- * This file defines all database tables for the community review (jury) system.
- * Inspired by CS:GO Overwatch, this allows experienced community members to review
- * flagged games and vote on whether cheating occurred.
+ * This file defines all database tables for the Arbiter Overwatch system.
+ * Inspired by CS:GO Overwatch, this allows experienced community members (arbiters)
+ * to review flagged games and vote on whether cheating occurred.
  *
  * Tables:
- * - juryInvestigators: Tracks eligible jurors, their score, and review stats
- * - juryCases: Flagged games pending community review
- * - juryVerdicts: Individual juror votes per case
- * - juryCaseAssignments: Which jurors are assigned to which cases
+ * - overwatchArbiters: Tracks eligible arbiters, their score, and review stats
+ * - overwatchCases: Flagged games pending community review
+ * - overwatchVerdicts: Individual arbiter votes per case
+ * - overwatchCaseAssignments: Which arbiters are assigned to which cases
  *
  * HOW IT WORKS:
  * 1. Games with high suspicion scores (>95%) get flagged
- * 2. A jury case is created and 5-7 eligible jurors are assigned
- * 3. Jurors watch anonymized replays and vote on different cheat categories
- * 4. Weighted votes (based on juror accuracy scores) determine final verdict
- * 5. Juror scores are updated based on whether they agreed with the majority
+ * 2. An overwatch case is created and 5-7 eligible arbiters are assigned
+ * 3. Arbiters watch anonymized replays and vote on different cheat categories
+ * 4. Weighted votes (based on arbiter accuracy scores) determine final verdict
+ * 5. Arbiter scores are updated based on whether they agreed with the majority
  *
  * WHY THIS MATTERS:
  * - Reduces false positives from automated detection
  * - Scales moderation through community participation
- * - Creates accountability with juror accuracy tracking
- * - Calibration cases ensure jurors stay honest
+ * - Creates accountability with arbiter accuracy tracking
+ * - Calibration cases ensure arbiters stay honest
  */
 
 import { pgTable, text, integer, numeric, boolean, timestamp, jsonb, index, unique } from 'drizzle-orm/pg-core';
@@ -31,16 +31,16 @@ import { nanoid } from 'nanoid';
 import { users, games } from './pg-schema';
 
 // ============================================================================
-// JURY INVESTIGATORS TABLE
+// OVERWATCH ARBITERS TABLE
 // ============================================================================
-// Tracks users who are eligible to serve as jurors and their performance stats.
-// Think of this as a "juror profile" that determines if someone can review cases.
-export const juryInvestigators = pgTable('jury_investigators', {
-  // The user ID serves as the primary key (one juror profile per user)
+// Tracks users who are eligible to serve as arbiters and their performance stats.
+// Think of this as an "arbiter profile" that determines if someone can review cases.
+export const overwatchArbiters = pgTable('overwatch_arbiters', {
+  // The user ID serves as the primary key (one arbiter profile per user)
   userId: text('user_id').primaryKey().references(() => users.id, { onDelete: 'cascade' }),
 
-  // Snapshot of the player's ELO when they became eligible to be a juror
-  // We store this to prevent manipulation (e.g., boosting ELO to become juror then tanking)
+  // Snapshot of the player's ELO when they became eligible to be an arbiter
+  // We store this to prevent manipulation (e.g., boosting ELO to become arbiter then tanking)
   eloAtQualification: integer('elo_at_qualification').notNull(),
 
   // How many games the user had played when they qualified
@@ -49,45 +49,45 @@ export const juryInvestigators = pgTable('jury_investigators', {
   // ---------------------------------------------------------------------------
   // Investigator Score (0.000 to 1.000)
   // ---------------------------------------------------------------------------
-  // This score represents how accurate the juror's verdicts are compared to the
-  // consensus. New jurors start at 0.500 (neutral). The score goes up when they
+  // This score represents how accurate the arbiter's verdicts are compared to the
+  // consensus. New arbiters start at 0.500 (neutral). The score goes up when they
   // agree with the majority verdict and down when they disagree.
   //
   // Why this matters:
-  // - High-score jurors have more weight in the final verdict
-  // - Low-score jurors (<0.250) get suspended
+  // - High-score arbiters have more weight in the final verdict
+  // - Low-score arbiters (<0.250) get suspended
   // - Creates incentive for careful, accurate reviewing
   investigatorScore: numeric('investigator_score', { precision: 4, scale: 3 }).notNull().default('0.500'),
 
-  // Total number of cases this juror has reviewed (verdicts submitted)
+  // Total number of cases this arbiter has reviewed (verdicts submitted)
   casesReviewed: integer('cases_reviewed').notNull().default(0),
 
   // How many of those verdicts agreed with the final majority verdict
   accurateVerdicts: integer('accurate_verdicts').notNull().default(0),
 
-  // Whether this juror is currently active and can receive new case assignments
+  // Whether this arbiter is currently active and can receive new case assignments
   isActive: boolean('is_active').notNull().default(true),
 
   // If suspended, when the suspension ends (null = not suspended or permanent)
-  // Jurors are suspended when their score drops too low (<0.250)
+  // Arbiters are suspended when their score drops too low (<0.250)
   suspendedUntil: timestamp('suspended_until', { withTimezone: true }),
 
   // Optional reason for suspension
   suspensionReason: text('suspension_reason'),
 
-  // When this juror profile was created
+  // When this arbiter profile was created
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().$defaultFn(() => new Date()),
 
-  // When this juror profile was last updated
+  // When this arbiter profile was last updated
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().$defaultFn(() => new Date()),
 });
 
 // ============================================================================
-// JURY CASES TABLE
+// OVERWATCH CASES TABLE
 // ============================================================================
 // Games that have been flagged for community review.
-// Each case represents one game that needs jury investigation.
-export const juryCases = pgTable('jury_cases', {
+// Each case represents one game that needs arbiter investigation.
+export const overwatchCases = pgTable('overwatch_cases', {
   // Primary key - auto-generated unique ID
   id: text('id').primaryKey().$defaultFn(() => nanoid()),
 
@@ -126,8 +126,8 @@ export const juryCases = pgTable('jury_cases', {
   // Case Status
   // ---------------------------------------------------------------------------
   // Tracks the lifecycle of the case:
-  // - 'pending_assignment': Just created, waiting to be assigned to jurors
-  // - 'active': Assigned to jurors, waiting for verdicts
+  // - 'pending_assignment': Just created, waiting to be assigned to arbiters
+  // - 'active': Assigned to arbiters, waiting for verdicts
   // - 'pending_resolution': Enough verdicts received, calculating final result
   // - 'resolved': Final verdict reached
   // - 'expired': Deadline passed without resolution (auto-handled)
@@ -139,7 +139,7 @@ export const juryCases = pgTable('jury_cases', {
   // The outcome of the case once resolved:
   // - 'innocent': Not enough evidence of cheating
   // - 'guilty': Weighted majority voted guilty
-  // - 'inconclusive': Jurors were split, needs escalation
+  // - 'inconclusive': Arbiters were split, needs escalation
   // - null: Case not yet resolved
   finalVerdict: text('final_verdict'),
 
@@ -154,7 +154,7 @@ export const juryCases = pgTable('jury_cases', {
   // Test Case Fields
   // ---------------------------------------------------------------------------
   // Some cases are "calibration cases" - we already know if the player cheated
-  // or not. These are used to test juror accuracy without them knowing.
+  // or not. These are used to test arbiter accuracy without them knowing.
   //
   // 1 in 5 cases is a test case (20%)
   isTestCase: boolean('is_test_case').notNull().default(false),
@@ -173,34 +173,34 @@ export const juryCases = pgTable('jury_cases', {
   resolvedAt: timestamp('resolved_at', { withTimezone: true }),
 }, (table) => [
   // Index for finding cases by game
-  index('jury_cases_game_idx').on(table.gameId),
+  index('overwatch_cases_game_idx').on(table.gameId),
   // Index for finding active cases for a suspect
-  index('jury_cases_suspect_idx').on(table.suspectPlayerId),
+  index('overwatch_cases_suspect_idx').on(table.suspectPlayerId),
   // Index for finding pending cases that need assignment
-  index('jury_cases_status_idx').on(table.status),
+  index('overwatch_cases_status_idx').on(table.status),
   // Index for finding cases by deadline (to handle expiration)
-  index('jury_cases_deadline_idx').on(table.deadline),
+  index('overwatch_cases_deadline_idx').on(table.deadline),
 ]);
 
 // ============================================================================
-// JURY VERDICTS TABLE
+// OVERWATCH VERDICTS TABLE
 // ============================================================================
-// Individual juror votes for each case.
-// Each juror submits one verdict per case they're assigned to.
-export const juryVerdicts = pgTable('jury_verdicts', {
+// Individual arbiter votes for each case.
+// Each arbiter submits one verdict per case they're assigned to.
+export const overwatchVerdicts = pgTable('overwatch_verdicts', {
   // Primary key - auto-generated unique ID
   id: text('id').primaryKey().$defaultFn(() => nanoid()),
 
   // The case this verdict is for
-  caseId: text('case_id').notNull().references(() => juryCases.id, { onDelete: 'cascade' }),
+  caseId: text('case_id').notNull().references(() => overwatchCases.id, { onDelete: 'cascade' }),
 
-  // The juror who submitted this verdict
+  // The arbiter who submitted this verdict
   investigatorId: text('investigator_id').notNull().references(() => users.id),
 
   // ---------------------------------------------------------------------------
   // Cheat Category Verdicts
   // ---------------------------------------------------------------------------
-  // Jurors vote on three specific categories of cheating:
+  // Arbiters vote on three specific categories of cheating:
   //
   // 1. ENGINE ASSISTANCE
   //    Using a chess engine (like Stockfish) to suggest moves
@@ -220,10 +220,10 @@ export const juryVerdicts = pgTable('jury_verdicts', {
   inputAutomation: text('input_automation').notNull(),
   externalAssistance: text('external_assistance').notNull(),
 
-  // Optional notes explaining the juror's reasoning
+  // Optional notes explaining the arbiter's reasoning
   notes: text('notes'),
 
-  // How confident the juror is in their verdict (1-5)
+  // How confident the arbiter is in their verdict (1-5)
   // 1 = very uncertain, 5 = very confident
   confidence: integer('confidence').notNull().default(3),
 
@@ -236,118 +236,118 @@ export const juryVerdicts = pgTable('jury_verdicts', {
   // (true = accurate, false = inaccurate, null = case not yet resolved)
   agreedWithMajority: boolean('agreed_with_majority'),
 
-  // How many points the juror's score changed based on this verdict
+  // How many points the arbiter's score changed based on this verdict
   // Positive = gained accuracy points, negative = lost points
   scoreDelta: numeric('score_delta', { precision: 4, scale: 3 }),
 
   // When this verdict was submitted
   submittedAt: timestamp('submitted_at', { withTimezone: true }).notNull().$defaultFn(() => new Date()),
 }, (table) => [
-  // Ensure a juror can only submit one verdict per case
-  unique('jury_verdict_unique').on(table.caseId, table.investigatorId),
+  // Ensure an arbiter can only submit one verdict per case
+  unique('overwatch_verdict_unique').on(table.caseId, table.investigatorId),
   // Index for finding all verdicts for a case
-  index('jury_verdicts_case_idx').on(table.caseId),
-  // Index for finding all verdicts by a juror
-  index('jury_verdicts_investigator_idx').on(table.investigatorId),
+  index('overwatch_verdicts_case_idx').on(table.caseId),
+  // Index for finding all verdicts by an arbiter
+  index('overwatch_verdicts_investigator_idx').on(table.investigatorId),
 ]);
 
 // ============================================================================
-// JURY CASE ASSIGNMENTS TABLE
+// OVERWATCH CASE ASSIGNMENTS TABLE
 // ============================================================================
-// Tracks which jurors are assigned to which cases.
-// Each case gets 5-7 jurors from different ELO ranges.
-export const juryCaseAssignments = pgTable('jury_case_assignments', {
+// Tracks which arbiters are assigned to which cases.
+// Each case gets 5-7 arbiters from different ELO ranges.
+export const overwatchCaseAssignments = pgTable('overwatch_case_assignments', {
   // Primary key - auto-generated unique ID
   id: text('id').primaryKey().$defaultFn(() => nanoid()),
 
   // The case this assignment is for
-  caseId: text('case_id').notNull().references(() => juryCases.id, { onDelete: 'cascade' }),
+  caseId: text('case_id').notNull().references(() => overwatchCases.id, { onDelete: 'cascade' }),
 
-  // The juror assigned to this case
+  // The arbiter assigned to this case
   investigatorId: text('investigator_id').notNull().references(() => users.id),
 
   // ---------------------------------------------------------------------------
   // Assignment Metadata
   // ---------------------------------------------------------------------------
 
-  // The juror's ELO at time of assignment
-  // We try to assign jurors from various ELO ranges to get diverse perspectives
+  // The arbiter's ELO at time of assignment
+  // We try to assign arbiters from various ELO ranges to get diverse perspectives
   eloAtAssignment: integer('elo_at_assignment').notNull(),
 
-  // The juror's investigator score at time of assignment
-  // Higher-score jurors get more weight in the final verdict calculation
+  // The arbiter's investigator score at time of assignment
+  // Higher-score arbiters get more weight in the final verdict calculation
   scoreAtAssignment: numeric('score_at_assignment', { precision: 4, scale: 3 }).notNull(),
 
   // ---------------------------------------------------------------------------
   // Assignment Status
   // ---------------------------------------------------------------------------
-  // - 'pending': Assigned but juror hasn't started reviewing
-  // - 'in_progress': Juror has opened the case
-  // - 'completed': Juror has submitted their verdict
-  // - 'expired': Juror didn't submit verdict before deadline
-  // - 'recused': Juror couldn't review (knew the player, etc.)
+  // - 'pending': Assigned but arbiter hasn't started reviewing
+  // - 'in_progress': Arbiter has opened the case
+  // - 'completed': Arbiter has submitted their verdict
+  // - 'expired': Arbiter didn't submit verdict before deadline
+  // - 'recused': Arbiter couldn't review (knew the player, etc.)
   status: text('status').notNull().default('pending'),
 
   // When this assignment was created
   assignedAt: timestamp('assigned_at', { withTimezone: true }).notNull().$defaultFn(() => new Date()),
 
-  // When the juror submitted their verdict (if completed)
+  // When the arbiter submitted their verdict (if completed)
   completedAt: timestamp('completed_at', { withTimezone: true }),
 }, (table) => [
-  // Ensure a juror can only be assigned once per case
-  unique('jury_assignment_unique').on(table.caseId, table.investigatorId),
+  // Ensure an arbiter can only be assigned once per case
+  unique('overwatch_assignment_unique').on(table.caseId, table.investigatorId),
   // Index for finding all assignments for a case
-  index('jury_case_assignments_case_idx').on(table.caseId),
-  // Index for finding all assignments for a juror (to show them their queue)
-  index('jury_case_assignments_investigator_idx').on(table.investigatorId),
+  index('overwatch_case_assignments_case_idx').on(table.caseId),
+  // Index for finding all assignments for an arbiter (to show them their queue)
+  index('overwatch_case_assignments_investigator_idx').on(table.investigatorId),
   // Index for finding pending assignments (work queue)
-  index('jury_case_assignments_status_idx').on(table.status),
+  index('overwatch_case_assignments_status_idx').on(table.status),
 ]);
 
 // ============================================================================
 // RELATIONS
 // ============================================================================
 
-export const juryInvestigatorsRelations = relations(juryInvestigators, ({ one, many }) => ({
+export const overwatchArbitersRelations = relations(overwatchArbiters, ({ one, many }) => ({
   user: one(users, {
-    fields: [juryInvestigators.userId],
+    fields: [overwatchArbiters.userId],
     references: [users.id],
   }),
-  verdicts: many(juryVerdicts),
-  assignments: many(juryCaseAssignments),
+  verdicts: many(overwatchVerdicts),
+  assignments: many(overwatchCaseAssignments),
 }));
 
-export const juryCasesRelations = relations(juryCases, ({ one, many }) => ({
+export const overwatchCasesRelations = relations(overwatchCases, ({ one, many }) => ({
   game: one(games, {
-    fields: [juryCases.gameId],
+    fields: [overwatchCases.gameId],
     references: [games.id],
   }),
   suspectPlayer: one(users, {
-    fields: [juryCases.suspectPlayerId],
+    fields: [overwatchCases.suspectPlayerId],
     references: [users.id],
   }),
-  verdicts: many(juryVerdicts),
-  assignments: many(juryCaseAssignments),
+  verdicts: many(overwatchVerdicts),
+  assignments: many(overwatchCaseAssignments),
 }));
 
-export const juryVerdictsRelations = relations(juryVerdicts, ({ one }) => ({
-  case: one(juryCases, {
-    fields: [juryVerdicts.caseId],
-    references: [juryCases.id],
+export const overwatchVerdictsRelations = relations(overwatchVerdicts, ({ one }) => ({
+  case: one(overwatchCases, {
+    fields: [overwatchVerdicts.caseId],
+    references: [overwatchCases.id],
   }),
   investigator: one(users, {
-    fields: [juryVerdicts.investigatorId],
+    fields: [overwatchVerdicts.investigatorId],
     references: [users.id],
   }),
 }));
 
-export const juryCaseAssignmentsRelations = relations(juryCaseAssignments, ({ one }) => ({
-  case: one(juryCases, {
-    fields: [juryCaseAssignments.caseId],
-    references: [juryCases.id],
+export const overwatchCaseAssignmentsRelations = relations(overwatchCaseAssignments, ({ one }) => ({
+  case: one(overwatchCases, {
+    fields: [overwatchCaseAssignments.caseId],
+    references: [overwatchCases.id],
   }),
   investigator: one(users, {
-    fields: [juryCaseAssignments.investigatorId],
+    fields: [overwatchCaseAssignments.investigatorId],
     references: [users.id],
   }),
 }));
@@ -356,17 +356,17 @@ export const juryCaseAssignmentsRelations = relations(juryCaseAssignments, ({ on
 // TYPE EXPORTS
 // ============================================================================
 
-export type JuryInvestigator = typeof juryInvestigators.$inferSelect;
-export type NewJuryInvestigator = typeof juryInvestigators.$inferInsert;
+export type OverwatchArbiter = typeof overwatchArbiters.$inferSelect;
+export type NewOverwatchArbiter = typeof overwatchArbiters.$inferInsert;
 
-export type JuryCase = typeof juryCases.$inferSelect;
-export type NewJuryCase = typeof juryCases.$inferInsert;
+export type OverwatchCase = typeof overwatchCases.$inferSelect;
+export type NewOverwatchCase = typeof overwatchCases.$inferInsert;
 
-export type JuryVerdict = typeof juryVerdicts.$inferSelect;
-export type NewJuryVerdict = typeof juryVerdicts.$inferInsert;
+export type OverwatchVerdict = typeof overwatchVerdicts.$inferSelect;
+export type NewOverwatchVerdict = typeof overwatchVerdicts.$inferInsert;
 
-export type JuryCaseAssignment = typeof juryCaseAssignments.$inferSelect;
-export type NewJuryCaseAssignment = typeof juryCaseAssignments.$inferInsert;
+export type OverwatchCaseAssignment = typeof overwatchCaseAssignments.$inferSelect;
+export type NewOverwatchCaseAssignment = typeof overwatchCaseAssignments.$inferInsert;
 
 // Verdict options for each cheat category
 export type VerdictOption = 'insufficient' | 'guilty';

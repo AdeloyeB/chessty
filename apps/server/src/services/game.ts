@@ -149,7 +149,7 @@ export async function endGame(
   // This enables anti-cheat evaluation before paying out
   // The settlement service will:
   // - Auto-settle clean games immediately (suspicion < 95%)
-  // - Hold suspicious games for jury review (suspicion >= 95%)
+  // - Hold suspicious games for overwatch review (suspicion >= 95%)
   // - Handle draws by refunding both players
   const totalPot = parseFloat(game.totalPot);
   const loserId = winnerId

@@ -12,8 +12,8 @@
  *    - evaluateGame(): Get suspicion score from anti-cheat
  *    - decideSettlement(): Determine auto-settle vs hold
  *    - settleGame(): Pay winner for clean games
- *    - holdForReview(): Create jury case for suspicious games
- *    - resolveDispute(): Handle jury verdict
+ *    - holdForReview(): Create overwatch case for suspicious games
+ *    - resolveDispute(): Handle overwatch verdict
  *    - handleTimeout(): 48-hour safety release
  *    - processSettlement(): Main entry point combining all steps
  *

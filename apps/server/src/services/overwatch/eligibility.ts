@@ -1,8 +1,8 @@
 /**
- * Jury Eligibility Service
- * =========================
+ * Arbiter Overwatch Eligibility Service
+ * ======================================
  *
- * Determines whether a user is eligible to serve as a juror in the community
+ * Determines whether a user is eligible to serve as an arbiter in the community
  * review system. Eligibility is based on experience and standing.
  *
  * ELIGIBILITY REQUIREMENTS:
@@ -11,31 +11,31 @@
  * 3. Good Standing (not currently banned or under investigation)
  *
  * WHY THESE REQUIREMENTS:
- * - ELO 1400+: Jurors need to understand good vs. suspicious play
+ * - ELO 1400+: Arbiters need to understand good vs. suspicious play
  * - 100+ games: Ensures familiarity with platform norms and behaviors
  * - Good standing: Prevents bad actors from influencing verdicts
  */
 
 import { eq, and, or, isNull, gt } from 'drizzle-orm';
-import { db, users, juryInvestigators, playerSanctions, juryCaseAssignments } from '../../drizzle';
+import { db, users, overwatchArbiters, playerSanctions, overwatchCaseAssignments } from '../../drizzle';
 
 // ---------------------------------------------------------------------------
 // Configuration Constants
 // ---------------------------------------------------------------------------
 
-/** Minimum ELO rating required to be a juror */
-export const JURY_MIN_ELO = 1400;
+/** Minimum ELO rating required to be an arbiter */
+export const OVERWATCH_MIN_ELO = 1400;
 
-/** Minimum number of games played required to be a juror */
-export const JURY_MIN_GAMES = 100;
+/** Minimum number of games played required to be an arbiter */
+export const OVERWATCH_MIN_GAMES = 100;
 
-/** Score threshold below which a juror is suspended */
-export const JURY_SUSPENSION_THRESHOLD = 0.250;
+/** Score threshold below which an arbiter is suspended */
+export const OVERWATCH_SUSPENSION_THRESHOLD = 0.250;
 
 /** Default suspension duration in days */
-export const JURY_SUSPENSION_DAYS = 30;
+export const OVERWATCH_SUSPENSION_DAYS = 30;
 
-/** Maximum number of pending cases a juror can have at once */
+/** Maximum number of pending cases an arbiter can have at once */
 export const MAX_PENDING_ASSIGNMENTS = 5;
 
 // ---------------------------------------------------------------------------
@@ -43,10 +43,10 @@ export const MAX_PENDING_ASSIGNMENTS = 5;
 // ---------------------------------------------------------------------------
 
 export interface EligibilityResult {
-  /** Whether the user is eligible to be a juror */
+  /** Whether the user is eligible to be an arbiter */
   eligible: boolean;
 
-  /** If already enrolled, the juror profile */
+  /** If already enrolled, the arbiter profile */
   enrolled: boolean;
 
   /** If enrolled, whether currently active */
@@ -70,7 +70,7 @@ export interface EligibilityResult {
 // ---------------------------------------------------------------------------
 
 /**
- * Check if a user is eligible to serve as a juror.
+ * Check if a user is eligible to serve as an arbiter.
  *
  * This checks:
  * 1. ELO rating meets minimum (1400+)
@@ -102,17 +102,17 @@ export async function checkEligibility(userId: string): Promise<EligibilityResul
     };
   }
 
-  // Check if user is already enrolled as a juror
-  const existingJuror = await db.query.juryInvestigators.findFirst({
-    where: eq(juryInvestigators.userId, userId),
+  // Check if user is already enrolled as an arbiter
+  const existingArbiter = await db.query.overwatchArbiters.findFirst({
+    where: eq(overwatchArbiters.userId, userId),
   });
 
   // Check requirements
-  const meetsEloRequirement = user.eloRating >= JURY_MIN_ELO;
-  const meetsGamesRequirement = user.gamesPlayed >= JURY_MIN_GAMES;
+  const meetsEloRequirement = user.eloRating >= OVERWATCH_MIN_ELO;
+  const meetsGamesRequirement = user.gamesPlayed >= OVERWATCH_MIN_GAMES;
 
   // Check for active sanctions OR recent sanctions (1-year cooldown after ban ends)
-  // A user cannot be a juror if:
+  // A user cannot be an arbiter if:
   // 1. They have a permanent ban (endsAt is null)
   // 2. They have a temp ban that hasn't ended yet (endsAt > now)
   // 3. They had a ban that ended less than 1 year ago (cooldown period)
@@ -123,7 +123,7 @@ export async function checkEligibility(userId: string): Promise<EligibilityResul
   const blockingSanction = await db.query.playerSanctions.findFirst({
     where: and(
       eq(playerSanctions.playerId, userId),
-      // Sanctions that block jury eligibility:
+      // Sanctions that block arbiter eligibility:
       // - Not appealed at all (appealed = false), OR
       // - Appealed but upheld (appeal failed - sanction remains in effect)
       // Successfully appealed sanctions (reduced/overturned) DON'T block
@@ -146,10 +146,10 @@ export async function checkEligibility(userId: string): Promise<EligibilityResul
 
   const reasons: string[] = [];
   if (!meetsEloRequirement) {
-    reasons.push(`ELO rating must be at least ${JURY_MIN_ELO} (current: ${user.eloRating})`);
+    reasons.push(`ELO rating must be at least ${OVERWATCH_MIN_ELO} (current: ${user.eloRating})`);
   }
   if (!meetsGamesRequirement) {
-    reasons.push(`Must have played at least ${JURY_MIN_GAMES} games (current: ${user.gamesPlayed})`);
+    reasons.push(`Must have played at least ${OVERWATCH_MIN_GAMES} games (current: ${user.gamesPlayed})`);
   }
   if (!hasGoodStanding) {
     // Provide more specific feedback about why they're not eligible
@@ -173,19 +173,19 @@ export async function checkEligibility(userId: string): Promise<EligibilityResul
 
   // If enrolled, check if suspended
   let active = true;
-  if (existingJuror) {
-    if (!existingJuror.isActive) {
+  if (existingArbiter) {
+    if (!existingArbiter.isActive) {
       active = false;
     }
-    if (existingJuror.suspendedUntil && existingJuror.suspendedUntil > now) {
+    if (existingArbiter.suspendedUntil && existingArbiter.suspendedUntil > now) {
       active = false;
     }
   }
 
   return {
     eligible,
-    enrolled: !!existingJuror,
-    active: existingJuror ? active : undefined,
+    enrolled: !!existingArbiter,
+    active: existingArbiter ? active : undefined,
     reasons: reasons.length > 0 ? reasons : undefined,
     stats: {
       currentElo: user.eloRating,
@@ -198,28 +198,28 @@ export async function checkEligibility(userId: string): Promise<EligibilityResul
 }
 
 /**
- * Enroll a user as a juror.
+ * Enroll a user as an arbiter.
  *
- * This creates a juror profile for the user with their current stats.
+ * This creates an arbiter profile for the user with their current stats.
  * The user must pass eligibility checks first.
  *
  * @param userId - The user ID to enroll
- * @returns The created juror profile or error
+ * @returns The created arbiter profile or error
  */
-export async function enrollAsJuror(userId: string): Promise<{
+export async function enrollAsArbiter(userId: string): Promise<{
   success: boolean;
   error?: string;
-  juror?: typeof juryInvestigators.$inferSelect;
+  arbiter?: typeof overwatchArbiters.$inferSelect;
 }> {
   // Check eligibility first
   const eligibility = await checkEligibility(userId);
 
   if (eligibility.enrolled) {
     // User is already enrolled, just return success
-    const existingJuror = await db.query.juryInvestigators.findFirst({
-      where: eq(juryInvestigators.userId, userId),
+    const existingArbiter = await db.query.overwatchArbiters.findFirst({
+      where: eq(overwatchArbiters.userId, userId),
     });
-    return { success: true, juror: existingJuror! };
+    return { success: true, arbiter: existingArbiter! };
   }
 
   if (!eligibility.eligible) {
@@ -229,9 +229,9 @@ export async function enrollAsJuror(userId: string): Promise<{
     };
   }
 
-  // Create the juror profile
-  const [newJuror] = await db
-    .insert(juryInvestigators)
+  // Create the arbiter profile
+  const [newArbiter] = await db
+    .insert(overwatchArbiters)
     .values({
       userId,
       eloAtQualification: eligibility.stats.currentElo,
@@ -243,115 +243,115 @@ export async function enrollAsJuror(userId: string): Promise<{
     })
     .returning();
 
-  console.log(`[Jury] User ${userId} enrolled as juror with ELO ${eligibility.stats.currentElo}`);
+  console.log(`[Overwatch] User ${userId} enrolled as arbiter with ELO ${eligibility.stats.currentElo}`);
 
-  return { success: true, juror: newJuror };
+  return { success: true, arbiter: newArbiter };
 }
 
 /**
- * Get a user's juror profile if they are enrolled.
+ * Get a user's arbiter profile if they are enrolled.
  *
  * @param userId - The user ID to look up
- * @returns The juror profile or null
+ * @returns The arbiter profile or null
  */
-export async function getJurorProfile(userId: string): Promise<typeof juryInvestigators.$inferSelect | null> {
-  const profile = await db.query.juryInvestigators.findFirst({
-    where: eq(juryInvestigators.userId, userId),
+export async function getArbiterProfile(userId: string): Promise<typeof overwatchArbiters.$inferSelect | null> {
+  const profile = await db.query.overwatchArbiters.findFirst({
+    where: eq(overwatchArbiters.userId, userId),
   });
   return profile ?? null;
 }
 
 /**
- * Check if a juror is currently eligible to receive new case assignments.
+ * Check if an arbiter is currently eligible to receive new case assignments.
  *
- * This is different from general eligibility - it checks if an enrolled juror
+ * This is different from general eligibility - it checks if an enrolled arbiter
  * can currently take on new cases (not suspended, not too busy, etc.)
  *
- * @param userId - The juror's user ID
+ * @param userId - The arbiter's user ID
  * @returns Whether they can receive new assignments
  */
 export async function canReceiveAssignments(userId: string): Promise<boolean> {
-  const juror = await getJurorProfile(userId);
+  const arbiter = await getArbiterProfile(userId);
 
-  if (!juror) {
+  if (!arbiter) {
     return false;
   }
 
   // Check if active
-  if (!juror.isActive) {
+  if (!arbiter.isActive) {
     return false;
   }
 
   // Check if suspended
   const now = new Date();
-  if (juror.suspendedUntil && juror.suspendedUntil > now) {
+  if (arbiter.suspendedUntil && arbiter.suspendedUntil > now) {
     return false;
   }
 
   // Check if score is above suspension threshold
-  const score = parseFloat(juror.investigatorScore);
-  if (score < JURY_SUSPENSION_THRESHOLD) {
+  const score = parseFloat(arbiter.investigatorScore);
+  if (score < OVERWATCH_SUSPENSION_THRESHOLD) {
     return false;
   }
 
-  // Check pending assignment count - jurors shouldn't be overloaded
-  const pendingAssignments = await db.query.juryCaseAssignments.findMany({
+  // Check pending assignment count - arbiters shouldn't be overloaded
+  const pendingAssignments = await db.query.overwatchCaseAssignments.findMany({
     where: and(
-      eq(juryCaseAssignments.investigatorId, userId),
-      eq(juryCaseAssignments.status, 'pending')
+      eq(overwatchCaseAssignments.investigatorId, userId),
+      eq(overwatchCaseAssignments.status, 'pending')
     ),
   });
 
   if (pendingAssignments.length >= MAX_PENDING_ASSIGNMENTS) {
-    return false; // Juror has too many pending cases
+    return false; // Arbiter has too many pending cases
   }
 
   return true;
 }
 
 /**
- * Suspend a juror for poor performance.
+ * Suspend an arbiter for poor performance.
  *
- * @param userId - The juror to suspend
+ * @param userId - The arbiter to suspend
  * @param reason - Why they're being suspended
  * @param durationDays - How long to suspend (default: 30 days)
  */
-export async function suspendJuror(
+export async function suspendArbiter(
   userId: string,
   reason: string,
-  durationDays: number = JURY_SUSPENSION_DAYS
+  durationDays: number = OVERWATCH_SUSPENSION_DAYS
 ): Promise<void> {
   const suspendedUntil = new Date();
   suspendedUntil.setDate(suspendedUntil.getDate() + durationDays);
 
   await db
-    .update(juryInvestigators)
+    .update(overwatchArbiters)
     .set({
       isActive: false,
       suspendedUntil,
       suspensionReason: reason,
       updatedAt: new Date(),
     })
-    .where(eq(juryInvestigators.userId, userId));
+    .where(eq(overwatchArbiters.userId, userId));
 
-  console.log(`[Jury] Juror ${userId} suspended for ${durationDays} days: ${reason}`);
+  console.log(`[Overwatch] Arbiter ${userId} suspended for ${durationDays} days: ${reason}`);
 }
 
 /**
- * Reactivate a suspended juror.
+ * Reactivate a suspended arbiter.
  *
- * @param userId - The juror to reactivate
+ * @param userId - The arbiter to reactivate
  */
-export async function reactivateJuror(userId: string): Promise<void> {
+export async function reactivateArbiter(userId: string): Promise<void> {
   await db
-    .update(juryInvestigators)
+    .update(overwatchArbiters)
     .set({
       isActive: true,
       suspendedUntil: null,
       suspensionReason: null,
       updatedAt: new Date(),
     })
-    .where(eq(juryInvestigators.userId, userId));
+    .where(eq(overwatchArbiters.userId, userId));
 
-  console.log(`[Jury] Juror ${userId} reactivated`);
+  console.log(`[Overwatch] Arbiter ${userId} reactivated`);
 }

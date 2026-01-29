@@ -1,22 +1,22 @@
 /**
- * Jury Verdict Aggregation Service
- * ==================================
+ * Arbiter Overwatch Verdict Aggregation Service
+ * ==============================================
  *
- * Handles the calculation of final verdicts from individual juror votes.
+ * Handles the calculation of final verdicts from individual arbiter votes.
  *
  * WEIGHTED VOTING SYSTEM:
- * Not all votes are equal. Jurors with higher accuracy scores have more
+ * Not all votes are equal. Arbiters with higher accuracy scores have more
  * influence on the final verdict. This means:
- * - New jurors (score 0.500) have moderate influence
- * - Experienced accurate jurors (score 0.800+) have high influence
- * - Inaccurate jurors (score <0.400) have low influence
+ * - New arbiters (score 0.500) have moderate influence
+ * - Experienced accurate arbiters (score 0.800+) have high influence
+ * - Inaccurate arbiters (score <0.400) have low influence
  *
  * VERDICT THRESHOLD:
  * A conviction (guilty verdict) requires 75% weighted agreement.
  * This high threshold protects against false positives.
  *
  * CHEAT CATEGORIES:
- * Jurors vote on three categories independently:
+ * Arbiters vote on three categories independently:
  * 1. Engine Assistance - Using chess engines
  * 2. Input Automation - Using bots/scripts
  * 3. External Assistance - Help from other people
@@ -27,15 +27,15 @@
 import { eq, and, sql } from 'drizzle-orm';
 import {
   db,
-  juryCases,
-  juryVerdicts,
-  juryCaseAssignments,
-  juryInvestigators,
+  overwatchCases,
+  overwatchVerdicts,
+  overwatchCaseAssignments,
+  overwatchArbiters,
   playerSanctions,
-  type JuryVerdict,
+  type OverwatchVerdict,
   type VerdictOption,
 } from '../../drizzle';
-import { updateJurorScores } from './scoring';
+import { updateArbiterScores } from './scoring';
 import { sanitizeText } from '../../utils/sanitize';
 import { withTransaction } from '../../utils/transaction';
 
@@ -95,7 +95,7 @@ export interface AggregationResult {
 // ---------------------------------------------------------------------------
 
 /**
- * Submit a juror's verdict for a case.
+ * Submit an arbiter's verdict for a case.
  *
  * This creates the verdict record and checks if the case should be resolved.
  *
@@ -104,7 +104,7 @@ export interface AggregationResult {
  */
 export async function submitVerdict(input: VerdictInput): Promise<{
   success: boolean;
-  verdict?: JuryVerdict;
+  verdict?: OverwatchVerdict;
   error?: string;
   caseResolved?: boolean;
 }> {
@@ -114,11 +114,11 @@ export async function submitVerdict(input: VerdictInput): Promise<{
   // Wrap the multi-step operation in a transaction for consistency
   // This ensures all database operations succeed or fail together
   return await withTransaction(async (tx) => {
-    // Verify the juror is assigned to this case
-    const assignment = await tx.query.juryCaseAssignments.findFirst({
+    // Verify the arbiter is assigned to this case
+    const assignment = await tx.query.overwatchCaseAssignments.findFirst({
       where: and(
-        eq(juryCaseAssignments.caseId, input.caseId),
-        eq(juryCaseAssignments.investigatorId, input.investigatorId)
+        eq(overwatchCaseAssignments.caseId, input.caseId),
+        eq(overwatchCaseAssignments.investigatorId, input.investigatorId)
       ),
     });
 
@@ -135,21 +135,21 @@ export async function submitVerdict(input: VerdictInput): Promise<{
     }
 
     // Get the case
-    const juryCase = await tx.query.juryCases.findFirst({
-      where: eq(juryCases.id, input.caseId),
+    const overwatchCase = await tx.query.overwatchCases.findFirst({
+      where: eq(overwatchCases.id, input.caseId),
     });
 
-    if (!juryCase) {
+    if (!overwatchCase) {
       return { success: false, error: 'Case not found' };
     }
 
-    if (juryCase.status === 'resolved' || juryCase.status === 'expired') {
-      return { success: false, error: `Case is already ${juryCase.status}` };
+    if (overwatchCase.status === 'resolved' || overwatchCase.status === 'expired') {
+      return { success: false, error: `Case is already ${overwatchCase.status}` };
     }
 
     // Create the verdict with sanitized notes
     const [newVerdict] = await tx
-      .insert(juryVerdicts)
+      .insert(overwatchVerdicts)
       .values({
         caseId: input.caseId,
         investigatorId: input.investigatorId,
@@ -163,24 +163,24 @@ export async function submitVerdict(input: VerdictInput): Promise<{
 
     // Update the assignment status
     await tx
-      .update(juryCaseAssignments)
+      .update(overwatchCaseAssignments)
       .set({
         status: 'completed',
         completedAt: new Date(),
       })
-      .where(eq(juryCaseAssignments.id, assignment.id));
+      .where(eq(overwatchCaseAssignments.id, assignment.id));
 
-    // Update juror stats
+    // Update arbiter stats
     await tx
-      .update(juryInvestigators)
+      .update(overwatchArbiters)
       .set({
-        casesReviewed: sql`${juryInvestigators.casesReviewed} + 1`,
+        casesReviewed: sql`${overwatchArbiters.casesReviewed} + 1`,
         updatedAt: new Date(),
       })
-      .where(eq(juryInvestigators.userId, input.investigatorId));
+      .where(eq(overwatchArbiters.userId, input.investigatorId));
 
     console.log(
-      `[Jury] Verdict submitted for case ${input.caseId} by ${input.investigatorId}: ` +
+      `[Overwatch] Verdict submitted for case ${input.caseId} by ${input.investigatorId}: ` +
       `engine=${input.engineAssistance}, automation=${input.inputAutomation}, external=${input.externalAssistance}`
     );
 
@@ -210,21 +210,21 @@ export async function submitVerdict(input: VerdictInput): Promise<{
 /**
  * Aggregate all verdicts for a case using weighted voting.
  *
- * The weight of each vote is the juror's investigator score.
- * Higher accuracy jurors have more influence on the final verdict.
+ * The weight of each vote is the arbiter's investigator score.
+ * Higher accuracy arbiters have more influence on the final verdict.
  *
  * @param caseId - The case to aggregate verdicts for
  * @returns Aggregation result with weighted scores
  */
 export async function aggregateVerdicts(caseId: string): Promise<AggregationResult> {
   // Get all verdicts for this case
-  const verdicts = await db.query.juryVerdicts.findMany({
-    where: eq(juryVerdicts.caseId, caseId),
+  const verdicts = await db.query.overwatchVerdicts.findMany({
+    where: eq(overwatchVerdicts.caseId, caseId),
   });
 
   // Get all assignments (to know expected count)
-  const assignments = await db.query.juryCaseAssignments.findMany({
-    where: eq(juryCaseAssignments.caseId, caseId),
+  const assignments = await db.query.overwatchCaseAssignments.findMany({
+    where: eq(overwatchCaseAssignments.caseId, caseId),
   });
 
   const activeAssignments = assignments.filter(
@@ -245,9 +245,9 @@ export async function aggregateVerdicts(caseId: string): Promise<AggregationResu
     };
   }
 
-  // Get juror scores for each verdict
+  // Get arbiter scores for each verdict
   const weightedVerdicts: Array<{
-    verdict: JuryVerdict;
+    verdict: OverwatchVerdict;
     weight: number;
   }> = [];
 
@@ -310,7 +310,7 @@ export async function aggregateVerdicts(caseId: string): Promise<AggregationResu
  * @returns Weighted guilty percentage for each category
  */
 function calculateCategoryScores(
-  weightedVerdicts: Array<{ verdict: JuryVerdict; weight: number }>
+  weightedVerdicts: Array<{ verdict: OverwatchVerdict; weight: number }>
 ): AggregationResult['categoryScores'] {
   const totalWeight = weightedVerdicts.reduce((sum, { weight }) => sum + weight, 0);
 
@@ -349,7 +349,7 @@ function calculateCategoryScores(
  * Resolve a case with the final verdict.
  *
  * This updates the case status, applies sanctions if guilty, and updates
- * all juror scores based on whether they agreed with the majority.
+ * all arbiter scores based on whether they agreed with the majority.
  *
  * @param caseId - The case to resolve
  * @param aggregation - The aggregation result
@@ -362,24 +362,24 @@ export async function resolveCase(
     throw new Error('Cannot resolve case without final verdict');
   }
 
-  const juryCase = await db.query.juryCases.findFirst({
-    where: eq(juryCases.id, caseId),
+  const overwatchCase = await db.query.overwatchCases.findFirst({
+    where: eq(overwatchCases.id, caseId),
   });
 
-  if (!juryCase) {
+  if (!overwatchCase) {
     throw new Error('Case not found');
   }
 
   // Determine if this is consistent with known outcome (for test cases)
-  const isTestCase = juryCase.isTestCase;
-  const knownOutcome = juryCase.knownOutcome;
+  const isTestCase = overwatchCase.isTestCase;
+  const knownOutcome = overwatchCase.knownOutcome;
 
   // Build verdict notes
   const notes = buildVerdictNotes(aggregation, isTestCase, knownOutcome);
 
   // Update the case
   await db
-    .update(juryCases)
+    .update(overwatchCases)
     .set({
       status: 'resolved',
       finalVerdict: aggregation.finalVerdict,
@@ -387,19 +387,19 @@ export async function resolveCase(
       verdictNotes: notes,
       resolvedAt: new Date(),
     })
-    .where(eq(juryCases.id, caseId));
+    .where(eq(overwatchCases.id, caseId));
 
   console.log(
-    `[Jury] Case ${caseId} resolved: ${aggregation.finalVerdict} ` +
+    `[Overwatch] Case ${caseId} resolved: ${aggregation.finalVerdict} ` +
     `(guilty%: ${(aggregation.overallGuiltyPercentage * 100).toFixed(1)}%)`
   );
 
-  // Update juror scores based on whether they agreed with the majority
-  await updateJurorScores(caseId, aggregation);
+  // Update arbiter scores based on whether they agreed with the majority
+  await updateArbiterScores(caseId, aggregation);
 
   // Apply sanctions if guilty (and not a test case)
   if (aggregation.finalVerdict === 'guilty' && !isTestCase) {
-    await applySanctionForGuiltyVerdict(juryCase.suspectPlayerId, caseId);
+    await applySanctionForGuiltyVerdict(overwatchCase.suspectPlayerId, caseId);
   }
 }
 
@@ -413,7 +413,7 @@ function buildVerdictNotes(
 ): string {
   const parts: string[] = [];
 
-  parts.push(`Verdict based on ${aggregation.verdictCount} juror votes.`);
+  parts.push(`Verdict based on ${aggregation.verdictCount} arbiter votes.`);
 
   parts.push(
     `Category scores: ` +
@@ -428,14 +428,14 @@ function buildVerdictNotes(
   if (isTestCase) {
     parts.push(`[CALIBRATION CASE] Known outcome: ${knownOutcome}`);
     const correct = aggregation.finalVerdict === knownOutcome;
-    parts.push(`Jury ${correct ? 'correctly' : 'incorrectly'} identified this case.`);
+    parts.push(`Arbiters ${correct ? 'correctly' : 'incorrectly'} identified this case.`);
   }
 
   return parts.join('\n');
 }
 
 /**
- * Apply sanctions when a player is found guilty by the jury.
+ * Apply sanctions when a player is found guilty by the arbiters.
  *
  * @param playerId - The guilty player
  * @param caseId - The case that resulted in this sanction
@@ -472,14 +472,14 @@ async function applySanctionForGuiltyVerdict(
   await db.insert(playerSanctions).values({
     playerId,
     sanctionType,
-    reason: `Found guilty of cheating by community jury (Case: ${caseId})`,
+    reason: `Found guilty of cheating by Arbiter Overwatch (Case: ${caseId})`,
     endsAt,
     reviewTaskId: null,
     appealed: false,
   });
 
   console.log(
-    `[Jury] Sanction applied to ${playerId}: ${sanctionType} ` +
+    `[Overwatch] Sanction applied to ${playerId}: ${sanctionType} ` +
     `(${endsAt ? `until ${endsAt.toISOString()}` : 'permanent'})`
   );
 }
@@ -491,17 +491,17 @@ async function applySanctionForGuiltyVerdict(
  * approaches or all verdicts are in.
  */
 export async function checkAndResolveCases(): Promise<number> {
-  const activeCases = await db.query.juryCases.findMany({
-    where: eq(juryCases.status, 'active'),
+  const activeCases = await db.query.overwatchCases.findMany({
+    where: eq(overwatchCases.status, 'active'),
   });
 
   let resolvedCount = 0;
 
-  for (const juryCase of activeCases) {
-    const aggregation = await aggregateVerdicts(juryCase.id);
+  for (const overwatchCase of activeCases) {
+    const aggregation = await aggregateVerdicts(overwatchCase.id);
 
     // Resolve if we have enough verdicts OR deadline has passed
-    const deadlinePassed = juryCase.deadline < new Date();
+    const deadlinePassed = overwatchCase.deadline < new Date();
 
     if (aggregation.shouldResolve || (deadlinePassed && aggregation.verdictCount > 0)) {
       // For deadline-passed cases with insufficient verdicts, force a resolution
@@ -513,13 +513,13 @@ export async function checkAndResolveCases(): Promise<number> {
         }
       }
 
-      await resolveCase(juryCase.id, aggregation);
+      await resolveCase(overwatchCase.id, aggregation);
       resolvedCount++;
     }
   }
 
   if (resolvedCount > 0) {
-    console.log(`[Jury] Resolved ${resolvedCount} cases`);
+    console.log(`[Overwatch] Resolved ${resolvedCount} cases`);
   }
 
   return resolvedCount;

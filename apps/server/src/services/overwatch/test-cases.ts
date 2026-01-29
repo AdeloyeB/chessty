@@ -1,25 +1,25 @@
 /**
- * Jury Test Cases Service
- * ========================
+ * Arbiter Overwatch Test Cases Service
+ * =====================================
  *
- * Handles calibration cases (test cases) that are used to measure juror accuracy.
+ * Handles calibration cases (test cases) that are used to measure arbiter accuracy.
  *
  * WHAT ARE TEST CASES?
- * Test cases are jury cases where we already know the correct answer.
- * They're inserted into the case queue without jurors knowing which cases
+ * Test cases are overwatch cases where we already know the correct answer.
+ * They're inserted into the case queue without arbiters knowing which cases
  * are real and which are tests.
  *
  * PURPOSE:
- * 1. Measure juror accuracy objectively
- * 2. Catch bad-faith jurors (those who vote randomly or always vote one way)
- * 3. Maintain jury quality over time
- * 4. Provide training for new jurors
+ * 1. Measure arbiter accuracy objectively
+ * 2. Catch bad-faith arbiters (those who vote randomly or always vote one way)
+ * 3. Maintain overwatch quality over time
+ * 4. Provide training for new arbiters
  *
  * HOW IT WORKS:
  * - 1 in 5 cases (20%) are test cases
  * - Test cases are marked isTestCase=true and have a knownOutcome
- * - Jurors who fail test cases get extra penalties to their score
- * - Jurors who pass test cases get extra bonuses
+ * - Arbiters who fail test cases get extra penalties to their score
+ * - Arbiters who pass test cases get extra bonuses
  *
  * SOURCES OF TEST CASES:
  * 1. Confirmed cheaters from previous investigations (known guilty)
@@ -31,10 +31,10 @@ import { eq, and, desc, gte } from 'drizzle-orm';
 import {
   db,
   games,
-  juryCases,
+  overwatchCases,
   playerSanctions,
   users,
-  type JuryCase,
+  type OverwatchCase,
 } from '../../drizzle';
 import { createCase } from './case-assignment';
 import { withTransaction } from '../../utils/transaction';
@@ -81,8 +81,8 @@ export interface TestCaseSource {
  */
 export async function shouldInsertTestCase(): Promise<boolean> {
   // Get recent cases (last 100)
-  const recentCases = await db.query.juryCases.findMany({
-    orderBy: [desc(juryCases.createdAt)],
+  const recentCases = await db.query.overwatchCases.findMany({
+    orderBy: [desc(overwatchCases.createdAt)],
     limit: 100,
   });
 
@@ -136,21 +136,21 @@ export async function getTestCaseSource(): Promise<TestCaseSource | null> {
  */
 async function getKnownGuiltyCase(): Promise<TestCaseSource | null> {
   return withTransaction(async (tx) => {
-    // Find players with active sanctions from jury verdicts
+    // Find players with active sanctions from overwatch verdicts
     const sanctions = await tx.query.playerSanctions.findMany({
       where: and(
         eq(playerSanctions.sanctionType, 'temp_ban'),
-        // Only use sanctions from jury verdicts (contain "Case:" in reason)
+        // Only use sanctions from overwatch verdicts (contain "Case:" in reason)
       ),
       limit: 50,
     });
 
-    // Filter to sanctions that mention jury cases
-    const jurySanctions = sanctions.filter(s =>
-      s.reason.includes('Case:') || s.reason.includes('jury')
+    // Filter to sanctions that mention overwatch cases
+    const overwatchSanctions = sanctions.filter(s =>
+      s.reason.includes('Case:') || s.reason.includes('overwatch') || s.reason.includes('overwatch')
     );
 
-    if (jurySanctions.length === 0) {
+    if (overwatchSanctions.length === 0) {
       // No confirmed cheaters, try using high-suspicion flags
       // Note: getHighSuspicionCase() runs outside this transaction, which is fine
       // because it's a separate, independent lookup
@@ -158,7 +158,7 @@ async function getKnownGuiltyCase(): Promise<TestCaseSource | null> {
     }
 
     // Pick a random sanctioned player
-    const randomSanction = jurySanctions[Math.floor(Math.random() * jurySanctions.length)];
+    const randomSanction = overwatchSanctions[Math.floor(Math.random() * overwatchSanctions.length)];
 
     // Find one of their games that hasn't been used as a test case recently
     // Use tx for consistency - ensures games match the sanction we just found
@@ -201,13 +201,13 @@ async function getKnownGuiltyCase(): Promise<TestCaseSource | null> {
  */
 async function getHighSuspicionCase(): Promise<TestCaseSource | null> {
   // Find games with very high suspicion scores that weren't already test cases
-  const resolvedGuilty = await db.query.juryCases.findMany({
+  const resolvedGuilty = await db.query.overwatchCases.findMany({
     where: and(
-      eq(juryCases.status, 'resolved'),
-      eq(juryCases.finalVerdict, 'guilty'),
-      eq(juryCases.isTestCase, false)
+      eq(overwatchCases.status, 'resolved'),
+      eq(overwatchCases.finalVerdict, 'guilty'),
+      eq(overwatchCases.isTestCase, false)
     ),
-    orderBy: [desc(juryCases.createdAt)],
+    orderBy: [desc(overwatchCases.createdAt)],
     limit: 20,
   });
 
@@ -222,7 +222,7 @@ async function getHighSuspicionCase(): Promise<TestCaseSource | null> {
     gameId: randomCase.gameId,
     playerId: randomCase.suspectPlayerId,
     outcome: 'guilty',
-    reason: 'Previously confirmed by jury (high confidence)',
+    reason: 'Previously confirmed by arbiters (high confidence)',
     suspicionScore: parseFloat(randomCase.suspicionScore),
   };
 }
@@ -291,15 +291,15 @@ async function getKnownInnocentCase(): Promise<TestCaseSource | null> {
  * Create a test case from a source.
  *
  * @param source - The test case source
- * @returns The created jury case
+ * @returns The created overwatch case
  */
-export async function createTestCase(source: TestCaseSource): Promise<JuryCase> {
+export async function createTestCase(source: TestCaseSource): Promise<OverwatchCase> {
   console.log(
-    `[Jury] Creating test case: ${source.outcome} ` +
+    `[Overwatch] Creating test case: ${source.outcome} ` +
     `(game: ${source.gameId}, player: ${source.playerId})`
   );
 
-  // DON'T expose testCaseReason to jurors - it reveals this is a test case
+  // DON'T expose testCaseReason to arbiters - it reveals this is a test case
   return createCase({
     gameId: source.gameId,
     suspectPlayerId: source.playerId,
@@ -325,16 +325,16 @@ export async function getTestCaseStats(): Promise<{
   totalTestCases: number;
   activeTestCases: number;
   resolvedTestCases: number;
-  juryAccuracyOnTestCases: number;
+  arbiterAccuracyOnTestCases: number;
   testCaseRatio: number;
 }> {
-  const allCases = await db.query.juryCases.findMany({});
+  const allCases = await db.query.overwatchCases.findMany({});
 
   const testCases = allCases.filter(c => c.isTestCase);
   const resolvedTestCases = testCases.filter(c => c.status === 'resolved');
   const activeTestCases = testCases.filter(c => c.status === 'active');
 
-  // Calculate jury accuracy on resolved test cases
+  // Calculate arbiter accuracy on resolved test cases
   let correctVerdicts = 0;
   let totalResolved = 0;
 
@@ -347,7 +347,7 @@ export async function getTestCaseStats(): Promise<{
     }
   }
 
-  const juryAccuracyOnTestCases = totalResolved > 0
+  const arbiterAccuracyOnTestCases = totalResolved > 0
     ? (correctVerdicts / totalResolved) * 100
     : 0;
 
@@ -360,7 +360,7 @@ export async function getTestCaseStats(): Promise<{
     totalTestCases: testCases.length,
     activeTestCases: activeTestCases.length,
     resolvedTestCases: resolvedTestCases.length,
-    juryAccuracyOnTestCases,
+    arbiterAccuracyOnTestCases,
     testCaseRatio,
   };
 }
@@ -371,7 +371,7 @@ export async function getTestCaseStats(): Promise<{
  * Call this when a new real case is about to be created.
  * It may create a test case first if the ratio needs balancing.
  */
-export async function maybeInsertTestCase(): Promise<JuryCase | null> {
+export async function maybeInsertTestCase(): Promise<OverwatchCase | null> {
   const shouldInsert = await shouldInsertTestCase();
 
   if (!shouldInsert) {
@@ -381,7 +381,7 @@ export async function maybeInsertTestCase(): Promise<JuryCase | null> {
   const source = await getTestCaseSource();
 
   if (!source) {
-    console.log('[Jury] No test case source available');
+    console.log('[Overwatch] No test case source available');
     return null;
   }
 

@@ -10,7 +10,7 @@
  * we also need to track settlements for anti-cheat integration. This handler:
  * 1. Creates a settlement record for audit/tracking
  * 2. Evaluates the game for cheating
- * 3. Creates jury cases if suspicion is detected
+ * 3. Creates overwatch cases if suspicion is detected
  *
  * DESIGN DECISIONS:
  * - NON-BLOCKING: Settlement processing runs after the game ends.
@@ -26,7 +26,7 @@
  *
  * For now, this handler focuses on:
  * - Creating settlement records for auditing
- * - Detecting suspicious games and creating jury cases
+ * - Detecting suspicious games and creating overwatch cases
  * - Sending notifications about game status
  */
 

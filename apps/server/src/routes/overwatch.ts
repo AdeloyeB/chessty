@@ -1,24 +1,24 @@
 /**
- * Jury System API Routes
- * =======================
+ * Arbiter Overwatch API Routes
+ * =============================
  *
- * HTTP endpoints for the community review (jury) system.
+ * HTTP endpoints for the Arbiter Overwatch community review system.
  *
  * ENDPOINTS:
- * - GET /api/jury/eligibility - Check if current user can be a juror
- * - POST /api/jury/enroll - Enroll as a juror
- * - GET /api/jury/cases - Get available cases for this juror
- * - GET /api/jury/cases/:id - Get case details (anonymized)
- * - POST /api/jury/cases/:id/verdict - Submit verdict
- * - GET /api/jury/stats - Get juror's stats and score
+ * - GET /api/overwatch/eligibility - Check if current user can be an arbiter
+ * - POST /api/overwatch/enroll - Enroll as an arbiter
+ * - GET /api/overwatch/cases - Get available cases for this arbiter
+ * - GET /api/overwatch/cases/:id - Get case details (anonymized)
+ * - POST /api/overwatch/cases/:id/verdict - Submit verdict
+ * - GET /api/overwatch/stats - Get arbiter's stats and score
  *
  * AUTHENTICATION:
  * All endpoints require authentication. Users must be logged in.
  *
  * AUTHORIZATION:
  * - Eligibility/enroll: Any authenticated user
- * - Cases/verdict: Must be an enrolled, active juror
- * - Stats: Must be an enrolled juror
+ * - Cases/verdict: Must be an enrolled, active arbiter
+ * - Stats: Must be an enrolled arbiter
  */
 
 import { z } from 'zod';
@@ -26,15 +26,15 @@ import type { ApiResponse } from '@chess-game/shared';
 import { authenticateRequest } from './auth';
 import {
   checkEligibility,
-  enrollAsJuror,
-  getJurorProfile,
-  getJurorCases,
+  enrollAsArbiter,
+  getArbiterProfile,
+  getArbiterCases,
   getCaseForReview,
   submitVerdict,
-  getJurorStats,
-} from '../services/jury';
-import type { VerdictOption } from '../drizzle/jury-schema';
-import { JURY_RATE_LIMITERS, rateLimitResponse } from '../middleware/rate-limiter';
+  getArbiterStats,
+} from '../services/overwatch';
+import type { VerdictOption } from '../drizzle/overwatch-schema';
+import { OVERWATCH_RATE_LIMITERS, rateLimitResponse } from '../middleware/rate-limiter';
 import { sanitizeText } from '../utils/sanitize';
 
 // ---------------------------------------------------------------------------
@@ -45,8 +45,8 @@ import { sanitizeText } from '../utils/sanitize';
  * Randomize a timestamp to prevent test case detection via timing analysis.
  * Returns a random timestamp within the last N days.
  *
- * WHY: Test cases are injected into the jury system to calibrate juror accuracy.
- * If jurors could identify test cases by their timestamps (e.g., "this game was
+ * WHY: Test cases are injected into the overwatch system to calibrate arbiter accuracy.
+ * If arbiters could identify test cases by their timestamps (e.g., "this game was
  * created exactly when I enrolled"), they could game the system. This function
  * makes all timestamps look like random recent games.
  */
@@ -76,9 +76,9 @@ const VerdictSchema = z.object({
 // ---------------------------------------------------------------------------
 
 /**
- * GET /api/jury/eligibility
+ * GET /api/overwatch/eligibility
  *
- * Check if the current user is eligible to be a juror.
+ * Check if the current user is eligible to be an arbiter.
  * Returns eligibility status and reasons if not eligible.
  */
 export async function handleGetEligibility(req: Request): Promise<Response> {
@@ -113,9 +113,9 @@ export async function handleGetEligibility(req: Request): Promise<Response> {
 }
 
 /**
- * POST /api/jury/enroll
+ * POST /api/overwatch/enroll
  *
- * Enroll the current user as a juror.
+ * Enroll the current user as an arbiter.
  * User must meet eligibility requirements.
  */
 export async function handleEnroll(req: Request): Promise<Response> {
@@ -128,7 +128,7 @@ export async function handleEnroll(req: Request): Promise<Response> {
       || req.headers.get('x-real-ip')
       || 'unknown';
 
-    const ipRateResult = JURY_RATE_LIMITERS.enroll.check(`ip:${clientIp}`);
+    const ipRateResult = OVERWATCH_RATE_LIMITERS.enroll.check(`ip:${clientIp}`);
     if (!ipRateResult.allowed) {
       return rateLimitResponse(ipRateResult);
     }
@@ -146,12 +146,12 @@ export async function handleEnroll(req: Request): Promise<Response> {
     }
 
     // Also rate limit by user ID (defense in depth)
-    const rateResult = JURY_RATE_LIMITERS.enroll.check(auth.userId);
+    const rateResult = OVERWATCH_RATE_LIMITERS.enroll.check(auth.userId);
     if (!rateResult.allowed) {
       return rateLimitResponse(rateResult);
     }
 
-    const result = await enrollAsJuror(auth.userId);
+    const result = await enrollAsArbiter(auth.userId);
 
     if (!result.success) {
       return Response.json(
@@ -166,12 +166,12 @@ export async function handleEnroll(req: Request): Promise<Response> {
     return Response.json({
       success: true,
       data: {
-        message: 'Successfully enrolled as juror',
-        juror: {
-          userId: result.juror!.userId,
-          score: parseFloat(result.juror!.investigatorScore),
-          casesReviewed: result.juror!.casesReviewed,
-          isActive: result.juror!.isActive,
+        message: 'Successfully enrolled as arbiter',
+        arbiter: {
+          userId: result.arbiter!.userId,
+          score: parseFloat(result.arbiter!.investigatorScore),
+          casesReviewed: result.arbiter!.casesReviewed,
+          isActive: result.arbiter!.isActive,
         },
       },
     } satisfies ApiResponse<unknown>);
@@ -188,9 +188,9 @@ export async function handleEnroll(req: Request): Promise<Response> {
 }
 
 /**
- * GET /api/jury/cases
+ * GET /api/overwatch/cases
  *
- * Get all cases assigned to the current juror.
+ * Get all cases assigned to the current arbiter.
  * Optional query param: status=pending|in_progress|completed
  */
 export async function handleGetCases(req: Request): Promise<Response> {
@@ -207,18 +207,18 @@ export async function handleGetCases(req: Request): Promise<Response> {
     }
 
     // Rate limit check
-    const rateResult = JURY_RATE_LIMITERS.getCases.check(auth.userId);
+    const rateResult = OVERWATCH_RATE_LIMITERS.getCases.check(auth.userId);
     if (!rateResult.allowed) {
       return rateLimitResponse(rateResult);
     }
 
-    // Check if user is a juror
-    const juror = await getJurorProfile(auth.userId);
-    if (!juror) {
+    // Check if user is an arbiter
+    const arbiter = await getArbiterProfile(auth.userId);
+    if (!arbiter) {
       return Response.json(
         {
           success: false,
-          error: { code: 'NOT_JUROR', message: 'You are not enrolled as a juror' },
+          error: { code: 'NOT_ARBITER', message: 'You are not enrolled as an arbiter' },
         } satisfies ApiResponse<never>,
         { status: 403 }
       );
@@ -231,7 +231,7 @@ export async function handleGetCases(req: Request): Promise<Response> {
       ? statusParam
       : undefined;
 
-    const cases = await getJurorCases(auth.userId, status);
+    const cases = await getArbiterCases(auth.userId, status);
 
     // Format response with minimal info (cases are anonymized)
     const formattedCases = cases.map(assignment => ({
@@ -265,7 +265,7 @@ export async function handleGetCases(req: Request): Promise<Response> {
 }
 
 /**
- * GET /api/jury/cases/:id
+ * GET /api/overwatch/cases/:id
  *
  * Get detailed case information for review.
  * Case data is anonymized (player identities hidden).
@@ -284,7 +284,7 @@ export async function handleGetCase(req: Request, caseId: string): Promise<Respo
     }
 
     // Rate limit check
-    const rateResult = JURY_RATE_LIMITERS.getCase.check(auth.userId);
+    const rateResult = OVERWATCH_RATE_LIMITERS.getCase.check(auth.userId);
     if (!rateResult.allowed) {
       return rateLimitResponse(rateResult);
     }
@@ -303,15 +303,15 @@ export async function handleGetCase(req: Request, caseId: string): Promise<Respo
     }
 
     // Format anonymized case data
-    const { case: juryCase, game, anonymizedPlayerId } = reviewData;
+    const { case: overwatchCase, game, anonymizedPlayerId } = reviewData;
 
     // Determine which player is the suspect
-    const suspectIsWhite = juryCase.suspectPlayerId === game.whitePlayerId;
+    const suspectIsWhite = overwatchCase.suspectPlayerId === game.whitePlayerId;
 
     // Sanitize metadata to strip test case identifying info
-    // This prevents jurors from identifying test cases injected for calibration
-    const sanitizedMetadata = juryCase.anticheatMetadata ? {
-      ...juryCase.anticheatMetadata,
+    // This prevents arbiters from identifying test cases injected for calibration
+    const sanitizedMetadata = overwatchCase.anticheatMetadata ? {
+      ...overwatchCase.anticheatMetadata,
       // Strip fields that could identify test cases
       testCaseReason: undefined,
       insertedAt: undefined,
@@ -319,7 +319,7 @@ export async function handleGetCase(req: Request, caseId: string): Promise<Respo
     } : undefined;
 
     // Normalize timestamps to prevent test case detection via timing analysis
-    // WHY: Test cases might have timestamps that correlate with juror enrollment,
+    // WHY: Test cases might have timestamps that correlate with arbiter enrollment,
     // or be from the future, or have other timing patterns that reveal them.
     // By randomizing all timestamps to look like recent games, we make test cases
     // indistinguishable from real cases.
@@ -351,10 +351,10 @@ export async function handleGetCase(req: Request, caseId: string): Promise<Respo
     return Response.json({
       success: true,
       data: {
-        caseId: juryCase.id,
-        priority: juryCase.priority,
-        deadline: juryCase.deadline,
-        status: juryCase.status,
+        caseId: overwatchCase.id,
+        priority: overwatchCase.priority,
+        deadline: overwatchCase.deadline,
+        status: overwatchCase.status,
 
         // Anonymized game data with normalized timestamps
         game: normalizedGame,
@@ -410,10 +410,10 @@ export async function handleGetCase(req: Request, caseId: string): Promise<Respo
 }
 
 /**
- * POST /api/jury/cases/:id/verdict
+ * POST /api/overwatch/cases/:id/verdict
  *
  * Submit a verdict for a case.
- * Juror must vote on all three cheat categories.
+ * Arbiter must vote on all three cheat categories.
  */
 export async function handleSubmitVerdict(req: Request, caseId: string): Promise<Response> {
   try {
@@ -429,7 +429,7 @@ export async function handleSubmitVerdict(req: Request, caseId: string): Promise
     }
 
     // Rate limit check
-    const rateResult = JURY_RATE_LIMITERS.verdict.check(auth.userId);
+    const rateResult = OVERWATCH_RATE_LIMITERS.verdict.check(auth.userId);
     if (!rateResult.allowed) {
       return rateLimitResponse(rateResult);
     }
@@ -488,9 +488,9 @@ export async function handleSubmitVerdict(req: Request, caseId: string): Promise
 }
 
 /**
- * GET /api/jury/stats
+ * GET /api/overwatch/stats
  *
- * Get the current juror's statistics and score.
+ * Get the current arbiter's statistics and score.
  */
 export async function handleGetStats(req: Request): Promise<Response> {
   try {
@@ -505,13 +505,13 @@ export async function handleGetStats(req: Request): Promise<Response> {
       );
     }
 
-    const stats = await getJurorStats(auth.userId);
+    const stats = await getArbiterStats(auth.userId);
 
     if (!stats) {
       return Response.json(
         {
           success: false,
-          error: { code: 'NOT_JUROR', message: 'You are not enrolled as a juror' },
+          error: { code: 'NOT_ARBITER', message: 'You are not enrolled as an arbiter' },
         } satisfies ApiResponse<never>,
         { status: 404 }
       );

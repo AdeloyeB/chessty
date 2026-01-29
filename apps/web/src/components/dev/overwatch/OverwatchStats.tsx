@@ -1,28 +1,28 @@
 'use client';
 
 /**
- * JuryStats Component
+ * OverwatchStats Component
  *
- * Displays the current juror's personal statistics and ranking.
+ * Displays the current arbiter's personal statistics and ranking.
  *
  * WHAT THIS COMPONENT DOES:
  * - Shows investigator score as a visual progress bar (0-1 scale)
  * - Displays cases reviewed, correct verdicts, and accuracy rate
- * - Shows rank among all jurors
+ * - Shows rank among all arbiters
  *
  * WHY THESE METRICS MATTER:
  * - Investigator Score: Determines weight of verdicts in final decisions
- * - Accuracy Rate: How often the juror agrees with consensus verdicts
+ * - Accuracy Rate: How often the arbiter agrees with consensus verdicts
  * - Rank: Competitive element to encourage careful review
  */
 
-import type { JurorStats } from './mockJuryData';
+import type { ArbiterStats } from './mockOverwatchData';
 
-interface JuryStatsProps {
-  stats: JurorStats;
+interface OverwatchStatsProps {
+  stats: ArbiterStats;
 }
 
-export function JuryStats({ stats }: JuryStatsProps) {
+export function OverwatchStats({ stats }: OverwatchStatsProps) {
   // Score color based on value
   const getScoreColor = (score: number) => {
     if (score >= 0.85) return 'text-emerald-400';
@@ -43,9 +43,9 @@ export function JuryStats({ stats }: JuryStatsProps) {
     <div className="space-y-4">
       {/* Header */}
       <div>
-        <h3 className="text-sm font-mono text-white">juror_statistics</h3>
+        <h3 className="text-sm font-mono text-white">arbiter_statistics</h3>
         <p className="text-xs font-mono text-[#666] mt-0.5">
-          your performance as a jury member
+          your performance as an Arbiter Overwatch member
         </p>
       </div>
 
@@ -58,8 +58,8 @@ export function JuryStats({ stats }: JuryStatsProps) {
               {(stats.investigatorScore * 100).toFixed(1)}%
             </p>
           </div>
-          <div className={`px-3 py-1 text-xs font-mono border ${getRankColor(stats.rank, stats.totalJurors)}`}>
-            #{stats.rank} of {stats.totalJurors}
+          <div className={`px-3 py-1 text-xs font-mono border ${getRankColor(stats.rank, stats.totalArbiters)}`}>
+            #{stats.rank} of {stats.totalArbiters}
           </div>
         </div>
 
@@ -97,7 +97,7 @@ export function JuryStats({ stats }: JuryStatsProps) {
         <StatBox
           label="rank"
           value={`#${stats.rank}`}
-          sublabel={`top ${Math.round((stats.rank / stats.totalJurors) * 100)}%`}
+          sublabel={`top ${Math.round((stats.rank / stats.totalArbiters) * 100)}%`}
           highlight={stats.rank <= 10}
         />
       </div>
@@ -189,4 +189,4 @@ function AccuracyBar({
   );
 }
 
-export default JuryStats;
+export default OverwatchStats;

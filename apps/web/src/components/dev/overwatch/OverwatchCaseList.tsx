@@ -1,13 +1,13 @@
 'use client';
 
 /**
- * JuryCaseList Component
+ * OverwatchCaseList Component
  *
- * Displays a paginated list of cases available for jury review.
+ * Displays a paginated list of cases available for arbiter review.
  * Shows case ID, suspicion score, priority badge, and time remaining.
  *
  * WHAT THIS COMPONENT DOES:
- * - Lists all pending cases that need jury review
+ * - Lists all pending cases that need arbiter review
  * - Uses pagination (no scrolling) per project guidelines
  * - Color-codes priority levels for quick triage
  * - Shows countdown timer for case expiration
@@ -15,10 +15,10 @@
 
 import { useState, useEffect } from 'react';
 import { PaginatedList } from '@/components/ui/PaginatedGrid';
-import type { JuryCase, CasePriority } from './mockJuryData';
+import type { OverwatchCase, CasePriority } from './mockOverwatchData';
 
-interface JuryCaseListProps {
-  cases: JuryCase[];
+interface OverwatchCaseListProps {
+  cases: OverwatchCase[];
   onSelectCase: (caseId: string) => void;
 }
 
@@ -59,30 +59,30 @@ function formatTimeRemaining(expiresAt: Date): string {
  * Individual case row in the list.
  */
 function CaseRow({
-  juryCase,
+  overwatchCase,
   onSelect,
 }: {
-  juryCase: JuryCase;
+  overwatchCase: OverwatchCase;
   onSelect: () => void;
 }) {
-  const [timeRemaining, setTimeRemaining] = useState(formatTimeRemaining(juryCase.expiresAt));
-  const priority = PRIORITY_STYLES[juryCase.priority];
+  const [timeRemaining, setTimeRemaining] = useState(formatTimeRemaining(overwatchCase.expiresAt));
+  const priority = PRIORITY_STYLES[overwatchCase.priority];
 
   // Update time remaining every minute
   useEffect(() => {
     const interval = setInterval(() => {
-      setTimeRemaining(formatTimeRemaining(juryCase.expiresAt));
+      setTimeRemaining(formatTimeRemaining(overwatchCase.expiresAt));
     }, 60000);
 
     return () => clearInterval(interval);
-  }, [juryCase.expiresAt]);
+  }, [overwatchCase.expiresAt]);
 
   // Suspicion score color based on value
-  const scoreColor = juryCase.suspicionScore >= 70
+  const scoreColor = overwatchCase.suspicionScore >= 70
     ? 'text-red-400'
-    : juryCase.suspicionScore >= 50
+    : overwatchCase.suspicionScore >= 50
     ? 'text-orange-400'
-    : juryCase.suspicionScore >= 30
+    : overwatchCase.suspicionScore >= 30
     ? 'text-amber-400'
     : 'text-white/50';
 
@@ -94,7 +94,7 @@ function CaseRow({
           <div className="flex items-center gap-3 mb-2">
             {/* Case ID */}
             <span className="font-mono text-sm text-white">
-              {juryCase.id.toUpperCase()}
+              {overwatchCase.id.toUpperCase()}
             </span>
 
             {/* Priority badge */}
@@ -106,22 +106,22 @@ function CaseRow({
           {/* Player info */}
           <div className="flex items-center gap-2 text-xs font-mono text-[#888]">
             <span className={scoreColor}>
-              {juryCase.suspicionScore}% suspicious
+              {overwatchCase.suspicionScore}% suspicious
             </span>
             <span className="text-[#666]">/</span>
-            <span>{juryCase.suspectUsername}</span>
-            <span className="text-[#666]">({juryCase.suspectRating})</span>
+            <span>{overwatchCase.suspectUsername}</span>
+            <span className="text-[#666]">({overwatchCase.suspectRating})</span>
             <span className="text-[#666]">vs</span>
-            <span>{juryCase.opponentUsername}</span>
+            <span>{overwatchCase.opponentUsername}</span>
           </div>
 
           {/* Game details */}
           <div className="flex items-center gap-2 mt-1 text-xs font-mono text-[#666]">
-            <span>{juryCase.timeControl}</span>
+            <span>{overwatchCase.timeControl}</span>
             <span>/</span>
-            <span>{juryCase.opening}</span>
+            <span>{overwatchCase.opening}</span>
             <span>/</span>
-            <span>${juryCase.wagerAmount}</span>
+            <span>${overwatchCase.wagerAmount}</span>
           </div>
         </div>
 
@@ -152,7 +152,7 @@ function CaseRow({
   );
 }
 
-export function JuryCaseList({ cases, onSelectCase }: JuryCaseListProps) {
+export function OverwatchCaseList({ cases, onSelectCase }: OverwatchCaseListProps) {
   if (cases.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">
@@ -181,11 +181,11 @@ export function JuryCaseList({ cases, onSelectCase }: JuryCaseListProps) {
       <PaginatedList
         items={cases}
         itemsPerPage={5}
-        renderItem={(juryCase) => (
+        renderItem={(overwatchCase) => (
           <CaseRow
-            key={juryCase.id}
-            juryCase={juryCase}
-            onSelect={() => onSelectCase(juryCase.id)}
+            key={overwatchCase.id}
+            overwatchCase={overwatchCase}
+            onSelect={() => onSelectCase(overwatchCase.id)}
           />
         )}
         emptyMessage="no cases available"
@@ -195,4 +195,4 @@ export function JuryCaseList({ cases, onSelectCase }: JuryCaseListProps) {
   );
 }
 
-export default JuryCaseList;
+export default OverwatchCaseList;

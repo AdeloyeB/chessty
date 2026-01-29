@@ -1,9 +1,9 @@
 /**
- * Mock data for the Jury System dev tools
+ * Mock data for the Arbiter Overwatch System dev tools
  *
  * WHAT THIS FILE IS FOR:
- * Provides realistic mock cases and jury statistics for testing the
- * jury review interface in dev mode. These data structures mirror what
+ * Provides realistic mock cases and arbiter statistics for testing the
+ * overwatch review interface in dev mode. These data structures mirror what
  * the actual anti-cheat system would provide.
  */
 
@@ -11,7 +11,7 @@ import type { Move } from '@chess-game/shared';
 import { MOCK_PLAYERS } from '@/lib/mock/mockData';
 
 // ---------------------------------------------------------------------------
-// Types for Jury System
+// Types for Arbiter Overwatch System
 // ---------------------------------------------------------------------------
 
 /**
@@ -22,17 +22,17 @@ import { MOCK_PLAYERS } from '@/lib/mock/mockData';
 export type VerdictOption = 'insufficient' | 'evident';
 
 /**
- * The three types of cheating the jury evaluates.
+ * The three types of cheating arbiters evaluate.
  * Each has different detection patterns and evidence types.
  */
 export type ChargeType = 'engine_assistance' | 'input_automation' | 'external_assistance';
 
 /**
- * A juror's verdict on a case.
+ * An arbiter's verdict on a case.
  */
-export interface JuryVerdict {
+export interface OverwatchVerdict {
   caseId: string;
-  jurorId: string;
+  arbiterId: string;
   engineAssistance: VerdictOption;
   inputAutomation: VerdictOption;
   externalAssistance: VerdictOption;
@@ -41,7 +41,7 @@ export interface JuryVerdict {
 
 /**
  * Statistical analysis for a suspected game.
- * These are the metrics jurors review to determine if cheating occurred.
+ * These are the metrics arbiters review to determine if cheating occurred.
  */
 export interface CaseStatistics {
   // Centipawn Loss Analysis
@@ -87,9 +87,9 @@ export interface CaseStatistics {
 export type CasePriority = 'low' | 'medium' | 'high' | 'critical';
 
 /**
- * A case for jury review.
+ * A case for arbiter review.
  */
-export interface JuryCase {
+export interface OverwatchCase {
   id: string;
   gameId: string;
 
@@ -123,16 +123,16 @@ export interface JuryCase {
 }
 
 /**
- * Juror statistics and rank.
+ * Arbiter statistics and rank.
  */
-export interface JurorStats {
-  jurorId: string;
+export interface ArbiterStats {
+  arbiterId: string;
   investigatorScore: number; // 0-1, accuracy of verdicts
   casesReviewed: number;
   correctVerdicts: number;
   accuracyRate: number; // 0-100
   rank: number;
-  totalJurors: number;
+  totalArbiters: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -298,10 +298,10 @@ function generateStatistics(suspiciousLevel: 'clean' | 'moderate' | 'high'): Cas
 }
 
 /**
- * Generate mock jury cases for testing.
+ * Generate mock overwatch cases for testing.
  */
-export function generateMockCases(count: number = 5): JuryCase[] {
-  const cases: JuryCase[] = [];
+export function generateMockCases(count: number = 5): OverwatchCase[] {
+  const cases: OverwatchCase[] = [];
   const openings = ['Italian Game', 'Sicilian Najdorf', 'Ruy Lopez', 'French Defense', 'Caro-Kann'];
   const timeControls = ['3+0', '5+0', '5+3', '10+0', '15+10'];
 
@@ -348,30 +348,30 @@ export function generateMockCases(count: number = 5): JuryCase[] {
 }
 
 /**
- * Generate mock juror statistics.
+ * Generate mock arbiter statistics.
  */
-export function generateMockJurorStats(): JurorStats {
+export function generateMockArbiterStats(): ArbiterStats {
   const casesReviewed = Math.floor(Math.random() * 50) + 10;
   const correctVerdicts = Math.floor(casesReviewed * (0.65 + Math.random() * 0.30));
   const accuracyRate = (correctVerdicts / casesReviewed) * 100;
 
   return {
-    jurorId: 'current-user',
+    arbiterId: 'current-user',
     investigatorScore: 0.5 + Math.random() * 0.45,
     casesReviewed,
     correctVerdicts,
     accuracyRate: Math.round(accuracyRate * 10) / 10,
     rank: Math.floor(Math.random() * 50) + 1,
-    totalJurors: Math.floor(Math.random() * 100) + 100,
+    totalArbiters: Math.floor(Math.random() * 100) + 100,
   };
 }
 
 /**
  * Mock available cases for the case list.
  */
-export const MOCK_JURY_CASES = generateMockCases(8);
+export const MOCK_OVERWATCH_CASES = generateMockCases(8);
 
 /**
- * Mock juror stats.
+ * Mock arbiter stats.
  */
-export const MOCK_JUROR_STATS = generateMockJurorStats();
+export const MOCK_ARBITER_STATS = generateMockArbiterStats();

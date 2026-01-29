@@ -1,19 +1,19 @@
 /**
- * Jury Case Assignment Service
- * =============================
+ * Arbiter Overwatch Case Assignment Service
+ * ==========================================
  *
- * Handles assigning jurors to cases and managing the assignment lifecycle.
+ * Handles assigning arbiters to cases and managing the assignment lifecycle.
  *
  * ASSIGNMENT STRATEGY:
- * Each case gets 5-7 jurors from different ELO ranges to ensure diverse
- * perspectives. Higher-rated jurors can spot subtle cheating patterns,
- * while lower-rated jurors ensure obvious cheating isn't missed.
+ * Each case gets 5-7 arbiters from different ELO ranges to ensure diverse
+ * perspectives. Higher-rated arbiters can spot subtle cheating patterns,
+ * while lower-rated arbiters ensure obvious cheating isn't missed.
  *
  * ELO RANGES FOR ASSIGNMENT:
- * - 1400-1600: 1-2 jurors
- * - 1600-1800: 1-2 jurors
- * - 1800-2000: 1-2 jurors
- * - 2000+: 1 juror (if available)
+ * - 1400-1600: 1-2 arbiters
+ * - 1600-1800: 1-2 arbiters
+ * - 1800-2000: 1-2 arbiters
+ * - 2000+: 1 arbiter (if available)
  *
  * EXCLUSIONS:
  * - Players who played in the game being reviewed
@@ -27,11 +27,11 @@ import {
   db,
   users,
   games,
-  juryInvestigators,
-  juryCases,
-  juryCaseAssignments,
-  type JuryCase,
-  type JuryCaseAssignment,
+  overwatchArbiters,
+  overwatchCases,
+  overwatchCaseAssignments,
+  type OverwatchCase,
+  type OverwatchCaseAssignment,
 } from '../../drizzle';
 import { canReceiveAssignments, MAX_PENDING_ASSIGNMENTS } from './eligibility';
 import { anonymizePlayerId } from '../../utils/anonymize';
@@ -40,21 +40,21 @@ import { anonymizePlayerId } from '../../utils/anonymize';
 // Configuration
 // ---------------------------------------------------------------------------
 
-/** Minimum number of jurors per case */
-export const MIN_JURORS_PER_CASE = 5;
+/** Minimum number of arbiters per case */
+export const MIN_ARBITERS_PER_CASE = 5;
 
-/** Maximum number of jurors per case */
-export const MAX_JURORS_PER_CASE = 7;
+/** Maximum number of arbiters per case */
+export const MAX_ARBITERS_PER_CASE = 7;
 
-/** Target number of jurors per case */
-export const TARGET_JURORS_PER_CASE = 6;
+/** Target number of arbiters per case */
+export const TARGET_ARBITERS_PER_CASE = 6;
 
 /** Case deadline in hours from creation */
 export const CASE_DEADLINE_HOURS = 48;
 
 /**
  * ELO ranges for diverse assignment.
- * We try to get jurors from each range to ensure perspectives across skill levels.
+ * We try to get arbiters from each range to ensure perspectives across skill levels.
  */
 export const ELO_RANGES = [
   { min: 1400, max: 1599, target: 2 },
@@ -88,21 +88,21 @@ export interface AssignmentResult {
 // ---------------------------------------------------------------------------
 
 /**
- * Create a new jury case for a flagged game.
+ * Create a new overwatch case for a flagged game.
  *
- * This creates the case record and immediately attempts to assign jurors.
+ * This creates the case record and immediately attempts to assign arbiters.
  *
  * @param input - Case creation parameters
  * @returns The created case
  */
-export async function createCase(input: CaseCreationInput): Promise<JuryCase> {
+export async function createCase(input: CaseCreationInput): Promise<OverwatchCase> {
   // Calculate deadline (default: 48 hours from now)
   const deadline = new Date();
   deadline.setHours(deadline.getHours() + CASE_DEADLINE_HOURS);
 
   // Create the case
   const [newCase] = await db
-    .insert(juryCases)
+    .insert(overwatchCases)
     .values({
       gameId: input.gameId,
       suspectPlayerId: input.suspectPlayerId,
@@ -117,161 +117,161 @@ export async function createCase(input: CaseCreationInput): Promise<JuryCase> {
     .returning();
 
   console.log(
-    `[Jury] Created case ${newCase.id} for game ${input.gameId} ` +
+    `[Overwatch] Created case ${newCase.id} for game ${input.gameId} ` +
     `(suspect: ${input.suspectPlayerId}, score: ${input.suspicionScore.toFixed(2)})`
   );
 
-  // Attempt to assign jurors immediately
-  await assignJurorsToCase(newCase.id);
+  // Attempt to assign arbiters immediately
+  await assignArbitersToCase(newCase.id);
 
   // Refresh the case to get updated status
-  const updatedCase = await db.query.juryCases.findFirst({
-    where: eq(juryCases.id, newCase.id),
+  const updatedCase = await db.query.overwatchCases.findFirst({
+    where: eq(overwatchCases.id, newCase.id),
   });
 
   return updatedCase!;
 }
 
 /**
- * Assign jurors to a case.
+ * Assign arbiters to a case.
  *
- * This finds eligible jurors from different ELO ranges and assigns them.
+ * This finds eligible arbiters from different ELO ranges and assigns them.
  * Excludes players involved in the game or who know the suspect.
  *
- * @param caseId - The case to assign jurors to
+ * @param caseId - The case to assign arbiters to
  * @returns Assignment result with count and any errors
  */
-export async function assignJurorsToCase(caseId: string): Promise<AssignmentResult> {
+export async function assignArbitersToCase(caseId: string): Promise<AssignmentResult> {
   const errors: string[] = [];
 
   // Get the case and related game
-  const juryCase = await db.query.juryCases.findFirst({
-    where: eq(juryCases.id, caseId),
+  const overwatchCase = await db.query.overwatchCases.findFirst({
+    where: eq(overwatchCases.id, caseId),
   });
 
-  if (!juryCase) {
+  if (!overwatchCase) {
     return { success: false, assignedCount: 0, errors: ['Case not found'] };
   }
 
   // Get the game to find excluded players
   const game = await db.query.games.findFirst({
-    where: eq(games.id, juryCase.gameId),
+    where: eq(games.id, overwatchCase.gameId),
   });
 
   if (!game) {
     return { success: false, assignedCount: 0, errors: ['Game not found'] };
   }
 
-  // Players who cannot be jurors for this case
+  // Players who cannot be arbiters for this case
   const excludedPlayerIds = [
     game.whitePlayerId,
     game.blackPlayerId,
-    juryCase.suspectPlayerId,
+    overwatchCase.suspectPlayerId,
   ];
 
   // Get current assignments to avoid duplicates
-  const existingAssignments = await db.query.juryCaseAssignments.findMany({
-    where: eq(juryCaseAssignments.caseId, caseId),
+  const existingAssignments = await db.query.overwatchCaseAssignments.findMany({
+    where: eq(overwatchCaseAssignments.caseId, caseId),
   });
   const alreadyAssignedIds = existingAssignments.map(a => a.investigatorId);
 
-  // Find eligible jurors from each ELO range
-  const assignedJurors: string[] = [];
+  // Find eligible arbiters from each ELO range
+  const assignedArbiters: string[] = [];
 
   for (const range of ELO_RANGES) {
-    const jurorsInRange = await findEligibleJurorsInRange(
+    const arbitersInRange = await findEligibleArbitersInRange(
       range.min,
       range.max,
       range.target,
-      [...excludedPlayerIds, ...alreadyAssignedIds, ...assignedJurors]
+      [...excludedPlayerIds, ...alreadyAssignedIds, ...assignedArbiters]
     );
 
-    for (const juror of jurorsInRange) {
+    for (const arbiter of arbitersInRange) {
       // Double-check they can receive assignments
-      const canAssign = await canReceiveAssignments(juror.userId);
+      const canAssign = await canReceiveAssignments(arbiter.userId);
       if (!canAssign) continue;
 
       // Check they don't have too many pending cases
-      const pendingCount = await getPendingAssignmentCount(juror.userId);
+      const pendingCount = await getPendingAssignmentCount(arbiter.userId);
       if (pendingCount >= MAX_PENDING_ASSIGNMENTS) continue;
 
       // Create the assignment
       try {
-        await db.insert(juryCaseAssignments).values({
+        await db.insert(overwatchCaseAssignments).values({
           caseId,
-          investigatorId: juror.userId,
-          eloAtAssignment: juror.user.eloRating,
-          scoreAtAssignment: juror.investigatorScore,
+          investigatorId: arbiter.userId,
+          eloAtAssignment: arbiter.user.eloRating,
+          scoreAtAssignment: arbiter.investigatorScore,
           status: 'pending',
         });
 
-        assignedJurors.push(juror.userId);
+        assignedArbiters.push(arbiter.userId);
         console.log(
-          `[Jury] Assigned juror ${juror.userId} (ELO: ${juror.user.eloRating}) ` +
+          `[Overwatch] Assigned arbiter ${arbiter.userId} (ELO: ${arbiter.user.eloRating}) ` +
           `to case ${caseId}`
         );
       } catch (err) {
         // Might fail if there's a race condition with unique constraint
-        errors.push(`Failed to assign ${juror.userId}: ${err instanceof Error ? err.message : 'unknown'}`);
+        errors.push(`Failed to assign ${arbiter.userId}: ${err instanceof Error ? err.message : 'unknown'}`);
       }
     }
   }
 
-  // Update case status if we have enough jurors
-  const totalAssigned = existingAssignments.length + assignedJurors.length;
-  if (totalAssigned >= MIN_JURORS_PER_CASE) {
+  // Update case status if we have enough arbiters
+  const totalAssigned = existingAssignments.length + assignedArbiters.length;
+  if (totalAssigned >= MIN_ARBITERS_PER_CASE) {
     await db
-      .update(juryCases)
+      .update(overwatchCases)
       .set({ status: 'active' })
-      .where(eq(juryCases.id, caseId));
+      .where(eq(overwatchCases.id, caseId));
   }
 
   return {
-    success: totalAssigned >= MIN_JURORS_PER_CASE,
-    assignedCount: assignedJurors.length,
+    success: totalAssigned >= MIN_ARBITERS_PER_CASE,
+    assignedCount: assignedArbiters.length,
     errors: errors.length > 0 ? errors : undefined,
   };
 }
 
 /**
- * Find eligible jurors within a specific ELO range.
+ * Find eligible arbiters within a specific ELO range.
  *
  * Uses batch queries to avoid N+1 database calls:
- * 1. Single query to get all active, non-suspended jurors
+ * 1. Single query to get all active, non-suspended arbiters
  * 2. Single query to get all users in the ELO range
  * 3. In-memory join using a Map for O(1) lookups
  *
  * @param minElo - Minimum ELO for this range
  * @param maxElo - Maximum ELO for this range
- * @param count - How many jurors to find
+ * @param count - How many arbiters to find
  * @param excludeIds - User IDs to exclude
- * @returns Array of eligible jurors sorted by investigator score
+ * @returns Array of eligible arbiters sorted by investigator score
  */
-async function findEligibleJurorsInRange(
+async function findEligibleArbitersInRange(
   minElo: number,
   maxElo: number,
   count: number,
   excludeIds: string[]
-): Promise<Array<typeof juryInvestigators.$inferSelect & { user: typeof users.$inferSelect; parsedScore: number }>> {
+): Promise<Array<typeof overwatchArbiters.$inferSelect & { user: typeof users.$inferSelect; parsedScore: number }>> {
   const now = new Date();
 
-  // Step 1: Get all active, non-suspended jurors not in the exclude list (single query)
-  const activeJurors = await db.query.juryInvestigators.findMany({
+  // Step 1: Get all active, non-suspended arbiters not in the exclude list (single query)
+  const activeArbiters = await db.query.overwatchArbiters.findMany({
     where: and(
-      eq(juryInvestigators.isActive, true),
-      excludeIds.length > 0 ? notInArray(juryInvestigators.userId, excludeIds) : undefined,
-      // Filter out suspended jurors at the database level
+      eq(overwatchArbiters.isActive, true),
+      excludeIds.length > 0 ? notInArray(overwatchArbiters.userId, excludeIds) : undefined,
+      // Filter out suspended arbiters at the database level
       or(
-        isNull(juryInvestigators.suspendedUntil),
-        lt(juryInvestigators.suspendedUntil, now)
+        isNull(overwatchArbiters.suspendedUntil),
+        lt(overwatchArbiters.suspendedUntil, now)
       )
     ),
   });
 
-  if (activeJurors.length === 0) return [];
+  if (activeArbiters.length === 0) return [];
 
   // Step 2: Batch fetch ALL users in ONE query, filtered by ELO range
-  const userIds = activeJurors.map(j => j.userId);
+  const userIds = activeArbiters.map(j => j.userId);
   const usersInRange = await db.query.users.findMany({
     where: and(
       inArray(users.id, userIds),
@@ -286,7 +286,7 @@ async function findEligibleJurorsInRange(
   const userMap = new Map(usersInRange.map(u => [u.id, u]));
 
   // Step 4: Pre-parse scores ONCE before sorting (avoids repeated parseFloat in sort comparator)
-  const eligibleJurors = activeJurors
+  const eligibleArbiters = activeArbiters
     .filter(j => userMap.has(j.userId))
     .map(j => ({
       ...j,
@@ -295,22 +295,22 @@ async function findEligibleJurorsInRange(
     }));
 
   // Sort by pre-parsed investigator score (higher score = more trusted)
-  eligibleJurors.sort((a, b) => b.parsedScore - a.parsedScore);
+  eligibleArbiters.sort((a, b) => b.parsedScore - a.parsedScore);
 
-  return eligibleJurors.slice(0, count);
+  return eligibleArbiters.slice(0, count);
 }
 
 /**
- * Get the number of pending case assignments for a juror.
+ * Get the number of pending case assignments for an arbiter.
  *
- * @param userId - The juror's user ID
+ * @param userId - The arbiter's user ID
  * @returns Count of pending assignments
  */
 async function getPendingAssignmentCount(userId: string): Promise<number> {
-  const pending = await db.query.juryCaseAssignments.findMany({
+  const pending = await db.query.overwatchCaseAssignments.findMany({
     where: and(
-      eq(juryCaseAssignments.investigatorId, userId),
-      eq(juryCaseAssignments.status, 'pending')
+      eq(overwatchCaseAssignments.investigatorId, userId),
+      eq(overwatchCaseAssignments.status, 'pending')
     ),
   });
 
@@ -318,22 +318,22 @@ async function getPendingAssignmentCount(userId: string): Promise<number> {
 }
 
 /**
- * Get all cases assigned to a juror.
+ * Get all cases assigned to an arbiter.
  *
- * @param userId - The juror's user ID
+ * @param userId - The arbiter's user ID
  * @param status - Optional filter by assignment status
  * @returns Array of case assignments with case details
  */
-export async function getJurorCases(
+export async function getArbiterCases(
   userId: string,
   status?: 'pending' | 'in_progress' | 'completed'
-): Promise<Array<JuryCaseAssignment & { case: JuryCase }>> {
-  const assignments = await db.query.juryCaseAssignments.findMany({
+): Promise<Array<OverwatchCaseAssignment & { case: OverwatchCase }>> {
+  const assignments = await db.query.overwatchCaseAssignments.findMany({
     where: and(
-      eq(juryCaseAssignments.investigatorId, userId),
-      status ? eq(juryCaseAssignments.status, status) : undefined
+      eq(overwatchCaseAssignments.investigatorId, userId),
+      status ? eq(overwatchCaseAssignments.status, status) : undefined
     ),
-    orderBy: [desc(juryCaseAssignments.assignedAt)],
+    orderBy: [desc(overwatchCaseAssignments.assignedAt)],
   });
 
   // Handle empty assignments case
@@ -343,8 +343,8 @@ export async function getJurorCases(
 
   // BATCH QUERY: Fetch all cases in one query instead of N queries (fixes N+1 problem)
   const caseIds = assignments.map(a => a.caseId);
-  const cases = await db.query.juryCases.findMany({
-    where: inArray(juryCases.id, caseIds),
+  const cases = await db.query.overwatchCases.findMany({
+    where: inArray(overwatchCases.id, caseIds),
   });
 
   // Create lookup map for O(1) access
@@ -360,27 +360,27 @@ export async function getJurorCases(
 }
 
 /**
- * Get case details for a juror to review.
+ * Get case details for an arbiter to review.
  *
  * This returns anonymized case data (player IDs removed or replaced).
  *
  * @param caseId - The case ID
- * @param investigatorId - The juror requesting the case
+ * @param investigatorId - The arbiter requesting the case
  * @returns Anonymized case details or null if not assigned
  */
 export async function getCaseForReview(
   caseId: string,
   investigatorId: string
 ): Promise<{
-  case: JuryCase;
+  case: OverwatchCase;
   game: typeof games.$inferSelect;
   anonymizedPlayerId: string;
 } | null> {
-  // Verify the juror is assigned to this case
-  const assignment = await db.query.juryCaseAssignments.findFirst({
+  // Verify the arbiter is assigned to this case
+  const assignment = await db.query.overwatchCaseAssignments.findFirst({
     where: and(
-      eq(juryCaseAssignments.caseId, caseId),
-      eq(juryCaseAssignments.investigatorId, investigatorId)
+      eq(overwatchCaseAssignments.caseId, caseId),
+      eq(overwatchCaseAssignments.investigatorId, investigatorId)
     ),
   });
 
@@ -389,8 +389,8 @@ export async function getCaseForReview(
   }
 
   // Get case and game data
-  const caseData = await db.query.juryCases.findFirst({
-    where: eq(juryCases.id, caseId),
+  const caseData = await db.query.overwatchCases.findFirst({
+    where: eq(overwatchCases.id, caseId),
   });
 
   if (!caseData) {
@@ -408,9 +408,9 @@ export async function getCaseForReview(
   // Mark assignment as in_progress if it was pending
   if (assignment.status === 'pending') {
     await db
-      .update(juryCaseAssignments)
+      .update(overwatchCaseAssignments)
       .set({ status: 'in_progress' })
-      .where(eq(juryCaseAssignments.id, assignment.id));
+      .where(eq(overwatchCaseAssignments.id, assignment.id));
   }
 
   // Generate anonymized player ID using secure HMAC-based anonymization
@@ -430,17 +430,17 @@ export async function getCaseForReview(
  * @param caseId - The case ID
  * @returns Array of assignments
  */
-export async function getCaseAssignments(caseId: string): Promise<JuryCaseAssignment[]> {
-  return db.query.juryCaseAssignments.findMany({
-    where: eq(juryCaseAssignments.caseId, caseId),
+export async function getCaseAssignments(caseId: string): Promise<OverwatchCaseAssignment[]> {
+  return db.query.overwatchCaseAssignments.findMany({
+    where: eq(overwatchCaseAssignments.caseId, caseId),
   });
 }
 
 /**
- * Mark an assignment as recused (juror can't review this case).
+ * Mark an assignment as recused (arbiter can't review this case).
  *
  * @param caseId - The case ID
- * @param investigatorId - The juror's user ID
+ * @param investigatorId - The arbiter's user ID
  * @param reason - Why they're recusing
  */
 export async function recuseFromCase(
@@ -449,20 +449,20 @@ export async function recuseFromCase(
   reason: string
 ): Promise<void> {
   await db
-    .update(juryCaseAssignments)
+    .update(overwatchCaseAssignments)
     .set({
       status: 'recused',
       completedAt: new Date(),
     })
     .where(and(
-      eq(juryCaseAssignments.caseId, caseId),
-      eq(juryCaseAssignments.investigatorId, investigatorId)
+      eq(overwatchCaseAssignments.caseId, caseId),
+      eq(overwatchCaseAssignments.investigatorId, investigatorId)
     ));
 
-  console.log(`[Jury] Juror ${investigatorId} recused from case ${caseId}: ${reason}`);
+  console.log(`[Overwatch] Arbiter ${investigatorId} recused from case ${caseId}: ${reason}`);
 
-  // Try to find a replacement juror
-  await assignJurorsToCase(caseId);
+  // Try to find a replacement arbiter
+  await assignArbitersToCase(caseId);
 }
 
 /**
@@ -474,10 +474,10 @@ export async function expirePendingAssignments(): Promise<number> {
   const now = new Date();
 
   // Find all cases past their deadline that are still active
-  const expiredCases = await db.query.juryCases.findMany({
+  const expiredCases = await db.query.overwatchCases.findMany({
     where: and(
-      eq(juryCases.status, 'active'),
-      lt(juryCases.deadline, now)
+      eq(overwatchCases.status, 'active'),
+      lt(overwatchCases.deadline, now)
     ),
   });
 
@@ -486,11 +486,11 @@ export async function expirePendingAssignments(): Promise<number> {
   for (const caseData of expiredCases) {
     // Mark incomplete assignments as expired
     const result = await db
-      .update(juryCaseAssignments)
+      .update(overwatchCaseAssignments)
       .set({ status: 'expired' })
       .where(and(
-        eq(juryCaseAssignments.caseId, caseData.id),
-        inArray(juryCaseAssignments.status, ['pending', 'in_progress'])
+        eq(overwatchCaseAssignments.caseId, caseData.id),
+        inArray(overwatchCaseAssignments.status, ['pending', 'in_progress'])
       ))
       .returning();
 
@@ -498,7 +498,7 @@ export async function expirePendingAssignments(): Promise<number> {
   }
 
   if (expiredCount > 0) {
-    console.log(`[Jury] Expired ${expiredCount} pending assignments`);
+    console.log(`[Overwatch] Expired ${expiredCount} pending assignments`);
   }
 
   return expiredCount;

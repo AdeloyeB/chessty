@@ -63,13 +63,14 @@ export const settlements = pgTable('settlements', {
   // The player who triggered the suspicion flag (null if clean)
   flaggedPlayerId: text('flagged_player_id').references(() => users.id),
 
-  // Link to the jury review case if disputed
-  juryCaseId: text('jury_case_id').references(() => reviewTasks.id),
+  // Link to the Arbiter Overwatch review case if disputed
+  // Note: Database column is 'jury_case_id' for backwards compatibility
+  overwatchCaseId: text('jury_case_id').references(() => reviewTasks.id),
 
   // When the settlement was finalized (null if pending/disputed)
   settledAt: timestamp('settled_at', { withTimezone: true }),
 
-  // What triggered the final settlement: 'auto', 'jury', 'timeout', 'admin'
+  // What triggered the final settlement: 'auto', 'overwatch', 'timeout', 'admin'
   // null if not yet settled
   settledBy: text('settled_by'),
 
@@ -149,8 +150,8 @@ export const settlementsRelations = relations(settlements, ({ one, many }) => ({
     references: [users.id],
     relationName: 'settlementFlaggedPlayer',
   }),
-  juryCase: one(reviewTasks, {
-    fields: [settlements.juryCaseId],
+  overwatchCase: one(reviewTasks, {
+    fields: [settlements.overwatchCaseId],
     references: [reviewTasks.id],
   }),
   history: many(settlementHistory),

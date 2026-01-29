@@ -91,7 +91,7 @@ export const TEST_SETTLEMENT = {
   status: 'pending' as const,
   suspicionScore: null,
   flaggedPlayerId: null,
-  juryCaseId: null,
+  overwatchCaseId: null,
   settledAt: null,
   settledBy: null,
   escrowTxHash: null,
@@ -110,11 +110,11 @@ export function createTestSettlement(overrides?: Partial<typeof TEST_SETTLEMENT>
 }
 
 // ---------------------------------------------------------------------------
-// Jury Fixtures
+// Arbiter Overwatch Fixtures
 // ---------------------------------------------------------------------------
 
-export const TEST_JURY_CASE = {
-  id: 'test-jury-case-1',
+export const TEST_OVERWATCH_CASE = {
+  id: 'test-overwatch-case-1',
   gameId: 'test-game-1',
   suspectPlayerId: 'test-user-1',
   suspicionScore: '0.95',
@@ -131,18 +131,18 @@ export const TEST_JURY_CASE = {
   updatedAt: new Date(),
 };
 
-export function createTestJuryCase(overrides?: Partial<typeof TEST_JURY_CASE>) {
+export function createTestOverwatchCase(overrides?: Partial<typeof TEST_OVERWATCH_CASE>) {
   return {
-    ...TEST_JURY_CASE,
-    id: `test-jury-case-${nanoid(8)}`,
+    ...TEST_OVERWATCH_CASE,
+    id: `test-overwatch-case-${nanoid(8)}`,
     gameId: `test-game-${nanoid(8)}`,
     ...overrides
   };
 }
 
-export const TEST_JURY_VERDICT = {
+export const TEST_OVERWATCH_VERDICT = {
   id: 'test-verdict-1',
-  caseId: 'test-jury-case-1',
+  caseId: 'test-overwatch-case-1',
   investigatorId: 'test-investigator-1',
   engineAssistance: 'innocent' as const,
   inputAutomation: 'innocent' as const,
@@ -152,9 +152,9 @@ export const TEST_JURY_VERDICT = {
   createdAt: new Date(),
 };
 
-export function createTestVerdict(overrides?: Partial<typeof TEST_JURY_VERDICT>) {
+export function createTestVerdict(overrides?: Partial<typeof TEST_OVERWATCH_VERDICT>) {
   return {
-    ...TEST_JURY_VERDICT,
+    ...TEST_OVERWATCH_VERDICT,
     id: `test-verdict-${nanoid(8)}`,
     ...overrides
   };
@@ -182,7 +182,7 @@ export function createTestInvestigator(overrides?: Partial<typeof TEST_INVESTIGA
 
 export const TEST_CASE_ASSIGNMENT = {
   id: 'test-assignment-1',
-  caseId: 'test-jury-case-1',
+  caseId: 'test-overwatch-case-1',
   investigatorId: 'test-investigator-1',
   status: 'pending' as const,
   scoreAtAssignment: '0.500',
@@ -252,7 +252,7 @@ export const TEST_PLAYER_SANCTION = {
   id: 'test-sanction-1',
   playerId: 'test-user-1',
   sanctionType: 'temp_ban' as const,
-  reason: 'Found guilty of cheating by community jury',
+  reason: 'Found guilty of cheating by Arbiter Overwatch',
   endsAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days from now
   reviewTaskId: null,
   appealed: false,

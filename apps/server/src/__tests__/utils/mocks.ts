@@ -86,10 +86,10 @@ export function createMockAnticheatService() {
 }
 
 // ---------------------------------------------------------------------------
-// Jury Service Mock
+// Arbiter Overwatch Service Mock
 // ---------------------------------------------------------------------------
 
-export function createMockJuryService() {
+export function createMockOverwatchService() {
   return {
     submitVerdict: mock(() => Promise.resolve({ success: true, verdict: {} })),
     aggregateVerdicts: mock(() => Promise.resolve({
@@ -104,7 +104,7 @@ export function createMockJuryService() {
       expectedVerdicts: 5,
     })),
     resolveCase: mock(() => Promise.resolve()),
-    assignJurors: mock(() => Promise.resolve({ assigned: 5 })),
+    assignArbiters: mock(() => Promise.resolve({ assigned: 5 })),
     checkEligibility: mock(() => Promise.resolve({ eligible: true })),
   };
 }
@@ -133,7 +133,7 @@ export function createMockSettlementService() {
       priority: 'normal',
     })),
     settleGame: mock(() => Promise.resolve()),
-    holdForReview: mock(() => Promise.resolve('jury-case-1')),
+    holdForReview: mock(() => Promise.resolve('overwatch-case-1')),
     resolveDispute: mock(() => Promise.resolve()),
     handleTimeout: mock(() => Promise.resolve()),
     processSettlement: mock(() => Promise.resolve({
@@ -150,7 +150,7 @@ export function createMockSettlementService() {
 export function createMockNotificationService() {
   return {
     notifyPlayerHeldForReview: mock(() => Promise.resolve()),
-    notifyJuryCaseAssigned: mock(() => Promise.resolve()),
+    notifyOverwatchCaseAssigned: mock(() => Promise.resolve()),
     notifyVerdictResult: mock(() => Promise.resolve()),
     notifySettlementComplete: mock(() => Promise.resolve()),
   };

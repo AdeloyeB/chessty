@@ -2,7 +2,7 @@
 
 ## Overview
 
-This plan addresses all issues identified in the code review and security audit of PR #29 (Jury system, settlement service, and Tauri optimizations). The fixes are prioritized by severity and organized into implementation phases.
+This plan addresses all issues identified in the code review and security audit of PR #29 (Arbiter Overwatch system, settlement service, and Tauri optimizations). The fixes are prioritized by severity and organized into implementation phases.
 
 **PR Reference**: https://github.com/AdeloyeB/chessty/pull/29
 **Total Issues**: 18 (3 critical, 5 high, 6 medium, 4 low/suggestions)
@@ -34,9 +34,9 @@ This plan addresses all issues identified in the code review and security audit 
 
 ### 1.2 Incomplete Sanction Query (SEC-002)
 **Source**: Code Review + Security Audit
-**File**: `apps/server/src/services/jury/eligibility.ts:112-118`
+**File**: `apps/server/src/services/overwatch/eligibility.ts:112-118`
 
-**Problem**: The `where` clause only filters by `playerId`, missing the check for active sanctions (`endsAt IS NULL OR endsAt > NOW()`). Banned players can become jurors.
+**Problem**: The `where` clause only filters by `playerId`, missing the check for active sanctions (`endsAt IS NULL OR endsAt > NOW()`). Banned players can become arbiters.
 
 **Solution**:
 ```typescript
@@ -51,26 +51,26 @@ const activeSanction = await db.query.playerSanctions.findFirst({
 });
 ```
 
-**Additional Requirement**: Add 1-year cooling-off period after ban ends before jury eligibility.
+**Additional Requirement**: Add 1-year cooling-off period after ban ends before arbiter eligibility.
 
 **Files to Modify**:
-- [ ] `apps/server/src/services/jury/eligibility.ts`
+- [ ] `apps/server/src/services/overwatch/eligibility.ts`
 
 ---
 
 ### 1.3 N+1 Query Performance (CR-001)
 **Source**: Code Review
-**File**: `apps/server/src/services/jury/case-assignment.ts:270-285`
+**File**: `apps/server/src/services/overwatch/case-assignment.ts:270-285`
 
-**Problem**: `findEligibleJurorsInRange()` does individual DB queries for each juror to get user data. With 100+ jurors, causes hundreds of queries.
+**Problem**: `findEligibleArbitersInRange()` does individual DB queries for each arbiter to get user data. With 100+ arbiters, causes hundreds of queries.
 
 **Solution**: Batch user queries with `IN` clause:
 ```typescript
-// Step 1: Get all active jurors (single query)
-const activeJurors = await db.query.juryInvestigators.findMany({ ... });
+// Step 1: Get all active arbiters (single query)
+const activeArbiters = await db.query.overwatchArbiters.findMany({ ... });
 
 // Step 2: Batch fetch users (single query)
-const userIds = activeJurors.map(j => j.userId);
+const userIds = activeArbiters.map(j => j.userId);
 const users = await db.query.users.findMany({
   where: inArray(users.id, userIds),
 });
@@ -80,7 +80,7 @@ const userMap = new Map(users.map(u => [u.id, u]));
 ```
 
 **Files to Modify**:
-- [ ] `apps/server/src/services/jury/case-assignment.ts`
+- [ ] `apps/server/src/services/overwatch/case-assignment.ts`
 
 ---
 
@@ -88,7 +88,7 @@ const userMap = new Map(users.map(u => [u.id, u]));
 
 ### 2.1 Missing Rate Limiting (SEC-003)
 **Source**: Security Audit
-**File**: `apps/server/src/routes/jury.ts`
+**File**: `apps/server/src/routes/overwatch.ts`
 
 **Problem**: No rate limiting on verdict submission. Rapid requests could overwhelm server or exploit timing windows.
 
@@ -107,13 +107,13 @@ const userMap = new Map(users.map(u => [u.id, u]));
 
 **Files to Create/Modify**:
 - [ ] `apps/server/src/middleware/rate-limiter.ts` (NEW)
-- [ ] `apps/server/src/routes/jury.ts`
+- [ ] `apps/server/src/routes/overwatch.ts`
 
 ---
 
 ### 2.2 XSS in Verdict Notes (SEC-004)
 **Source**: Security Audit
-**File**: `apps/server/src/services/jury/verdict-aggregation.ts:151`
+**File**: `apps/server/src/services/overwatch/verdict-aggregation.ts:151`
 
 **Problem**: `notes` field accepts 2000 chars stored directly without sanitization. Stored XSS risk if rendered in admin UI.
 
@@ -124,36 +124,36 @@ const userMap = new Map(users.map(u => [u.id, u]));
 
 **Files to Create/Modify**:
 - [ ] `apps/server/src/utils/sanitize.ts` (NEW)
-- [ ] `apps/server/src/services/jury/verdict-aggregation.ts`
+- [ ] `apps/server/src/services/overwatch/verdict-aggregation.ts`
 
 ---
 
 ### 2.3 Test Case Score Manipulation (SEC-005)
 **Source**: Security Audit
-**File**: `apps/server/src/services/jury/test-cases.ts:117`, `apps/server/src/routes/jury.ts:285`
+**File**: `apps/server/src/services/overwatch/test-cases.ts:117`, `apps/server/src/routes/overwatch.ts:285`
 
-**Problem**: `anticheatMetadata` containing `testCaseReason` is exposed to jurors, allowing them to identify calibration cases and game their scores.
+**Problem**: `anticheatMetadata` containing `testCaseReason` is exposed to arbiters, allowing them to identify calibration cases and game their scores.
 
 **Solution**:
 1. Strip `testCaseReason` from metadata before sending to clients
 2. Don't include `insertedAt` timestamp (timing correlation)
 
 **Files to Modify**:
-- [ ] `apps/server/src/services/jury/test-cases.ts`
-- [ ] `apps/server/src/routes/jury.ts`
+- [ ] `apps/server/src/services/overwatch/test-cases.ts`
+- [ ] `apps/server/src/routes/overwatch.ts`
 
 ---
 
 ### 2.4 Unused Import (CR-002)
 **Source**: Code Review
-**File**: `apps/server/src/services/jury/verdict-aggregation.ts:462`
+**File**: `apps/server/src/services/overwatch/verdict-aggregation.ts:462`
 
 **Problem**: `nanoid` is imported but not used.
 
 **Solution**: Remove unused import.
 
 **Files to Modify**:
-- [ ] `apps/server/src/services/jury/verdict-aggregation.ts`
+- [ ] `apps/server/src/services/overwatch/verdict-aggregation.ts`
 
 ---
 
@@ -169,13 +169,13 @@ const userMap = new Map(users.map(u => [u.id, u]));
 
 **Files to Modify**:
 - [ ] `apps/server/src/services/settlement/settlement.service.ts`
-- [ ] Audit: `apps/server/src/services/jury/*.ts`
+- [ ] Audit: `apps/server/src/services/overwatch/*.ts`
 
 ---
 
 ### 3.2 Weak Anonymization (SEC-007)
 **Source**: Security Audit
-**File**: `apps/server/src/services/jury/case-assignment.ts:401`
+**File**: `apps/server/src/services/overwatch/case-assignment.ts:401`
 
 **Problem**: `Player_${caseId.slice(-6)}` is trivially reversible since caseId is visible.
 
@@ -186,47 +186,47 @@ const userMap = new Map(users.map(u => [u.id, u]));
 
 **Files to Create/Modify**:
 - [ ] `apps/server/src/utils/anonymize.ts` (NEW)
-- [ ] `apps/server/src/services/jury/case-assignment.ts`
+- [ ] `apps/server/src/services/overwatch/case-assignment.ts`
 - [ ] `.env.example` (add ANONYMIZATION_SECRET)
 
 ---
 
 ### 3.3 Overly Broad User Query (CR-004)
 **Source**: Code Review
-**File**: `apps/server/src/services/jury/test-cases.ts:229-235`
+**File**: `apps/server/src/services/overwatch/test-cases.ts:229-235`
 
 **Problem**: `findMany` with no filter could fetch entire user table.
 
 **Solution**: Add reasonable limit (100) and proper filters.
 
 **Files to Modify**:
-- [ ] `apps/server/src/services/jury/test-cases.ts`
+- [ ] `apps/server/src/services/overwatch/test-cases.ts`
 
 ---
 
 ### 3.4 Inefficient String Sorting (CR-005)
 **Source**: Code Review
-**File**: `apps/server/src/services/jury/case-assignment.ts:288`
+**File**: `apps/server/src/services/overwatch/case-assignment.ts:288`
 
 **Problem**: `parseFloat()` called on every comparison during sort.
 
 **Solution**: Parse scores once into a map before sorting.
 
 **Files to Modify**:
-- [ ] `apps/server/src/services/jury/case-assignment.ts`
+- [ ] `apps/server/src/services/overwatch/case-assignment.ts`
 
 ---
 
 ### 3.5 Missing Transaction in submitVerdict (CR-006)
 **Source**: Code Review (Suggestion)
-**File**: `apps/server/src/services/jury/verdict-aggregation.ts:104-194`
+**File**: `apps/server/src/services/overwatch/verdict-aggregation.ts:104-194`
 
 **Problem**: 4 sequential DB operations without transaction. Partial failure leaves inconsistent data.
 
 **Solution**: Wrap in transaction using the utility from Phase 1.
 
 **Files to Modify**:
-- [ ] `apps/server/src/services/jury/verdict-aggregation.ts`
+- [ ] `apps/server/src/services/overwatch/verdict-aggregation.ts`
 
 ---
 
@@ -240,7 +240,7 @@ const userMap = new Map(users.map(u => [u.id, u]));
 
 **Files to Modify**:
 - [ ] `apps/server/src/services/settlement/settlement.service.ts`
-- [ ] `apps/server/src/services/jury/verdict-aggregation.ts`
+- [ ] `apps/server/src/services/overwatch/verdict-aggregation.ts`
 
 ---
 
@@ -253,7 +253,7 @@ const userMap = new Map(users.map(u => [u.id, u]));
 
 ```sql
 CREATE INDEX idx_assignments_investigator_status
-  ON jury_case_assignments(investigator_id, status);
+  ON overwatch_case_assignments(investigator_id, status);
 ```
 
 **Files to Modify**:
@@ -314,7 +314,7 @@ CREATE INDEX idx_assignments_investigator_status
 
 ### Migrations Required
 - [ ] Add `version` column to `settlements` table
-- [ ] Add compound index on `jury_case_assignments(investigator_id, status)`
+- [ ] Add compound index on `overwatch_case_assignments(investigator_id, status)`
 - [ ] Add index on `player_sanctions(player_id, ends_at)`
 
 ### Environment Variables to Add
@@ -328,7 +328,7 @@ CREATE INDEX idx_assignments_investigator_status
 | `case-assignment.ts` | P0, P2 | Batch queries, anonymization, sorting |
 | `verdict-aggregation.ts` | P1, P2 | Sanitize notes, remove import, add transaction |
 | `test-cases.ts` | P1, P2 | Strip test markers, limit query |
-| `jury.ts` (routes) | P1 | Add rate limiting, strip metadata |
+| `overwatch.ts` (routes) | P1 | Add rate limiting, strip metadata |
 | `engine_lifecycle.rs` | P3 | Document Drop limitation |
 
 ---
@@ -345,8 +345,8 @@ CREATE INDEX idx_assignments_investigator_status
 
 ### Integration Tests
 - [ ] Concurrent `resolveDispute()` calls don't double-pay
-- [ ] Batch juror query returns same results as N+1 version
-- [ ] Test cases are not identifiable to jurors
+- [ ] Batch arbiter query returns same results as N+1 version
+- [ ] Test cases are not identifiable to arbiters
 
 ---
 

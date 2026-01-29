@@ -1,11 +1,11 @@
 /**
- * Jury Scoring Service
- * =====================
+ * Arbiter Overwatch Scoring Service
+ * ==================================
  *
- * Handles updating juror scores based on their verdict accuracy.
+ * Handles updating arbiter scores based on their verdict accuracy.
  *
  * SCORING ALGORITHM:
- * When a case is resolved, each juror's score is updated based on whether
+ * When a case is resolved, each arbiter's score is updated based on whether
  * their individual verdict agreed with the final majority verdict.
  *
  * Key factors:
@@ -29,7 +29,7 @@
  * WHY ASYMMETRIC:
  * - Losing more for disagreement prevents gaming (voting randomly)
  * - Creates real incentive to be careful and accurate
- * - Quickly filters out bad-faith jurors
+ * - Quickly filters out bad-faith arbiters
  *
  * SCORE BOUNDS:
  * - Minimum: 0.000 (suspended, cannot serve)
@@ -41,12 +41,12 @@
 import { eq, sql } from 'drizzle-orm';
 import {
   db,
-  juryVerdicts,
-  juryInvestigators,
-  juryCases,
+  overwatchVerdicts,
+  overwatchArbiters,
+  overwatchCases,
 } from '../../drizzle';
 import type { AggregationResult } from './verdict-aggregation';
-import { JURY_SUSPENSION_THRESHOLD, suspendJuror } from './eligibility';
+import { OVERWATCH_SUSPENSION_THRESHOLD, suspendArbiter } from './eligibility';
 
 // ---------------------------------------------------------------------------
 // Configuration
@@ -75,9 +75,9 @@ export const MAX_SCORE = 1.000;
 // ---------------------------------------------------------------------------
 
 /**
- * Update all juror scores after a case is resolved.
+ * Update all arbiter scores after a case is resolved.
  *
- * For each juror who submitted a verdict:
+ * For each arbiter who submitted a verdict:
  * 1. Determine if they agreed with the majority
  * 2. Calculate the score delta based on consensus strength
  * 3. Update their score and accuracy stats
@@ -86,22 +86,22 @@ export const MAX_SCORE = 1.000;
  * @param caseId - The resolved case
  * @param aggregation - The aggregation result with final verdict
  */
-export async function updateJurorScores(
+export async function updateArbiterScores(
   caseId: string,
   aggregation: AggregationResult
 ): Promise<void> {
   // Get the case to check if it's a test case
-  const juryCase = await db.query.juryCases.findFirst({
-    where: eq(juryCases.id, caseId),
+  const overwatchCase = await db.query.overwatchCases.findFirst({
+    where: eq(overwatchCases.id, caseId),
   });
 
-  if (!juryCase || !aggregation.finalVerdict) {
+  if (!overwatchCase || !aggregation.finalVerdict) {
     return;
   }
 
   // Get all verdicts for this case
-  const verdicts = await db.query.juryVerdicts.findMany({
-    where: eq(juryVerdicts.caseId, caseId),
+  const verdicts = await db.query.overwatchVerdicts.findMany({
+    where: eq(overwatchVerdicts.caseId, caseId),
   });
 
   // Calculate consensus strength
@@ -114,14 +114,14 @@ export async function updateJurorScores(
   const finalIsGuilty = aggregation.finalVerdict === 'guilty';
 
   for (const verdict of verdicts) {
-    // Did this juror's overall assessment agree with the final verdict?
+    // Did this arbiter's overall assessment agree with the final verdict?
     // They agreed if their "guilty" categories match the final verdict
-    const jurorVotedGuilty =
+    const arbiterVotedGuilty =
       verdict.engineAssistance === 'guilty' ||
       verdict.inputAutomation === 'guilty' ||
       verdict.externalAssistance === 'guilty';
 
-    const agreedWithMajority = jurorVotedGuilty === finalIsGuilty;
+    const agreedWithMajority = arbiterVotedGuilty === finalIsGuilty;
 
     // Calculate base score delta
     let scoreDelta: number;
@@ -132,9 +132,9 @@ export async function updateJurorScores(
     }
 
     // Apply test case multiplier if applicable
-    if (juryCase.isTestCase && juryCase.knownOutcome) {
-      const knownIsGuilty = juryCase.knownOutcome === 'guilty';
-      const correctOnTestCase = jurorVotedGuilty === knownIsGuilty;
+    if (overwatchCase.isTestCase && overwatchCase.knownOutcome) {
+      const knownIsGuilty = overwatchCase.knownOutcome === 'guilty';
+      const correctOnTestCase = arbiterVotedGuilty === knownIsGuilty;
 
       if (correctOnTestCase) {
         // Bonus for correctly identifying test case
@@ -145,14 +145,14 @@ export async function updateJurorScores(
       }
     }
 
-    // Get current juror score
-    const juror = await db.query.juryInvestigators.findFirst({
-      where: eq(juryInvestigators.userId, verdict.investigatorId),
+    // Get current arbiter score
+    const arbiter = await db.query.overwatchArbiters.findFirst({
+      where: eq(overwatchArbiters.userId, verdict.investigatorId),
     });
 
-    if (!juror) continue;
+    if (!arbiter) continue;
 
-    const currentScore = parseFloat(juror.investigatorScore);
+    const currentScore = parseFloat(arbiter.investigatorScore);
     let newScore = currentScore + scoreDelta;
 
     // Clamp to bounds
@@ -160,36 +160,36 @@ export async function updateJurorScores(
 
     // Update the verdict record with accuracy info
     await db
-      .update(juryVerdicts)
+      .update(overwatchVerdicts)
       .set({
         agreedWithMajority,
         scoreDelta: scoreDelta.toFixed(3),
       })
-      .where(eq(juryVerdicts.id, verdict.id));
+      .where(eq(overwatchVerdicts.id, verdict.id));
 
-    // Update the juror's score and accuracy stats
+    // Update the arbiter's score and accuracy stats
     const accurateVerdictsDelta = agreedWithMajority ? 1 : 0;
 
     await db
-      .update(juryInvestigators)
+      .update(overwatchArbiters)
       .set({
         investigatorScore: newScore.toFixed(3),
-        accurateVerdicts: sql`${juryInvestigators.accurateVerdicts} + ${accurateVerdictsDelta}`,
+        accurateVerdicts: sql`${overwatchArbiters.accurateVerdicts} + ${accurateVerdictsDelta}`,
         updatedAt: new Date(),
       })
-      .where(eq(juryInvestigators.userId, verdict.investigatorId));
+      .where(eq(overwatchArbiters.userId, verdict.investigatorId));
 
     console.log(
-      `[Jury] Juror ${verdict.investigatorId} score updated: ` +
+      `[Overwatch] Arbiter ${verdict.investigatorId} score updated: ` +
       `${currentScore.toFixed(3)} -> ${newScore.toFixed(3)} ` +
       `(${agreedWithMajority ? 'agreed' : 'disagreed'}, delta: ${scoreDelta.toFixed(3)})`
     );
 
-    // Check if juror should be suspended
-    if (newScore < JURY_SUSPENSION_THRESHOLD) {
-      await suspendJuror(
+    // Check if arbiter should be suspended
+    if (newScore < OVERWATCH_SUSPENSION_THRESHOLD) {
+      await suspendArbiter(
         verdict.investigatorId,
-        `Score dropped below suspension threshold (${newScore.toFixed(3)} < ${JURY_SUSPENSION_THRESHOLD})`,
+        `Score dropped below suspension threshold (${newScore.toFixed(3)} < ${OVERWATCH_SUSPENSION_THRESHOLD})`,
         30 // 30 day suspension
       );
     }
@@ -197,12 +197,12 @@ export async function updateJurorScores(
 }
 
 /**
- * Get detailed scoring statistics for a juror.
+ * Get detailed scoring statistics for an arbiter.
  *
- * @param userId - The juror's user ID
+ * @param userId - The arbiter's user ID
  * @returns Scoring statistics
  */
-export async function getJurorStats(userId: string): Promise<{
+export async function getArbiterStats(userId: string): Promise<{
   score: number;
   casesReviewed: number;
   accurateVerdicts: number;
@@ -210,31 +210,31 @@ export async function getJurorStats(userId: string): Promise<{
   rank: string;
   canServe: boolean;
 } | null> {
-  const juror = await db.query.juryInvestigators.findFirst({
-    where: eq(juryInvestigators.userId, userId),
+  const arbiter = await db.query.overwatchArbiters.findFirst({
+    where: eq(overwatchArbiters.userId, userId),
   });
 
-  if (!juror) {
+  if (!arbiter) {
     return null;
   }
 
-  const score = parseFloat(juror.investigatorScore);
-  const casesReviewed = juror.casesReviewed;
-  const accurateVerdicts = juror.accurateVerdicts;
+  const score = parseFloat(arbiter.investigatorScore);
+  const casesReviewed = arbiter.casesReviewed;
+  const accurateVerdicts = arbiter.accurateVerdicts;
   const accuracyRate = casesReviewed > 0 ? (accurateVerdicts / casesReviewed) * 100 : 0;
 
   // Determine rank based on score
   let rank: string;
   if (score >= 0.9) {
-    rank = 'Elite Investigator';
+    rank = 'Elite Arbiter';
   } else if (score >= 0.75) {
-    rank = 'Senior Investigator';
+    rank = 'Senior Arbiter';
   } else if (score >= 0.6) {
-    rank = 'Investigator';
+    rank = 'Arbiter';
   } else if (score >= 0.4) {
-    rank = 'Junior Investigator';
-  } else if (score >= JURY_SUSPENSION_THRESHOLD) {
-    rank = 'Probationary Investigator';
+    rank = 'Junior Arbiter';
+  } else if (score >= OVERWATCH_SUSPENSION_THRESHOLD) {
+    rank = 'Probationary Arbiter';
   } else {
     rank = 'Suspended';
   }
@@ -242,9 +242,9 @@ export async function getJurorStats(userId: string): Promise<{
   // Check if they can currently serve
   const now = new Date();
   const canServe =
-    juror.isActive &&
-    score >= JURY_SUSPENSION_THRESHOLD &&
-    (!juror.suspendedUntil || juror.suspendedUntil <= now);
+    arbiter.isActive &&
+    score >= OVERWATCH_SUSPENSION_THRESHOLD &&
+    (!arbiter.suspendedUntil || arbiter.suspendedUntil <= now);
 
   return {
     score,
@@ -257,24 +257,24 @@ export async function getJurorStats(userId: string): Promise<{
 }
 
 /**
- * Get the juror leaderboard (top jurors by score).
+ * Get the arbiter leaderboard (top arbiters by score).
  *
- * @param limit - Max number of jurors to return
- * @returns Sorted list of top jurors
+ * @param limit - Max number of arbiters to return
+ * @returns Sorted list of top arbiters
  */
-export async function getJurorLeaderboard(limit: number = 20): Promise<Array<{
+export async function getArbiterLeaderboard(limit: number = 20): Promise<Array<{
   userId: string;
   score: number;
   casesReviewed: number;
   accuracyRate: number;
   rank: string;
 }>> {
-  const jurors = await db.query.juryInvestigators.findMany({
-    where: eq(juryInvestigators.isActive, true),
+  const arbiters = await db.query.overwatchArbiters.findMany({
+    where: eq(overwatchArbiters.isActive, true),
   });
 
   // Sort by score descending
-  const sorted = jurors
+  const sorted = arbiters
     .map(j => ({
       userId: j.userId,
       score: parseFloat(j.investigatorScore),
@@ -288,28 +288,28 @@ export async function getJurorLeaderboard(limit: number = 20): Promise<Array<{
   return sorted.map(j => {
     let rank: string;
     if (j.score >= 0.9) {
-      rank = 'Elite Investigator';
+      rank = 'Elite Arbiter';
     } else if (j.score >= 0.75) {
-      rank = 'Senior Investigator';
+      rank = 'Senior Arbiter';
     } else if (j.score >= 0.6) {
-      rank = 'Investigator';
+      rank = 'Arbiter';
     } else if (j.score >= 0.4) {
-      rank = 'Junior Investigator';
+      rank = 'Junior Arbiter';
     } else {
-      rank = 'Probationary Investigator';
+      rank = 'Probationary Arbiter';
     }
     return { ...j, rank };
   });
 }
 
 /**
- * Manually adjust a juror's score (admin action).
+ * Manually adjust an arbiter's score (admin action).
  *
- * @param userId - The juror's user ID
+ * @param userId - The arbiter's user ID
  * @param newScore - The new score to set
  * @param reason - Why the score is being adjusted
  */
-export async function adjustJurorScore(
+export async function adjustArbiterScore(
   userId: string,
   newScore: number,
   reason: string
@@ -317,17 +317,17 @@ export async function adjustJurorScore(
   const clampedScore = Math.max(MIN_SCORE, Math.min(MAX_SCORE, newScore));
 
   await db
-    .update(juryInvestigators)
+    .update(overwatchArbiters)
     .set({
       investigatorScore: clampedScore.toFixed(3),
       updatedAt: new Date(),
     })
-    .where(eq(juryInvestigators.userId, userId));
+    .where(eq(overwatchArbiters.userId, userId));
 
-  console.log(`[Jury] Admin adjusted ${userId} score to ${clampedScore.toFixed(3)}: ${reason}`);
+  console.log(`[Overwatch] Admin adjusted ${userId} score to ${clampedScore.toFixed(3)}: ${reason}`);
 
   // Suspend if below threshold
-  if (clampedScore < JURY_SUSPENSION_THRESHOLD) {
-    await suspendJuror(userId, reason, 30);
+  if (clampedScore < OVERWATCH_SUSPENSION_THRESHOLD) {
+    await suspendArbiter(userId, reason, 30);
   }
 }

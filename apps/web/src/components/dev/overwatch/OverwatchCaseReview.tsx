@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * JuryCaseReview Component
+ * OverwatchCaseReview Component
  *
  * The main review interface for examining a suspected cheating case.
  * Integrates game replay, statistical analysis, and verdict submission.
@@ -12,7 +12,7 @@
  * - Shows comprehensive statistical analysis in an organized panel
  * - Includes the verdict submission panel at the bottom
  *
- * HOW JURORS USE THIS:
+ * HOW ARBITERS USE THIS:
  * 1. Review the statistical analysis to identify anomalies
  * 2. Watch the game replay, optionally viewing move-by-move analysis
  * 3. Consider all evidence before submitting a verdict
@@ -21,45 +21,45 @@
 import { useState, useCallback } from 'react';
 import { ChessBoard } from '@/components/chess/ChessBoard';
 import { useMoveViewer } from '@/hooks/useMoveViewer';
-import { JuryVerdictPanel } from './JuryVerdictPanel';
-import type { JuryCase, ChargeType, VerdictOption } from './mockJuryData';
+import { OverwatchVerdictPanel } from './OverwatchVerdictPanel';
+import type { OverwatchCase, ChargeType, VerdictOption } from './mockOverwatchData';
 import type { Square } from '@chess-game/shared/chess';
 
-interface JuryCaseReviewProps {
-  juryCase: JuryCase;
+interface OverwatchCaseReviewProps {
+  overwatchCase: OverwatchCase;
   onSubmitVerdict: (caseId: string, verdicts: Record<ChargeType, VerdictOption>) => void;
   onSkipCase: (caseId: string) => void;
   onBack: () => void;
 }
 
-export function JuryCaseReview({
-  juryCase,
+export function OverwatchCaseReview({
+  overwatchCase,
   onSubmitVerdict,
   onSkipCase,
   onBack,
-}: JuryCaseReviewProps) {
+}: OverwatchCaseReviewProps) {
   const [showMoveAnalysis, setShowMoveAnalysis] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Move viewer for game replay
   const moveViewer = useMoveViewer({
-    moves: juryCase.moves,
-    startingFen: juryCase.startingFen,
+    moves: overwatchCase.moves,
+    startingFen: overwatchCase.startingFen,
   });
 
   const handleSubmit = useCallback(async (verdicts: Record<ChargeType, VerdictOption>) => {
     setIsSubmitting(true);
     // Simulate network delay
     await new Promise(resolve => setTimeout(resolve, 500));
-    onSubmitVerdict(juryCase.id, verdicts);
+    onSubmitVerdict(overwatchCase.id, verdicts);
     setIsSubmitting(false);
-  }, [juryCase.id, onSubmitVerdict]);
+  }, [overwatchCase.id, onSubmitVerdict]);
 
   const handleSkip = useCallback(() => {
-    onSkipCase(juryCase.id);
-  }, [juryCase.id, onSkipCase]);
+    onSkipCase(overwatchCase.id);
+  }, [overwatchCase.id, onSkipCase]);
 
-  const stats = juryCase.statistics;
+  const stats = overwatchCase.statistics;
 
   return (
     <div className="h-full flex flex-col">
@@ -75,9 +75,9 @@ export function JuryCaseReview({
             </button>
             <div className="h-4 w-px bg-[#666]/30" />
             <div>
-              <span className="text-sm font-mono text-white">{juryCase.id.toUpperCase()}</span>
+              <span className="text-sm font-mono text-white">{overwatchCase.id.toUpperCase()}</span>
               <span className="text-xs font-mono text-[#666] ml-2">
-                {juryCase.suspicionScore}% suspicion
+                {overwatchCase.suspicionScore}% suspicion
               </span>
             </div>
           </div>
@@ -85,20 +85,20 @@ export function JuryCaseReview({
           <div className="flex items-center gap-6 text-xs font-mono">
             <div className="text-right">
               <span className="text-[#666]">suspect: </span>
-              <span className={juryCase.suspectColor === 'white' ? 'text-white' : 'text-[#888]'}>
-                {juryCase.suspectUsername}
+              <span className={overwatchCase.suspectColor === 'white' ? 'text-white' : 'text-[#888]'}>
+                {overwatchCase.suspectUsername}
               </span>
-              <span className="text-[#666] ml-1">({juryCase.suspectRating})</span>
+              <span className="text-[#666] ml-1">({overwatchCase.suspectRating})</span>
             </div>
             <span className="text-[#666]">vs</span>
             <div>
-              <span className={juryCase.suspectColor === 'black' ? 'text-white' : 'text-[#888]'}>
-                {juryCase.opponentUsername}
+              <span className={overwatchCase.suspectColor === 'black' ? 'text-white' : 'text-[#888]'}>
+                {overwatchCase.opponentUsername}
               </span>
-              <span className="text-[#666] ml-1">({juryCase.opponentRating})</span>
+              <span className="text-[#666] ml-1">({overwatchCase.opponentRating})</span>
             </div>
             <div className="text-[#666]">
-              {juryCase.timeControl} / {juryCase.opening}
+              {overwatchCase.timeControl} / {overwatchCase.opening}
             </div>
           </div>
         </div>
@@ -113,7 +113,7 @@ export function JuryCaseReview({
             <div className="h-full max-h-full aspect-square bg-black border border-[#666]/30">
               <ChessBoard
                 position={moveViewer.currentFen}
-                orientation={juryCase.suspectColor}
+                orientation={overwatchCase.suspectColor}
                 lastMove={
                   moveViewer.currentMove
                     ? { from: moveViewer.currentMove.from as Square, to: moveViewer.currentMove.to as Square }
@@ -198,7 +198,7 @@ export function JuryCaseReview({
         {/* Right: Analysis + Verdict */}
         <div className="flex flex-col gap-4 min-h-0 overflow-y-auto">
           {/* Statistical Analysis Panel */}
-          <StatisticalAnalysis stats={stats} suspectRating={juryCase.suspectRating} />
+          <StatisticalAnalysis stats={stats} suspectRating={overwatchCase.suspectRating} />
 
           {/* Move-by-move analysis (when enabled) */}
           {showMoveAnalysis && (
@@ -215,8 +215,8 @@ export function JuryCaseReview({
           )}
 
           {/* Verdict Panel */}
-          <JuryVerdictPanel
-            caseId={juryCase.id}
+          <OverwatchVerdictPanel
+            caseId={overwatchCase.id}
             onSubmit={handleSubmit}
             onSkip={handleSkip}
             isSubmitting={isSubmitting}
@@ -252,13 +252,13 @@ function ControlButton({
 
 /**
  * Statistical Analysis Panel
- * Shows all the metrics jurors need to evaluate the case.
+ * Shows all the metrics arbiters need to evaluate the case.
  */
 function StatisticalAnalysis({
   stats,
   suspectRating,
 }: {
-  stats: JuryCase['statistics'];
+  stats: OverwatchCase['statistics'];
   suspectRating: number;
 }) {
   return (
@@ -467,4 +467,4 @@ function FlagRow({
   );
 }
 
-export default JuryCaseReview;
+export default OverwatchCaseReview;

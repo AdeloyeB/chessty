@@ -30,7 +30,7 @@ import {
   SAMPLE_FENS,
 } from '@/lib/mock/mockData';
 import { AnalysisBoard } from '@/components/analysis/AnalysisBoard';
-import { JuryDevPanel } from '@/components/dev/jury';
+import { OverwatchDevPanel } from '@/components/dev/overwatch';
 import type { HistoryGame, Move } from '@chess-game/shared';
 
 // Only render in development
@@ -163,7 +163,7 @@ export function DevDebugPanel() {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedFen, setSelectedFen] = useState(Object.keys(FAMOUS_POSITIONS)[0]);
   const [showAnalysisBoard, setShowAnalysisBoard] = useState(false);
-  const [showJuryPanel, setShowJuryPanel] = useState(false);
+  const [showOverwatchPanel, setShowOverwatchPanel] = useState(false);
 
   // ── Store hooks (only call at top level) ──────────────────────────────
   const { addAchievementNotification, addNotification, clearAll } =
@@ -687,13 +687,13 @@ export function DevDebugPanel() {
 
             <div className="border-t border-purple-500/10" />
 
-            {/* ═══ Section 7: Jury System ═══ */}
-            <Section title="jury_system">
+            {/* ═══ Section 7: Arbiter Overwatch ═══ */}
+            <Section title="arbiter_overwatch">
               <button
-                onClick={() => setShowJuryPanel(true)}
+                onClick={() => setShowOverwatchPanel(true)}
                 className={btn}
               >
-                ▶ open_jury_panel (8 mock cases)
+                ▶ open_overwatch_panel (8 mock cases)
               </button>
               <p className="text-xs font-mono text-purple-400/40 px-1">
                 anti-cheat case review interface
@@ -727,19 +727,19 @@ export function DevDebugPanel() {
         />
       )}
 
-      {/* Jury Panel Modal - Full screen overlay */}
-      {showJuryPanel && (
+      {/* Overwatch Panel Modal - Full screen overlay */}
+      {showOverwatchPanel && (
         <div className="fixed inset-0 z-[100] bg-black">
           {/* Close button */}
           <button
-            onClick={() => setShowJuryPanel(false)}
+            onClick={() => setShowOverwatchPanel(false)}
             className="absolute top-4 right-4 z-10 w-10 h-10 bg-[#0a0a0a] border border-[#666]/30 text-[#888] hover:text-white hover:border-white transition-colors flex items-center justify-center font-mono"
           >
             x
           </button>
 
-          {/* Jury Panel */}
-          <JuryDevPanel />
+          {/* Overwatch Panel */}
+          <OverwatchDevPanel />
         </div>
       )}
     </>

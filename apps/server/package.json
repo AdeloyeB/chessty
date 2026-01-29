@@ -14,7 +14,7 @@
     "test:wallet-routes": "bun test src/routes/walletAuth.routes.test.ts",
     "test:redis": "bun test src/redis/",
     "test:settlement": "bun test src/services/settlement/",
-    "test:jury": "bun test src/services/jury/",
+    "test:overwatch": "bun test src/services/overwatch/",
     "test:anticheat": "bun test src/services/anticheat/",
     "test:events": "bun test src/events/handlers/",
     "db:generate": "drizzle-kit generate",

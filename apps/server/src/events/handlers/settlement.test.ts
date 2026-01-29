@@ -3,7 +3,7 @@
  *
  * These tests verify that the settlement handler correctly processes game
  * endings, creates settlement records, and handles suspicious games by
- * creating jury cases.
+ * creating overwatch cases.
  *
  * The settlement handler:
  * 1. Listens for game:ended events
@@ -30,7 +30,7 @@ const mockProcessSettlement = mock(() => Promise.resolve({
   status: 'settled',
   suspicionScore: 10,
   flaggedPlayerId: null,
-  juryCaseId: null,
+  overwatchCaseId: null,
   settledAt: new Date(),
   settledBy: 'auto',
   createdAt: new Date(),
@@ -72,7 +72,7 @@ describe('settlement.ts event handlers', () => {
       status: 'settled',
       suspicionScore: 10,
       flaggedPlayerId: null,
-      juryCaseId: null,
+      overwatchCaseId: null,
       settledAt: new Date(),
       settledBy: 'auto',
       createdAt: new Date(),
@@ -206,7 +206,7 @@ describe('settlement.ts event handlers', () => {
         status: 'disputed',
         suspicionScore: 96,
         flaggedPlayerId: 'player-1',
-        juryCaseId: 'jury-case-1',
+        overwatchCaseId: 'overwatch-case-1',
         settledAt: null,
         settledBy: null,
         createdAt: new Date(),

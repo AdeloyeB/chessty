@@ -1538,7 +1538,7 @@ Key metrics to watch:
 | Component | Unit Coverage | Integration Coverage | E2E Flows |
 |-----------|---------------|---------------------|-----------|
 | Settlement Service | 90% | 80% | 2 flows |
-| Jury System | 85% | 75% | 3 flows |
+| Arbiter Overwatch | 85% | 75% | 3 flows |
 | Anti-cheat (TS) | 80% | 70% | 1 flow |
 | Game Engine | 95% | 60% | 2 flows |
 | Wallet/Auth | 85% | 80% | 2 flows |
@@ -1692,12 +1692,12 @@ jobs:
    - Game creation flow
    - Making moves (happy path)
    - Game completion and settlement
-   - Jury enrollment
+   - Arbiter enrollment
 
 ### Phase 2: Integration Tests (Week 2)
 
 4. **Settlement service integration tests**
-5. **Jury system integration tests**
+5. **Arbiter Overwatch integration tests**
 6. **Anti-cheat service tests** (TypeScript side)
 
 ### Phase 3: Rust/Desktop Tests (Week 3)

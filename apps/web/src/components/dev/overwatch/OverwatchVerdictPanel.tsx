@@ -1,9 +1,9 @@
 'use client';
 
 /**
- * JuryVerdictPanel Component
+ * OverwatchVerdictPanel Component
  *
- * The verdict submission panel where jurors decide on three charges:
+ * The verdict submission panel where arbiters decide on three charges:
  * - Engine Assistance: Did the player use a chess engine?
  * - Input Automation: Was the input synthetically generated?
  * - External Assistance: Did the player receive help from another person?
@@ -15,9 +15,9 @@
  */
 
 import { useState } from 'react';
-import type { VerdictOption, ChargeType } from './mockJuryData';
+import type { VerdictOption, ChargeType } from './mockOverwatchData';
 
-interface JuryVerdictPanelProps {
+interface OverwatchVerdictPanelProps {
   caseId: string;
   onSubmit: (verdicts: Record<ChargeType, VerdictOption>) => void;
   onSkip: () => void;
@@ -48,12 +48,12 @@ const CHARGES: ChargeConfig[] = [
   },
 ];
 
-export function JuryVerdictPanel({
+export function OverwatchVerdictPanel({
   caseId,
   onSubmit,
   onSkip,
   isSubmitting = false,
-}: JuryVerdictPanelProps) {
+}: OverwatchVerdictPanelProps) {
   const [verdicts, setVerdicts] = useState<Record<ChargeType, VerdictOption | null>>({
     engine_assistance: null,
     input_automation: null,
@@ -211,4 +211,4 @@ function VerdictButton({
   );
 }
 
-export default JuryVerdictPanel;
+export default OverwatchVerdictPanel;
