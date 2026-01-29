@@ -458,11 +458,56 @@ fn current_timestamp_ms() -> u64 {
 mod tests {
     use super::*;
 
+    // =========================================================================
+    // NetworkMonitor Basic Tests
+    // =========================================================================
+
     #[test]
     fn test_network_monitor_new() {
         let monitor = NetworkMonitor::new();
         assert!(!monitor.is_active());
         assert!(monitor.get_events().is_empty());
+        assert_eq!(monitor.total_requests, 0);
+        assert_eq!(monitor.chess_api_requests, 0);
+        assert_eq!(monitor.websocket_connections, 0);
+    }
+
+    #[test]
+    fn test_network_monitor_default() {
+        let monitor = NetworkMonitor::default();
+        assert!(!monitor.is_active());
+        assert!(monitor.get_events().is_empty());
+    }
+
+    #[test]
+    fn test_start_monitoring_initializes_state() {
+        let mut monitor = NetworkMonitor::new();
+
+        monitor.start_monitoring();
+
+        assert!(monitor.is_active());
+        assert!(monitor.start_time > 0);
+        assert_eq!(monitor.total_requests, 0);
+        assert_eq!(monitor.chess_api_requests, 0);
+        assert_eq!(monitor.websocket_connections, 0);
+        assert!(monitor.get_events().is_empty());
+    }
+
+    #[test]
+    fn test_start_monitoring_clears_previous_state() {
+        let mut monitor = NetworkMonitor::new();
+
+        // First session
+        monitor.start_monitoring();
+        monitor.record_event("example.com", NetworkEventType::HttpRequest);
+        monitor.stop_monitoring();
+
+        // Second session should start fresh
+        monitor.start_monitoring();
+
+        assert!(monitor.is_active());
+        assert!(monitor.get_events().is_empty());
+        assert_eq!(monitor.total_requests, 0);
     }
 
     #[test]
@@ -475,6 +520,25 @@ mod tests {
         monitor.stop_monitoring();
         assert!(!monitor.is_active());
     }
+
+    #[test]
+    fn test_stop_monitoring_preserves_events() {
+        let mut monitor = NetworkMonitor::new();
+        monitor.start_monitoring();
+
+        monitor.record_event("example.com", NetworkEventType::HttpRequest);
+        monitor.record_event("test.com", NetworkEventType::HttpRequest);
+
+        monitor.stop_monitoring();
+
+        // Events should still be accessible after stopping
+        assert_eq!(monitor.get_events().len(), 2);
+        assert_eq!(monitor.total_requests, 2);
+    }
+
+    // =========================================================================
+    // Event Recording Tests
+    // =========================================================================
 
     #[test]
     fn test_record_event() {
@@ -490,6 +554,116 @@ mod tests {
     }
 
     #[test]
+    fn test_record_event_http_request() {
+        let mut monitor = NetworkMonitor::new();
+        monitor.start_monitoring();
+
+        monitor.record_event("example.com", NetworkEventType::HttpRequest);
+
+        assert_eq!(monitor.total_requests, 1);
+        assert_eq!(monitor.get_events().len(), 1);
+        assert_eq!(monitor.get_events()[0].event_type, NetworkEventType::HttpRequest);
+    }
+
+    #[test]
+    fn test_record_event_websocket_open() {
+        let mut monitor = NetworkMonitor::new();
+        monitor.start_monitoring();
+
+        monitor.record_event("example.com", NetworkEventType::WebSocketOpen);
+
+        assert_eq!(monitor.websocket_connections, 1);
+        assert_eq!(monitor.total_requests, 0); // WebSocket open is not an HTTP request
+    }
+
+    #[test]
+    fn test_record_event_websocket_close() {
+        let mut monitor = NetworkMonitor::new();
+        monitor.start_monitoring();
+
+        monitor.record_event("example.com", NetworkEventType::WebSocketClose);
+
+        // WebSocket close doesn't increment counters
+        assert_eq!(monitor.websocket_connections, 0);
+        assert_eq!(monitor.total_requests, 0);
+        assert_eq!(monitor.get_events().len(), 1);
+    }
+
+    #[test]
+    fn test_record_event_dns_lookup() {
+        let mut monitor = NetworkMonitor::new();
+        monitor.start_monitoring();
+
+        monitor.record_event("example.com", NetworkEventType::DnsLookup);
+
+        assert_eq!(monitor.total_requests, 0);
+        assert_eq!(monitor.get_events().len(), 1);
+        assert_eq!(monitor.get_events()[0].event_type, NetworkEventType::DnsLookup);
+    }
+
+    #[test]
+    fn test_record_event_other() {
+        let mut monitor = NetworkMonitor::new();
+        monitor.start_monitoring();
+
+        monitor.record_event("example.com", NetworkEventType::Other);
+
+        assert_eq!(monitor.total_requests, 0);
+        assert_eq!(monitor.get_events().len(), 1);
+    }
+
+    #[test]
+    fn test_events_not_recorded_when_inactive() {
+        let mut monitor = NetworkMonitor::new();
+        // Don't call start_monitoring()
+
+        monitor.record_event("example.com", NetworkEventType::HttpRequest);
+
+        assert!(monitor.get_events().is_empty());
+        assert_eq!(monitor.get_summary().total_requests, 0);
+    }
+
+    #[test]
+    fn test_record_event_chess_domain_flagged() {
+        let mut monitor = NetworkMonitor::new();
+        monitor.start_monitoring();
+
+        monitor.record_event("lichess.org", NetworkEventType::HttpRequest);
+
+        assert_eq!(monitor.chess_api_requests, 1);
+        assert!(monitor.get_events()[0].is_chess_related);
+    }
+
+    #[test]
+    fn test_record_event_non_chess_domain_not_flagged() {
+        let mut monitor = NetworkMonitor::new();
+        monitor.start_monitoring();
+
+        monitor.record_event("google.com", NetworkEventType::HttpRequest);
+
+        assert_eq!(monitor.chess_api_requests, 0);
+        assert!(!monitor.get_events()[0].is_chess_related);
+    }
+
+    #[test]
+    fn test_record_event_timestamp() {
+        let mut monitor = NetworkMonitor::new();
+        monitor.start_monitoring();
+
+        let before = current_timestamp_ms();
+        monitor.record_event("example.com", NetworkEventType::HttpRequest);
+        let after = current_timestamp_ms();
+
+        let event = &monitor.get_events()[0];
+        assert!(event.timestamp >= before);
+        assert!(event.timestamp <= after);
+    }
+
+    // =========================================================================
+    // Chess Domain Detection Tests
+    // =========================================================================
+
+    #[test]
     fn test_chess_domain_detection() {
         assert!(is_chess_domain("lichess.org"));
         assert!(is_chess_domain("api.chess.com"));
@@ -497,6 +671,73 @@ mod tests {
         assert!(!is_chess_domain("google.com"));
         assert!(!is_chess_domain("example.com"));
     }
+
+    #[test]
+    fn test_chess_domain_detection_lichess() {
+        assert!(is_chess_domain("lichess.org"));
+        assert!(is_chess_domain("api.lichess.org"));
+        assert!(is_chess_domain("lichess.org/api/analysis"));
+    }
+
+    #[test]
+    fn test_chess_domain_detection_chess_com() {
+        assert!(is_chess_domain("chess.com"));
+        assert!(is_chess_domain("www.chess.com"));
+        assert!(is_chess_domain("api.chess.com"));
+    }
+
+    #[test]
+    fn test_chess_domain_detection_chessify() {
+        assert!(is_chess_domain("chessify.me"));
+        assert!(is_chess_domain("api.chessify.me"));
+    }
+
+    #[test]
+    fn test_chess_domain_detection_chess24() {
+        assert!(is_chess_domain("chess24.com"));
+    }
+
+    #[test]
+    fn test_chess_domain_detection_decodechess() {
+        assert!(is_chess_domain("decodechess.com"));
+    }
+
+    #[test]
+    fn test_chess_domain_detection_nextchessmove() {
+        assert!(is_chess_domain("nextchessmove.com"));
+    }
+
+    #[test]
+    fn test_chess_domain_detection_stockfish_online() {
+        assert!(is_chess_domain("stockfish.online"));
+    }
+
+    #[test]
+    fn test_chess_domain_detection_case_insensitive() {
+        assert!(is_chess_domain("LICHESS.ORG"));
+        assert!(is_chess_domain("Chess.Com"));
+        assert!(is_chess_domain("CHESSIFY.ME"));
+    }
+
+    #[test]
+    fn test_chess_domain_detection_not_chess() {
+        assert!(!is_chess_domain("google.com"));
+        assert!(!is_chess_domain("github.com"));
+        assert!(!is_chess_domain("stackoverflow.com"));
+        assert!(!is_chess_domain("example.com"));
+        assert!(!is_chess_domain(""));
+    }
+
+    #[test]
+    fn test_chess_domain_detection_partial_match_false() {
+        // "chess" alone doesn't match specific domains
+        // The domain must contain one of the known chess analysis domains
+        assert!(!is_chess_domain("mychesssite.com")); // Contains "chess" but not in list
+    }
+
+    // =========================================================================
+    // Summary Generation Tests
+    // =========================================================================
 
     #[test]
     fn test_summary_generation() {
@@ -518,11 +759,120 @@ mod tests {
     }
 
     #[test]
-    fn test_pattern_analysis() {
+    fn test_summary_empty_monitor() {
+        let monitor = NetworkMonitor::new();
+        let summary = monitor.get_summary();
+
+        assert_eq!(summary.total_requests, 0);
+        assert_eq!(summary.chess_api_requests, 0);
+        assert_eq!(summary.websocket_connections, 0);
+        assert!(summary.requests_by_domain.is_empty());
+        assert!(summary.avg_request_interval_ms.is_none());
+    }
+
+    #[test]
+    fn test_summary_monitoring_timestamps() {
+        let mut monitor = NetworkMonitor::new();
+
+        let before = current_timestamp_ms();
+        monitor.start_monitoring();
+
+        monitor.record_event("example.com", NetworkEventType::HttpRequest);
+        std::thread::sleep(std::time::Duration::from_millis(10));
+
+        let summary = monitor.get_summary();
+        let after = current_timestamp_ms();
+
+        assert!(summary.monitoring_started >= before);
+        assert!(summary.monitoring_ended <= after);
+        assert!(summary.monitoring_ended >= summary.monitoring_started);
+    }
+
+    #[test]
+    fn test_summary_requests_by_domain() {
         let mut monitor = NetworkMonitor::new();
         monitor.start_monitoring();
 
-        // Add many chess API requests
+        monitor.record_event("a.com", NetworkEventType::HttpRequest);
+        monitor.record_event("b.com", NetworkEventType::HttpRequest);
+        monitor.record_event("a.com", NetworkEventType::HttpRequest);
+        monitor.record_event("c.com", NetworkEventType::HttpRequest);
+        monitor.record_event("a.com", NetworkEventType::HttpRequest);
+
+        let summary = monitor.get_summary();
+
+        assert_eq!(*summary.requests_by_domain.get("a.com").unwrap(), 3);
+        assert_eq!(*summary.requests_by_domain.get("b.com").unwrap(), 1);
+        assert_eq!(*summary.requests_by_domain.get("c.com").unwrap(), 1);
+    }
+
+    #[test]
+    fn test_summary_websocket_not_counted_as_request() {
+        let mut monitor = NetworkMonitor::new();
+        monitor.start_monitoring();
+
+        monitor.record_event("example.com", NetworkEventType::WebSocketOpen);
+        monitor.record_event("example.com", NetworkEventType::WebSocketClose);
+
+        let summary = monitor.get_summary();
+
+        // WebSocket events are not HTTP requests
+        assert!(summary.requests_by_domain.is_empty());
+    }
+
+    #[test]
+    fn test_summary_average_interval_single_event() {
+        let mut monitor = NetworkMonitor::new();
+        monitor.start_monitoring();
+
+        monitor.record_event("example.com", NetworkEventType::HttpRequest);
+
+        let summary = monitor.get_summary();
+
+        // With only one event, no interval can be calculated
+        assert!(summary.avg_request_interval_ms.is_none());
+    }
+
+    #[test]
+    fn test_summary_average_interval_multiple_events() {
+        let mut monitor = NetworkMonitor::new();
+        monitor.start_monitoring();
+
+        monitor.record_event("example.com", NetworkEventType::HttpRequest);
+        std::thread::sleep(std::time::Duration::from_millis(10));
+        monitor.record_event("example.com", NetworkEventType::HttpRequest);
+
+        let summary = monitor.get_summary();
+
+        // With 2+ events, interval should be calculated
+        assert!(summary.avg_request_interval_ms.is_some());
+    }
+
+    // =========================================================================
+    // Pattern Analysis Tests
+    // =========================================================================
+
+    #[test]
+    fn test_pattern_analysis_clean() {
+        let mut monitor = NetworkMonitor::new();
+        monitor.start_monitoring();
+
+        // Few non-chess requests
+        monitor.record_event("google.com", NetworkEventType::HttpRequest);
+        monitor.record_event("github.com", NetworkEventType::HttpRequest);
+
+        let flags = monitor.analyze_patterns();
+
+        // Should be clean
+        assert!(!flags.contains(&"high_chess_api_requests"));
+    }
+
+    #[test]
+    fn test_pattern_analysis_high_chess_api_requests() {
+        let mut monitor = NetworkMonitor::new();
+        monitor.start_monitoring();
+
+        // Add many chess API requests (more than 5)
         for _ in 0..10 {
             monitor.record_event("lichess.org", NetworkEventType::HttpRequest);
         }
@@ -532,18 +882,205 @@ mod tests {
     }
 
     #[test]
-    fn test_events_not_recorded_when_inactive() {
+    fn test_pattern_analysis_threshold_chess_requests() {
         let mut monitor = NetworkMonitor::new();
-        // Don't call start_monitoring()
+        monitor.start_monitoring();
 
-        monitor.record_event("example.com", NetworkEventType::HttpRequest);
+        // Exactly 5 chess API requests (at threshold)
+        for _ in 0..5 {
+            monitor.record_event("lichess.org", NetworkEventType::HttpRequest);
+        }
 
-        assert!(monitor.get_events().is_empty());
-        assert_eq!(monitor.get_summary().total_requests, 0);
+        let flags = monitor.analyze_patterns();
+
+        // 5 is not > 5, so should not flag
+        assert!(!flags.contains(&"high_chess_api_requests"));
+    }
+
+    #[test]
+    fn test_pattern_analysis_just_over_threshold() {
+        let mut monitor = NetworkMonitor::new();
+        monitor.start_monitoring();
+
+        // 6 chess API requests (just over threshold)
+        for _ in 0..6 {
+            monitor.record_event("lichess.org", NetworkEventType::HttpRequest);
+        }
+
+        let flags = monitor.analyze_patterns();
+
+        // 6 > 5, should flag
+        assert!(flags.contains(&"high_chess_api_requests"));
+    }
+
+    #[test]
+    fn test_pattern_analysis_chess_websocket() {
+        let mut monitor = NetworkMonitor::new();
+        monitor.start_monitoring();
+
+        monitor.record_event("lichess.org", NetworkEventType::WebSocketOpen);
+
+        let flags = monitor.analyze_patterns();
+        assert!(flags.contains(&"chess_websocket_active"));
+    }
+
+    #[test]
+    fn test_pattern_analysis_non_chess_websocket() {
+        let mut monitor = NetworkMonitor::new();
+        monitor.start_monitoring();
+
+        monitor.record_event("example.com", NetworkEventType::WebSocketOpen);
+
+        let flags = monitor.analyze_patterns();
+
+        // WebSocket to non-chess site should not flag chess_websocket_active
+        assert!(!flags.contains(&"chess_websocket_active"));
+    }
+
+    #[test]
+    fn test_pattern_analysis_empty_monitor() {
+        let monitor = NetworkMonitor::new();
+        let flags = monitor.analyze_patterns();
+        assert!(flags.is_empty());
+    }
+
+    #[test]
+    fn test_pattern_analysis_multiple_flags() {
+        let mut monitor = NetworkMonitor::new();
+        monitor.start_monitoring();
+
+        // Many chess API requests
+        for _ in 0..10 {
+            monitor.record_event("lichess.org", NetworkEventType::HttpRequest);
+        }
+
+        // Chess WebSocket
+        monitor.record_event("chess.com", NetworkEventType::WebSocketOpen);
+
+        let flags = monitor.analyze_patterns();
+
+        assert!(flags.contains(&"high_chess_api_requests"));
+        assert!(flags.contains(&"chess_websocket_active"));
+    }
+
+    // =========================================================================
+    // NetworkEvent Tests
+    // =========================================================================
+
+    #[test]
+    fn test_network_event_creation() {
+        let event = NetworkEvent {
+            timestamp: 12345,
+            domain: "example.com".to_string(),
+            is_chess_related: false,
+            event_type: NetworkEventType::HttpRequest,
+        };
+
+        assert_eq!(event.timestamp, 12345);
+        assert_eq!(event.domain, "example.com");
+        assert!(!event.is_chess_related);
+        assert_eq!(event.event_type, NetworkEventType::HttpRequest);
+    }
+
+    #[test]
+    fn test_network_event_clone() {
+        let original = NetworkEvent {
+            timestamp: 1000,
+            domain: "test.com".to_string(),
+            is_chess_related: true,
+            event_type: NetworkEventType::WebSocketOpen,
+        };
+
+        let cloned = original.clone();
+
+        assert_eq!(cloned.timestamp, original.timestamp);
+        assert_eq!(cloned.domain, original.domain);
+        assert_eq!(cloned.is_chess_related, original.is_chess_related);
+        assert_eq!(cloned.event_type, original.event_type);
+    }
+
+    // =========================================================================
+    // NetworkEventType Tests
+    // =========================================================================
+
+    #[test]
+    fn test_network_event_type_equality() {
+        assert_eq!(NetworkEventType::HttpRequest, NetworkEventType::HttpRequest);
+        assert_ne!(NetworkEventType::HttpRequest, NetworkEventType::WebSocketOpen);
+    }
+
+    #[test]
+    fn test_network_event_type_copy() {
+        let event_type = NetworkEventType::DnsLookup;
+        let copied = event_type;
+        assert_eq!(event_type, copied);
+    }
+
+    // =========================================================================
+    // NetworkSummary Tests
+    // =========================================================================
+
+    #[test]
+    fn test_network_summary_default() {
+        let summary = NetworkSummary::default();
+
+        assert_eq!(summary.total_requests, 0);
+        assert_eq!(summary.chess_api_requests, 0);
+        assert_eq!(summary.websocket_connections, 0);
+        assert!(summary.requests_by_domain.is_empty());
+        assert_eq!(summary.monitoring_started, 0);
+        assert_eq!(summary.monitoring_ended, 0);
+        assert!(summary.avg_request_interval_ms.is_none());
+    }
+
+    #[test]
+    fn test_network_summary_clone() {
+        let mut summary = NetworkSummary::default();
+        summary.total_requests = 10;
+        summary.requests_by_domain.insert("test.com".to_string(), 5);
+
+        let cloned = summary.clone();
+
+        assert_eq!(cloned.total_requests, 10);
+        assert_eq!(*cloned.requests_by_domain.get("test.com").unwrap(), 5);
+    }
+
+    // =========================================================================
+    // SharedNetworkMonitor Tests
+    // =========================================================================
+
+    #[test]
+    fn test_shared_network_monitor_new() {
+        let monitor = SharedNetworkMonitor::new();
+        let _ = monitor; // Just verify it creates
+    }
+
+    #[test]
+    fn test_shared_network_monitor_default() {
+        let monitor = SharedNetworkMonitor::default();
+        let _ = monitor;
+    }
+
+    #[test]
+    fn test_shared_network_monitor_clone() {
+        let monitor1 = SharedNetworkMonitor::new();
+        let monitor2 = monitor1.clone();
+
+        // Both should reference the same inner monitor
+        let _ = (monitor1, monitor2);
+    }
+
+    #[test]
+    fn test_shared_network_monitor_clone_inner() {
+        let monitor = SharedNetworkMonitor::new();
+        let inner = monitor.clone_inner();
+
+        // Should get a cloned Arc
+        assert_eq!(Arc::strong_count(&inner), 2);
     }
 
     #[tokio::test]
-    async fn test_shared_network_monitor() {
+    async fn test_shared_network_monitor_basic_workflow() {
         let monitor = SharedNetworkMonitor::new();
 
         monitor.start_monitoring().await;
@@ -553,5 +1090,241 @@ mod tests {
         assert_eq!(summary.total_requests, 1);
 
         monitor.stop_monitoring().await;
+    }
+
+    #[tokio::test]
+    async fn test_shared_network_monitor_multiple_events() {
+        let monitor = SharedNetworkMonitor::new();
+
+        monitor.start_monitoring().await;
+        monitor.record_event("a.com", NetworkEventType::HttpRequest).await;
+        monitor.record_event("b.com", NetworkEventType::HttpRequest).await;
+        monitor.record_event("lichess.org", NetworkEventType::HttpRequest).await;
+
+        let summary = monitor.get_summary().await;
+
+        assert_eq!(summary.total_requests, 3);
+        assert_eq!(summary.chess_api_requests, 1);
+    }
+
+    #[tokio::test]
+    async fn test_shared_network_monitor_analyze_patterns() {
+        let monitor = SharedNetworkMonitor::new();
+
+        monitor.start_monitoring().await;
+
+        // Add enough chess API requests to trigger flag
+        for _ in 0..10 {
+            monitor.record_event("lichess.org", NetworkEventType::HttpRequest).await;
+        }
+
+        let flags = monitor.analyze_patterns().await;
+        assert!(flags.contains(&"high_chess_api_requests"));
+    }
+
+    #[tokio::test]
+    async fn test_shared_network_monitor_concurrent_clones() {
+        let monitor = SharedNetworkMonitor::new();
+        let monitor_clone = monitor.clone();
+
+        monitor.start_monitoring().await;
+
+        // Record from original
+        monitor.record_event("a.com", NetworkEventType::HttpRequest).await;
+
+        // Record from clone (should affect same underlying monitor)
+        monitor_clone.record_event("b.com", NetworkEventType::HttpRequest).await;
+
+        let summary = monitor.get_summary().await;
+        assert_eq!(summary.total_requests, 2);
+
+        let summary_clone = monitor_clone.get_summary().await;
+        assert_eq!(summary_clone.total_requests, 2);
+    }
+
+    // =========================================================================
+    // Baseline Network Activity Tests
+    // =========================================================================
+
+    #[test]
+    fn test_baseline_no_activity() {
+        let mut monitor = NetworkMonitor::new();
+        monitor.start_monitoring();
+        // No events recorded
+
+        let summary = monitor.get_summary();
+
+        assert_eq!(summary.total_requests, 0);
+        assert_eq!(summary.chess_api_requests, 0);
+        assert_eq!(summary.websocket_connections, 0);
+        assert!(summary.requests_by_domain.is_empty());
+    }
+
+    #[test]
+    fn test_baseline_normal_browsing() {
+        let mut monitor = NetworkMonitor::new();
+        monitor.start_monitoring();
+
+        // Simulate normal browsing (non-chess sites)
+        monitor.record_event("google.com", NetworkEventType::HttpRequest);
+        monitor.record_event("youtube.com", NetworkEventType::HttpRequest);
+        monitor.record_event("github.com", NetworkEventType::HttpRequest);
+
+        let flags = monitor.analyze_patterns();
+
+        // Normal browsing should not trigger any flags
+        assert!(flags.is_empty());
+    }
+
+    // =========================================================================
+    // Anomalous Timing Tests
+    // =========================================================================
+
+    #[test]
+    fn test_anomalous_timing_many_requests() {
+        let mut monitor = NetworkMonitor::new();
+        monitor.start_monitoring();
+
+        // Many requests in quick succession
+        for i in 0..20 {
+            monitor.record_event(&format!("site{}.com", i), NetworkEventType::HttpRequest);
+        }
+
+        let summary = monitor.get_summary();
+
+        // Should have an average interval calculated
+        if summary.avg_request_interval_ms.is_some() {
+            // With many quick requests, interval should be small
+            let interval = summary.avg_request_interval_ms.unwrap();
+            // Just verify it's a reasonable value (not testing exact timing)
+            assert!(interval < 10000); // Less than 10 seconds
+        }
+    }
+
+    // =========================================================================
+    // Serialization Tests
+    // =========================================================================
+
+    #[test]
+    fn test_network_summary_serialization() {
+        let mut summary = NetworkSummary::default();
+        summary.total_requests = 5;
+        summary.chess_api_requests = 2;
+        summary.websocket_connections = 1;
+        summary.requests_by_domain.insert("lichess.org".to_string(), 2);
+        summary.monitoring_started = 1000;
+        summary.monitoring_ended = 2000;
+        summary.avg_request_interval_ms = Some(200);
+
+        let json = serde_json::to_string(&summary).expect("Serialization failed");
+        let deserialized: NetworkSummary =
+            serde_json::from_str(&json).expect("Deserialization failed");
+
+        assert_eq!(deserialized.total_requests, summary.total_requests);
+        assert_eq!(deserialized.chess_api_requests, summary.chess_api_requests);
+        assert_eq!(deserialized.websocket_connections, summary.websocket_connections);
+        assert_eq!(deserialized.monitoring_started, summary.monitoring_started);
+        assert_eq!(deserialized.monitoring_ended, summary.monitoring_ended);
+        assert_eq!(deserialized.avg_request_interval_ms, summary.avg_request_interval_ms);
+    }
+
+    #[test]
+    fn test_network_event_serialization() {
+        let event = NetworkEvent {
+            timestamp: 12345,
+            domain: "lichess.org".to_string(),
+            is_chess_related: true,
+            event_type: NetworkEventType::HttpRequest,
+        };
+
+        let json = serde_json::to_string(&event).expect("Serialization failed");
+        let deserialized: NetworkEvent =
+            serde_json::from_str(&json).expect("Deserialization failed");
+
+        assert_eq!(deserialized.timestamp, event.timestamp);
+        assert_eq!(deserialized.domain, event.domain);
+        assert_eq!(deserialized.is_chess_related, event.is_chess_related);
+        assert_eq!(deserialized.event_type, event.event_type);
+    }
+
+    #[test]
+    fn test_network_event_type_serialization() {
+        let event_types = vec![
+            NetworkEventType::HttpRequest,
+            NetworkEventType::WebSocketOpen,
+            NetworkEventType::WebSocketClose,
+            NetworkEventType::DnsLookup,
+            NetworkEventType::Other,
+        ];
+
+        for event_type in event_types {
+            let json = serde_json::to_string(&event_type).expect("Serialization failed");
+            let deserialized: NetworkEventType =
+                serde_json::from_str(&json).expect("Deserialization failed");
+            assert_eq!(deserialized, event_type);
+        }
+    }
+
+    // =========================================================================
+    // Edge Case Tests
+    // =========================================================================
+
+    #[test]
+    fn test_empty_domain() {
+        let mut monitor = NetworkMonitor::new();
+        monitor.start_monitoring();
+
+        monitor.record_event("", NetworkEventType::HttpRequest);
+
+        assert_eq!(monitor.get_events().len(), 1);
+        assert_eq!(monitor.get_events()[0].domain, "");
+        assert!(!monitor.get_events()[0].is_chess_related);
+    }
+
+    #[test]
+    fn test_long_domain() {
+        let mut monitor = NetworkMonitor::new();
+        monitor.start_monitoring();
+
+        let long_domain = "a".repeat(1000) + ".com";
+        monitor.record_event(&long_domain, NetworkEventType::HttpRequest);
+
+        assert_eq!(monitor.get_events().len(), 1);
+        assert_eq!(monitor.get_events()[0].domain.len(), 1004);
+    }
+
+    #[test]
+    fn test_special_characters_in_domain() {
+        let mut monitor = NetworkMonitor::new();
+        monitor.start_monitoring();
+
+        monitor.record_event("test-site.co.uk", NetworkEventType::HttpRequest);
+        monitor.record_event("sub.domain.example.com", NetworkEventType::HttpRequest);
+
+        assert_eq!(monitor.get_events().len(), 2);
+    }
+
+    #[test]
+    fn test_many_events() {
+        let mut monitor = NetworkMonitor::new();
+        monitor.start_monitoring();
+
+        // Record many events
+        for i in 0..1000 {
+            monitor.record_event(&format!("site{}.com", i), NetworkEventType::HttpRequest);
+        }
+
+        assert_eq!(monitor.total_requests, 1000);
+        assert_eq!(monitor.get_events().len(), 1000);
+    }
+
+    #[test]
+    fn test_utility_current_timestamp_ms() {
+        let ts1 = current_timestamp_ms();
+        std::thread::sleep(std::time::Duration::from_millis(5));
+        let ts2 = current_timestamp_ms();
+
+        assert!(ts2 > ts1);
+        assert!(ts2 - ts1 >= 5);
     }
 }

@@ -37,6 +37,17 @@ tokio-util = "0.7"
 # so the frontend can track and cancel specific analyses.
 uuid = { version = "1", features = ["v4"] }
 
+[dev-dependencies]
+# mockall generates mock implementations of traits for testing.
+# We use it to mock Stockfish process interactions and Tauri APIs.
+mockall = "0.12"
+# tokio-test provides utilities for testing async code with tokio.
+# Used for testing engine commands and lifecycle management.
+tokio-test = "0.4"
+# tempfile creates temporary files/directories for tests that need file I/O.
+# Useful for testing configuration persistence and sidecar paths.
+tempfile = "3"
+
 [features]
 default = []
 custom-protocol = ["tauri/custom-protocol"]

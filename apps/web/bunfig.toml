@@ -1,0 +1,9 @@
+# Bun Test Configuration for Web App
+# Documentation: https://bun.sh/docs/runtime/bunfig
+
+[test]
+# Timeout in milliseconds (default: 5000)
+timeout = 10000
+
+# Exclude E2E tests from bun test - they run via Playwright
+exclude = ["e2e/**/*"]
