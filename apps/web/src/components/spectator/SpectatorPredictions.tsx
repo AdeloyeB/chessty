@@ -1,6 +1,6 @@
 'use client';
 
-import { useSpectatorChatStore } from '@/store/spectatorChat';
+import { useSpectatorPredictionStore } from '@/store/spectatorPrediction';
 import { useAuthStore } from '@/store/auth';
 import { useWallet } from '@/hooks/useWallet';
 import { useWebSocket } from '@/hooks/useWebSocket';
@@ -19,7 +19,7 @@ export function SpectatorPredictions({
   whitePlayer,
   blackPlayer,
 }: SpectatorPredictionsProps) {
-  const { predictions } = useSpectatorChatStore();
+  const { predictions } = useSpectatorPredictionStore();
   const { user } = useAuthStore();
   const { isConnected, usdcBalance } = useWallet();
   const { acceptSpectatorPrediction } = useWebSocket();

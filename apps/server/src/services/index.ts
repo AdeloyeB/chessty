@@ -6,7 +6,6 @@ export * as gameService from './game';
 export * as bettingService from './betting';
 export * as challengeService from './challenge';
 export * as chess960Service from './chess960';
-export * as spectatorChatService from './spectatorChat';
 export * as spectatorPredictionService from './spectatorPrediction';
 export * as anticheatService from './anticheat';
 export * as stockfishService from './stockfish';

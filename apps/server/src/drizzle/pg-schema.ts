@@ -156,15 +156,6 @@ export const spectatorPredictions = pgTable('spectator_predictions', {
   settledAt: timestamp('settled_at', { withTimezone: true }),
 });
 
-// Spectator chat table
-export const spectatorChat = pgTable('spectator_chat', {
-  id: text('id').primaryKey(),
-  gameId: text('game_id').notNull().references(() => games.id),
-  userId: text('user_id').notNull().references(() => users.id),
-  message: text('message').notNull(),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().$defaultFn(() => new Date()),
-});
-
 // User achievements table
 export const userAchievements = pgTable('user_achievements', {
   id: text('id').primaryKey(),
@@ -289,7 +280,6 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   acceptedChallenges: many(challenges, { relationName: 'acceptor' }),
   spectatorPredictionsCreated: many(spectatorPredictions, { relationName: 'predictionCreator' }),
   spectatorPredictionsAccepted: many(spectatorPredictions, { relationName: 'predictionAcceptor' }),
-  spectatorChatMessages: many(spectatorChat),
   securityAuditLogs: many(securityAuditLog),
   achievements: many(userAchievements),
   profile: one(userProfiles, {
@@ -320,7 +310,6 @@ export const gamesRelations = relations(games, ({ one, many }) => ({
   }),
   bets: many(bets),
   spectatorPredictions: many(spectatorPredictions),
-  spectatorChatMessages: many(spectatorChat),
   moveAnalyses: many(moveAnalysis),
 }));
 
@@ -389,17 +378,6 @@ export const spectatorPredictionsRelations = relations(spectatorPredictions, ({ 
   }),
 }));
 
-export const spectatorChatRelations = relations(spectatorChat, ({ one }) => ({
-  game: one(games, {
-    fields: [spectatorChat.gameId],
-    references: [games.id],
-  }),
-  user: one(users, {
-    fields: [spectatorChat.userId],
-    references: [users.id],
-  }),
-}));
-
 export const securityAuditLogRelations = relations(securityAuditLog, ({ one }) => ({
   user: one(users, {
     fields: [securityAuditLog.userId],
@@ -461,8 +439,6 @@ export type Challenge = typeof challenges.$inferSelect;
 export type NewChallenge = typeof challenges.$inferInsert;
 export type SpectatorPrediction = typeof spectatorPredictions.$inferSelect;
 export type NewSpectatorPrediction = typeof spectatorPredictions.$inferInsert;
-export type SpectatorChatMessage = typeof spectatorChat.$inferSelect;
-export type NewSpectatorChatMessage = typeof spectatorChat.$inferInsert;
 export type SecurityAuditLogEntry = typeof securityAuditLog.$inferSelect;
 export type NewSecurityAuditLogEntry = typeof securityAuditLog.$inferInsert;
 export type UserAchievement = typeof userAchievements.$inferSelect;

@@ -16,7 +16,7 @@ import { useGameStore } from '@/store/game';
 import { useChallengeStore } from '@/store/challenge';
 import { useSpectatorStore } from '@/store/spectator';
 import { useMultiSpectatorStore } from '@/store/multiSpectator';
-import { useSpectatorChatStore } from '@/store/spectatorChat';
+import { useSpectatorPredictionStore } from '@/store/spectatorPrediction';
 import { useWalletStore } from '@/store/wallet';
 import { useFeatureFlag } from '@/store/flags';
 import { ACHIEVEMENTS } from '@chess-game/shared';
@@ -25,7 +25,6 @@ import {
   MOCK_PLAYERS,
   getRandomPlayers,
   generateMockChallenges,
-  generateMockChatMessages,
   TIME_CONTROLS,
   SAMPLE_FENS,
 } from '@/lib/mock/mockData';
@@ -172,7 +171,7 @@ export function DevDebugPanel() {
   const challenge = useChallengeStore();
   const spectator = useSpectatorStore();
   const multiSpectator = useMultiSpectatorStore();
-  const spectatorChat = useSpectatorChatStore();
+  const spectatorPrediction = useSpectatorPredictionStore();
   const wallet = useWalletStore();
   const multiGameEnabled = useFeatureFlag('spectator_multi_game');
 
@@ -327,20 +326,6 @@ export function DevDebugPanel() {
     multiSpectator.removeAllGames();
   };
 
-  const handleAddChatMessages = () => {
-    const msgs = generateMockChatMessages('spectated-game-1', 5);
-    msgs.forEach((m) => {
-      spectatorChat.addMessage({
-        id: m.id,
-        gameId: m.gameId,
-        userId: m.userId,
-        username: m.username,
-        message: m.message,
-        createdAt: m.createdAt,
-      });
-    });
-  };
-
   // ── Wallet handlers ───────────────────────────────────────────────────
   const handleAddWin = () => {
     wallet.addBalanceChange({
@@ -409,7 +394,7 @@ export function DevDebugPanel() {
     challenge.reset();
     spectator.stopSpectating();
     multiSpectator.removeAllGames();
-    spectatorChat.reset();
+    spectatorPrediction.reset();
     wallet.setDisconnected();
     clearAll();
   };
@@ -546,9 +531,6 @@ export function DevDebugPanel() {
                   <button onClick={handleUpdateOdds} className={btn}>
                     ↻ update_odds (legacy store)
                   </button>
-                  <button onClick={handleAddChatMessages} className={btn}>
-                    💬 add_chat_messages (5)
-                  </button>
                   <button onClick={handleClearMultiGames} className={btnNeutral}>
                     clear_all_games
                   </button>
@@ -561,9 +543,6 @@ export function DevDebugPanel() {
                   </button>
                   <button onClick={handleUpdateOdds} className={btn}>
                     ↻ update_odds (random shift)
-                  </button>
-                  <button onClick={handleAddChatMessages} className={btn}>
-                    💬 add_chat_messages (5)
                   </button>
                   <button
                     onClick={() => spectator.stopSpectating()}

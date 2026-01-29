@@ -4,8 +4,6 @@ import type {
   Move,
   MatchFoundPayload,
   OddsUpdatePayload,
-  SpectatorChatSendPayload,
-  SpectatorChatMessagePayload,
   SpectatorPredictionCreatePayload,
   SpectatorPredictionCreatedPayload,
   SpectatorPredictionMatchedPayload,
@@ -21,7 +19,6 @@ import * as gameService from '../services/game';
 import * as matchmakingService from '../services/matchmaking';
 import * as bettingService from '../services/betting';
 import * as authService from '../services/auth';
-import * as spectatorChatService from '../services/spectatorChat';
 import * as spectatorPredictionService from '../services/spectatorPrediction';
 import * as walletService from '../services/wallet';
 import { isFeatureEnabled } from '../services/featureFlags';
@@ -601,29 +598,6 @@ export class GameCoordinator {
       timeControl: match.timeControl,
     };
     this.broadcast.sendToUser(match.blackPlayerId, 'queue:match_found', blackPayload);
-  }
-
-  // --- Spectator Chat ---
-
-  async handleSpectatorChatSend(userId: string, payload: SpectatorChatSendPayload): Promise<void> {
-    if (!isFeatureEnabled('spectator_chat')) {
-      this.broadcast.sendError(userId, 'FEATURE_DISABLED', 'Spectator chat is currently disabled');
-      return;
-    }
-
-    try {
-      const message = await spectatorChatService.sendMessage(
-        payload.gameId,
-        userId,
-        payload.message
-      );
-
-      const chatPayload: SpectatorChatMessagePayload = { message };
-      this.broadcast.broadcastToSpectators(payload.gameId, 'spectator:chat_message', chatPayload);
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : 'Failed to send message';
-      this.broadcast.sendError(userId, 'CHAT_ERROR', msg);
-    }
   }
 
   // --- Spectator Predictions ---

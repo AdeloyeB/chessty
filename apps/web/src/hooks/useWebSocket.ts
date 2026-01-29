@@ -7,7 +7,7 @@ import { useGameStore } from '@/store/game';
 import { useSpectatorStore } from '@/store/spectator';
 import { useMultiSpectatorStore } from '@/store/multiSpectator';
 import { useChallengeStore } from '@/store/challenge';
-import { useSpectatorChatStore } from '@/store/spectatorChat';
+import { useSpectatorPredictionStore } from '@/store/spectatorPrediction';
 import { useNotificationStore } from '@/store/notification';
 
 const WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:3001/ws';
@@ -26,7 +26,7 @@ export function useWebSocket() {
   const spectatorStore = useSpectatorStore();
   const multiSpectatorStore = useMultiSpectatorStore();
   const challengeStore = useChallengeStore();
-  const spectatorChatStore = useSpectatorChatStore();
+  const spectatorPredictionStore = useSpectatorPredictionStore();
 
   const handleMessage = useCallback(
     (event: MessageEvent) => {
@@ -205,29 +205,22 @@ export function useWebSocket() {
             break;
           }
 
-          // Spectator chat events
-          case 'spectator:chat_message': {
-            const data = payload as any;
-            spectatorChatStore.addMessage(data.message);
-            break;
-          }
-
           // Spectator prediction events
           case 'spectator:prediction_created': {
             const data = payload as any;
-            spectatorChatStore.addPrediction(data.prediction);
+            spectatorPredictionStore.addPrediction(data.prediction);
             break;
           }
 
           case 'spectator:prediction_matched': {
             const data = payload as any;
-            spectatorChatStore.updatePrediction(data.prediction);
+            spectatorPredictionStore.updatePrediction(data.prediction);
             break;
           }
 
           case 'spectator:predictions_list': {
             const data = payload as any;
-            spectatorChatStore.setPredictions(data.predictions);
+            spectatorPredictionStore.setPredictions(data.predictions);
             break;
           }
 
@@ -269,7 +262,7 @@ export function useWebSocket() {
         console.error('Failed to parse WebSocket message:', error);
       }
     },
-    [gameStore, spectatorStore, multiSpectatorStore, challengeStore, spectatorChatStore]
+    [gameStore, spectatorStore, multiSpectatorStore, challengeStore, spectatorPredictionStore]
   );
 
   const connect = useCallback(() => {
@@ -454,13 +447,6 @@ export function useWebSocket() {
     [send]
   );
 
-  // Spectator chat actions
-  const sendSpectatorChat = useCallback(
-    (gameId: string, message: string) =>
-      send('spectator:chat_send', { gameId, message }),
-    [send]
-  );
-
   // Spectator prediction actions
   const createSpectatorPrediction = useCallback(
     (gameId: string, predictedWinnerId: string, amount: number) =>
@@ -520,8 +506,6 @@ export function useWebSocket() {
     acceptChallenge,
     confirmChallenge,
     declineChallenge,
-    // Spectator chat actions
-    sendSpectatorChat,
     // Spectator prediction actions
     createSpectatorPrediction,
     acceptSpectatorPrediction,

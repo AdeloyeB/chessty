@@ -80,11 +80,6 @@ export const DEFAULT_FEATURE_FLAGS = {
     description: 'Master toggle for the entire spectating feature — gates the spectate tab and ability to watch live games',
     enabled: true,
   },
-  spectator_chat: {
-    name: 'Spectator Chat',
-    description: 'Allow spectators to send chat messages while watching a game',
-    enabled: true,
-  },
   spectator_multi_game: {
     name: 'Multi-Game Spectating',
     description: 'Allow spectators to watch up to 5 games simultaneously with a sub-nav and drag-and-drop grid view',
@@ -109,7 +104,7 @@ export const FEATURE_FLAG_CATEGORIES = {
   WALLET: ['wallet_deposits', 'wallet_withdrawals'],
   SOCIAL: ['leaderboard_public', 'achievements_enabled'],
   GAME_MODES: ['practice_mode', 'challenge_marketplace'],
-  SPECTATOR: ['spectator_mode', 'spectator_predictions', 'spectator_chat', 'spectator_multi_game'],
+  SPECTATOR: ['spectator_mode', 'spectator_predictions', 'spectator_multi_game'],
   HISTORY: ['history_openings_tab'],
 } as const;
 

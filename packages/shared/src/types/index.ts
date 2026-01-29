@@ -163,8 +163,7 @@ export const WSMessageTypeSchema = z.enum([
   'challenge:accept',
   'challenge:confirm',
   'challenge:decline',
-  // Spectator chat/predictions (Client -> Server)
-  'spectator:chat_send',
+  // Spectator predictions (Client -> Server)
   'spectator:prediction_create',
   'spectator:prediction_accept',
   // Server -> Client
@@ -192,8 +191,7 @@ export const WSMessageTypeSchema = z.enum([
   'challenge:expired',
   'challenge:cancelled',
   'challenge:declined',
-  // Spectator chat/predictions (Server -> Client)
-  'spectator:chat_message',
+  // Spectator predictions (Server -> Client)
   'spectator:prediction_created',
   'spectator:prediction_matched',
   'spectator:prediction_settled',
@@ -344,16 +342,6 @@ export interface ChallengeDeclinedPayload {
   challengeId: string;
 }
 
-// Spectator chat payload types
-export interface SpectatorChatSendPayload {
-  gameId: string;
-  message: string;
-}
-
-export interface SpectatorChatMessagePayload {
-  message: SpectatorChatMessage;
-}
-
 // Spectator prediction payload types
 export interface SpectatorPredictionCreatePayload {
   gameId: string;
@@ -482,17 +470,6 @@ export interface SpectatorPredictionWithUsers extends SpectatorPrediction {
   acceptor?: PublicUser;
   predictedWinner: PublicUser;
 }
-
-// Spectator Chat
-export const SpectatorChatMessageSchema = z.object({
-  id: z.string(),
-  gameId: z.string(),
-  userId: z.string(),
-  username: z.string(),
-  message: z.string().max(500),
-  createdAt: z.date(),
-});
-export type SpectatorChatMessage = z.infer<typeof SpectatorChatMessageSchema>;
 
 // Profile types
 export interface UserProfileData {
