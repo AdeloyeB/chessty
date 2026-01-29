@@ -460,6 +460,7 @@ dependencies = [
  "tokio",
  "tokio-test",
  "tokio-util",
+ "url",
  "uuid",
 ]
 

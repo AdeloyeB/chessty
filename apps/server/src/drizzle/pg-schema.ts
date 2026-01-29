@@ -10,6 +10,7 @@ export const users = pgTable('users', {
   displayName: text('display_name').unique(), // Public display name, required for gameplay
   passwordHash: text('password_hash'),
   walletAddress: text('wallet_address').unique(), // Ethereum address for SIWE auth
+  discordId: text('discord_id').unique(), // Discord user ID (snowflake) for Discord bot integration
   googleId: text('google_id').unique(),
   githubId: text('github_id').unique(),
   twitterId: text('twitter_id').unique(),

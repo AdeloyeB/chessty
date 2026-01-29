@@ -8,7 +8,7 @@
 // What this file does:
 // 1. Registers plugins (store, shell, deep-link) — these add capabilities
 // 2. Registers IPC commands — so the frontend can call Rust functions
-// 3. Sets up the deep link handler — so "chessgamble://" URLs open our app
+// 3. Sets up the deep link handler — so "chkmate://" URLs open our app
 // 4. Launches the app window
 //
 // This replaces Electron's `electron/main.ts` entry point.
@@ -34,7 +34,82 @@ mod engine_lifecycle;
 // analysis for final cheat probability scoring. See docs/ANTI_CHEAT_PLAN.md.
 mod anticheat;
 
+use serde::Serialize;
 use tauri::Emitter;
+use url::Url;
+
+// =============================================================================
+// Deep Link Payload
+// =============================================================================
+// This struct represents the parsed data from a deep link URL.
+// When the frontend receives the "deep-link-received" event, it gets this data.
+//
+// Example: chkmate://challenge/abc123
+// - route: "challenge/abc123" (full path after the protocol)
+// - link_type: "challenge" (first segment of the path)
+// - id: Some("abc123") (second segment, if present)
+// - token: None (query parameter, only present for auth callbacks)
+#[derive(Debug, Clone, Serialize)]
+struct DeepLinkPayload {
+    /// The full route path after the protocol (e.g., "link/abc123")
+    route: String,
+    /// The type of link - first segment of the path (e.g., "link", "challenge", "auth")
+    link_type: String,
+    /// The ID or token from the path (second segment, if present)
+    id: Option<String>,
+    /// Query parameter token (used for auth callbacks)
+    token: Option<String>,
+}
+
+// =============================================================================
+// Deep Link Handler
+// =============================================================================
+// Parses a deep link URL and emits the appropriate event to the frontend.
+// This function handles all deep link types:
+// - chkmate://auth/callback?token=xxx  -> emits both "auth:token" (legacy) and "deep-link-received"
+// - chkmate://link/{token}             -> emits "deep-link-received" for Discord linking
+// - chkmate://challenge/{id}           -> emits "deep-link-received" for challenge acceptance
+fn handle_deep_link(handle: &tauri::AppHandle, url: &Url) {
+    // Get the path without the leading slash
+    // url.path() returns "/challenge/abc123", we want "challenge/abc123"
+    let path = url.path().trim_start_matches('/');
+
+    // Split the path into segments
+    // "challenge/abc123" -> ["challenge", "abc123"]
+    let segments: Vec<&str> = path.split('/').filter(|s| !s.is_empty()).collect();
+
+    // Extract the link type (first segment) and ID (second segment)
+    let link_type = segments.first().unwrap_or(&"").to_string();
+    let id = segments.get(1).map(|s| s.to_string());
+
+    // Extract the token from query parameters (for auth callbacks)
+    let token = url
+        .query_pairs()
+        .find(|(key, _)| key == "token")
+        .map(|(_, value)| value.to_string());
+
+    // Build the payload
+    let payload = DeepLinkPayload {
+        route: path.to_string(),
+        link_type: link_type.clone(),
+        id,
+        token: token.clone(),
+    };
+
+    // Emit the generic deep-link-received event for all routes
+    // The frontend can listen to this single event and handle routing
+    if let Err(e) = handle.emit("deep-link-received", &payload) {
+        eprintln!("Failed to emit deep-link-received event: {}", e);
+    }
+
+    // For backwards compatibility: also emit "auth:token" for auth callbacks
+    // This keeps existing OAuth flows working without modification
+    if link_type == "auth" && token.is_some() {
+        if let Err(e) = handle.emit("auth:token", token.as_ref().unwrap()) {
+            eprintln!("Failed to emit auth:token event: {}", e);
+        }
+    }
+}
 
 // Import the LazyEngineState for on-demand Stockfish spawning.
 // This replaces EngineState with a lazy-loading wrapper that:
@@ -71,8 +146,8 @@ fn main() {
         // (left-aligned) or Windows/Linux-style controls (right-aligned).
         .plugin(tauri_plugin_os::init())
 
-        // Deep Link plugin: Registers our app to handle "chessgamble://" URLs.
-        // When a user clicks a chessgamble:// link (e.g., after OAuth login),
+        // Deep Link plugin: Registers our app to handle "chkmate://" URLs.
+        // When a user clicks a chkmate:// link (e.g., from Discord),
         // the OS routes it to our app instead of the browser.
         .plugin(tauri_plugin_deep_link::init())
 
@@ -166,19 +241,21 @@ fn main() {
             }
 
             // -- Deep Link Event Handler --------------------------------------
-            // This is the OAuth callback flow:
+            // Deep links allow external apps (like Discord) to trigger actions
+            // in our app. When a user clicks a chkmate:// link, the OS routes
+            // it here.
             //
-            // 1. User clicks "Login" in the app
-            // 2. App opens browser to auth provider (Google, GitHub, etc.)
-            // 3. User logs in on the web
-            // 4. Auth provider redirects to: chessgamble://auth/callback?token=xxx
-            // 5. OS sees "chessgamble://" and sends the URL to our app
-            // 6. This handler fires, extracts the token from the URL
-            // 7. We emit "auth:token" event to the frontend with the token
-            // 8. Frontend receives the token and logs the user in
+            // Supported deep link routes:
+            // - chkmate://auth/callback?token=xxx  - OAuth login callback
+            // - chkmate://link/{token}             - Discord account linking
+            // - chkmate://challenge/{id}           - Accept a challenge
             //
-            // This replaces Electron's `app.on('open-url', ...)` handler
-            // and the `handleDeepLink()` function from electron/main.ts.
+            // Flow:
+            // 1. User clicks link in Discord (e.g., chkmate://challenge/abc123)
+            // 2. OS sees "chkmate://" and sends the URL to our app
+            // 3. This handler fires, parses the route and parameters
+            // 4. We emit "deep-link-received" event to the frontend
+            // 5. Frontend routes to the appropriate screen
 
             // Clone the app handle so we can use it inside the closure.
             // In Rust, closures "capture" variables from their environment.
@@ -194,58 +271,18 @@ fn main() {
                 // `event.urls()` returns all URLs that triggered this event.
                 // Usually there's just one, but we loop to be safe.
                 for url in event.urls() {
-                    // We only care about the auth callback path.
-                    // Example URL: chessgamble://auth/callback?token=eyJhbGciOi...
-                    //
-                    // `url.path()` returns "/auth/callback"
-                    // `url.query_pairs()` returns the ?key=value parameters
-                    if url.path().starts_with("/auth/callback") {
-                        // Look through the query parameters for "token"
-                        // `query_pairs()` returns an iterator of (key, value) pairs.
-                        // `find()` stops at the first match.
-                        let token = url
-                            .query_pairs()
-                            .find(|(key, _)| key == "token")
-                            .map(|(_, value)| value.to_string());
-
-                        if let Some(token) = token {
-                            // Emit the "auth:token" event to the frontend.
-                            // This is like Electron's:
-                            //   mainWindow.webContents.send('auth:token', token)
-                            //
-                            // Any frontend listener registered with:
-                            //   listen("auth:token", (event) => { ... })
-                            // will receive this event with the token as payload.
-                            if let Err(e) = handle.emit("auth:token", &token) {
-                                eprintln!("Failed to emit auth:token event: {}", e);
-                            }
-                        }
-                    }
+                    // Parse the deep link and emit appropriate events
+                    handle_deep_link(&handle, &url);
                 }
             });
 
             // -- Check if app was launched via deep link ----------------------
             // If the app wasn't already running when the deep link was clicked,
             // the OS launches it with the URL. `get_current()` checks for that
-            // initial URL so we don't miss the very first auth callback.
+            // initial URL so we don't miss the very first deep link.
             if let Ok(Some(urls)) = app.deep_link().get_current() {
-                let startup_handle = app.handle().clone();
                 for url in urls {
-                    if url.path().starts_with("/auth/callback") {
-                        let token = url
-                            .query_pairs()
-                            .find(|(key, _)| key == "token")
-                            .map(|(_, value)| value.to_string());
-
-                        if let Some(token) = token {
-                            if let Err(e) = startup_handle.emit("auth:token", &token) {
-                                eprintln!(
-                                    "Failed to emit auth:token on startup: {}",
-                                    e
-                                );
-                            }
-                        }
-                    }
+                    handle_deep_link(app.handle(), &url);
                 }
             }
 
