@@ -1,9 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { useSpectatorChatStore } from '@/store/spectatorChat';
+import { useSpectatorPredictionStore } from '@/store/spectatorPrediction';
 import { useWebSocket } from '@/hooks/useWebSocket';
-import { USDCAmount } from '../wallet/USDCAmount';
 import type { PublicUser } from '@chess-game/shared';
 
 interface CreatePredictionFormProps {
@@ -20,7 +19,7 @@ export function CreatePredictionForm({
   userBalance,
 }: CreatePredictionFormProps) {
   const [selectedPlayer, setSelectedPlayer] = useState<string | null>(null);
-  const { predictionAmount, setPredictionAmount } = useSpectatorChatStore();
+  const { predictionAmount, setPredictionAmount } = useSpectatorPredictionStore();
   const { createSpectatorPrediction } = useWebSocket();
 
   const [customAmount, setCustomAmount] = useState('');

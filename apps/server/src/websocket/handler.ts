@@ -261,11 +261,6 @@ export async function handleWebSocketMessage(ws: ServerWebSocket<WebSocketData>,
         await challengeCoordinator.handleDecline(userId, validatedPayload.challengeId);
         break;
 
-      // Spectator chat
-      case 'spectator:chat_send':
-        await gameCoordinator.handleSpectatorChatSend(userId, validatedPayload);
-        break;
-
       // Spectator predictions
       case 'spectator:prediction_create':
         await gameCoordinator.handleSpectatorPredictionCreate(userId, validatedPayload);

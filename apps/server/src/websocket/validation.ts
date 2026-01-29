@@ -76,12 +76,6 @@ export const ChallengeIdPayloadSchema = z.object({
   challengeId: challengeIdSchema,
 });
 
-/** spectator:chat_send */
-export const SpectatorChatSendPayloadSchema = z.object({
-  gameId: gameIdSchema,
-  message: z.string().min(1).max(500).trim(),
-});
-
 /** spectator:prediction_create */
 export const SpectatorPredictionCreatePayloadSchema = z.object({
   gameId: gameIdSchema,
@@ -110,7 +104,6 @@ export const PAYLOAD_SCHEMAS: Partial<Record<string, z.ZodType>> = {
   'challenge:accept': ChallengeIdPayloadSchema,
   'challenge:confirm': ChallengeIdPayloadSchema,
   'challenge:decline': ChallengeIdPayloadSchema,
-  'spectator:chat_send': SpectatorChatSendPayloadSchema,
   'spectator:prediction_create': SpectatorPredictionCreatePayloadSchema,
   'spectator:prediction_accept': SpectatorPredictionAcceptPayloadSchema,
 };
