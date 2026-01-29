@@ -37,6 +37,7 @@ import {
   type JuryCase,
 } from '../../drizzle';
 import { createCase } from './case-assignment';
+import { withTransaction } from '../../utils/transaction';
 
 // ---------------------------------------------------------------------------
 // Configuration
@@ -125,61 +126,72 @@ export async function getTestCaseSource(): Promise<TestCaseSource | null> {
 /**
  * Find a game from a confirmed cheater to use as a "known guilty" test case.
  *
+ * WHY TRANSACTION:
+ * This function does multiple queries (sanctions, then games as white, then games as black).
+ * Without a transaction, the data could change between queries - for example, a sanction
+ * could be removed or a game deleted mid-operation. The transaction ensures we get a
+ * consistent snapshot of the data across all queries.
+ *
  * @returns A test case source or null
  */
 async function getKnownGuiltyCase(): Promise<TestCaseSource | null> {
-  // Find players with active sanctions from jury verdicts
-  const sanctions = await db.query.playerSanctions.findMany({
-    where: and(
-      eq(playerSanctions.sanctionType, 'temp_ban'),
-      // Only use sanctions from jury verdicts (contain "Case:" in reason)
-    ),
-    limit: 50,
+  return withTransaction(async (tx) => {
+    // Find players with active sanctions from jury verdicts
+    const sanctions = await tx.query.playerSanctions.findMany({
+      where: and(
+        eq(playerSanctions.sanctionType, 'temp_ban'),
+        // Only use sanctions from jury verdicts (contain "Case:" in reason)
+      ),
+      limit: 50,
+    });
+
+    // Filter to sanctions that mention jury cases
+    const jurySanctions = sanctions.filter(s =>
+      s.reason.includes('Case:') || s.reason.includes('jury')
+    );
+
+    if (jurySanctions.length === 0) {
+      // No confirmed cheaters, try using high-suspicion flags
+      // Note: getHighSuspicionCase() runs outside this transaction, which is fine
+      // because it's a separate, independent lookup
+      return await getHighSuspicionCase();
+    }
+
+    // Pick a random sanctioned player
+    const randomSanction = jurySanctions[Math.floor(Math.random() * jurySanctions.length)];
+
+    // Find one of their games that hasn't been used as a test case recently
+    // Use tx for consistency - ensures games match the sanction we just found
+    const playerGames = await tx.query.games.findMany({
+      where: eq(games.whitePlayerId, randomSanction.playerId),
+      orderBy: [desc(games.createdAt)],
+      limit: 20,
+    });
+
+    // Also check games where they were black
+    const blackGames = await tx.query.games.findMany({
+      where: eq(games.blackPlayerId, randomSanction.playerId),
+      orderBy: [desc(games.createdAt)],
+      limit: 20,
+    });
+
+    const allGames = [...playerGames, ...blackGames];
+
+    if (allGames.length === 0) {
+      return null;
+    }
+
+    // Pick a random game
+    const randomGame = allGames[Math.floor(Math.random() * allGames.length)];
+
+    return {
+      gameId: randomGame.id,
+      playerId: randomSanction.playerId,
+      outcome: 'guilty',
+      reason: 'Confirmed cheater (previously sanctioned)',
+      suspicionScore: 0.99,
+    };
   });
-
-  // Filter to sanctions that mention jury cases
-  const jurySanctions = sanctions.filter(s =>
-    s.reason.includes('Case:') || s.reason.includes('jury')
-  );
-
-  if (jurySanctions.length === 0) {
-    // No confirmed cheaters, try using high-suspicion flags
-    return await getHighSuspicionCase();
-  }
-
-  // Pick a random sanctioned player
-  const randomSanction = jurySanctions[Math.floor(Math.random() * jurySanctions.length)];
-
-  // Find one of their games that hasn't been used as a test case recently
-  const playerGames = await db.query.games.findMany({
-    where: eq(games.whitePlayerId, randomSanction.playerId),
-    orderBy: [desc(games.createdAt)],
-    limit: 20,
-  });
-
-  // Also check games where they were black
-  const blackGames = await db.query.games.findMany({
-    where: eq(games.blackPlayerId, randomSanction.playerId),
-    orderBy: [desc(games.createdAt)],
-    limit: 20,
-  });
-
-  const allGames = [...playerGames, ...blackGames];
-
-  if (allGames.length === 0) {
-    return null;
-  }
-
-  // Pick a random game
-  const randomGame = allGames[Math.floor(Math.random() * allGames.length)];
-
-  return {
-    gameId: randomGame.id,
-    playerId: randomSanction.playerId,
-    outcome: 'guilty',
-    reason: 'Confirmed cheater (previously sanctioned)',
-    suspicionScore: 0.99,
-  };
 }
 
 /**

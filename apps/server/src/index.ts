@@ -86,6 +86,14 @@ import {
   handleUpdateFlag,
 } from './routes/flags';
 import {
+  handleGetEligibility,
+  handleEnroll,
+  handleGetCases,
+  handleGetCase,
+  handleSubmitVerdict,
+  handleGetStats,
+} from './routes/jury';
+import {
   handleWebSocketUpgrade,
   handleWebSocketOpen,
   handleWebSocketClose,
@@ -135,6 +143,29 @@ function jsonResponse(response: Response): Response {
     statusText: response.statusText,
     headers,
   });
+}
+
+// =============================================================================
+// Startup Validation
+// =============================================================================
+// Verify required secrets exist before starting the server.
+// This prevents runtime crashes in critical paths (e.g., jury anonymization).
+
+const REQUIRED_PRODUCTION_SECRETS = [
+  'ANONYMIZATION_SECRET', // Required for jury player anonymization (HMAC-based)
+] as const;
+
+if (process.env.NODE_ENV === 'production') {
+  const missing = REQUIRED_PRODUCTION_SECRETS.filter(key => !process.env[key]);
+  if (missing.length > 0) {
+    console.error('═══════════════════════════════════════════════════════════════');
+    console.error('FATAL: Missing required environment variables for production:');
+    missing.forEach(key => console.error(`  ✗ ${key}`));
+    console.error('═══════════════════════════════════════════════════════════════');
+    console.error('Server cannot start without these secrets. Exiting...');
+    process.exit(1);
+  }
+  console.log('[Startup] All required secrets validated ✓');
 }
 
 Bun.serve<WebSocketData>({
@@ -370,6 +401,30 @@ Bun.serve<WebSocketData>({
         const body = await req.json().catch(() => null);
         response = await handleUpdateFlag(flagId, body);
       }
+      // Jury routes
+      else if (path === '/api/jury/eligibility' && method === 'GET') {
+        response = await handleGetEligibility(req);
+      } else if (path === '/api/jury/enroll' && method === 'POST') {
+        response = await handleEnroll(req);
+      } else if (path === '/api/jury/cases' && method === 'GET') {
+        response = await handleGetCases(req);
+      } else if (path === '/api/jury/stats' && method === 'GET') {
+        response = await handleGetStats(req);
+      } else if (path.match(/^\/api\/jury\/cases\/[^/]+\/verdict$/) && method === 'POST') {
+        const caseId = path.split('/')[4];
+        if (!isValidId(caseId)) {
+          response = invalidIdResponse();
+        } else {
+          response = await handleSubmitVerdict(req, caseId);
+        }
+      } else if (path.match(/^\/api\/jury\/cases\/[^/]+$/) && method === 'GET') {
+        const caseId = path.split('/')[4];
+        if (!isValidId(caseId)) {
+          response = invalidIdResponse();
+        } else {
+          response = await handleGetCase(req, caseId);
+        }
+      }
       // Health check
       else if (path === '/health' && method === 'GET') {
         response = Response.json({
@@ -465,6 +520,10 @@ setInterval(async () => {
     console.error('[TOTP Cleanup] Error:', error);
   }
 }, 5 * 60 * 1000);
+
+// Start jury system periodic tasks (case resolution, assignment expiration)
+import { startJuryPeriodicTasks } from './events/handlers/jury';
+startJuryPeriodicTasks();
 
 console.log(`🚀 Chess Game Server running on http://localhost:${PORT}`);
 console.log(`📡 WebSocket available at ws://localhost:${PORT}/ws`);

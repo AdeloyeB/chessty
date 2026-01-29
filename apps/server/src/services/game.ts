@@ -2,7 +2,6 @@ import { eq, or, and, desc, gte, lte, count } from 'drizzle-orm';
 import { db, games, users, transactions } from '../drizzle';
 import type { Move, GameResult, HistoryFilters, HistoryStats, DateRange } from '@chess-game/shared';
 import * as eloService from './elo';
-import * as walletService from './wallet';
 import * as bettingService from './betting';
 import * as authService from './auth';
 
@@ -146,18 +145,24 @@ export async function endGame(
     .set({ eloChange: Math.abs(eloChanges.whiteChange) })
     .where(eq(games.id, gameId));
 
-  // Distribute winnings
+  // Create settlement record - settlement service handles all fund distribution
+  // This enables anti-cheat evaluation before paying out
+  // The settlement service will:
+  // - Auto-settle clean games immediately (suspicion < 95%)
+  // - Hold suspicious games for jury review (suspicion >= 95%)
+  // - Handle draws by refunding both players
   const totalPot = parseFloat(game.totalPot);
-  if (winnerId) {
-    await walletService.awardWinnings(winnerId, totalPot, gameId);
-  } else {
-    // Draw - return wagers
-    const wagerAmount = parseFloat(game.wagerAmount);
-    await Promise.all([
-      walletService.awardWinnings(game.whitePlayerId, wagerAmount, gameId),
-      walletService.awardWinnings(game.blackPlayerId, wagerAmount, gameId),
-    ]);
-  }
+  const loserId = winnerId
+    ? (winnerId === game.whitePlayerId ? game.blackPlayerId : game.whitePlayerId)
+    : null;
+
+  // Import dynamically to avoid circular dependency
+  const { processSettlement } = await import('./settlement');
+
+  // Trigger async settlement processing - this will evaluate and settle/hold based on suspicion score
+  processSettlement(gameId, winnerId, loserId, totalPot).catch(err =>
+    console.error(`[Settlement] Processing failed for game ${gameId}:`, err)
+  );
 
   // Settle spectator bets
   await bettingService.settleBetsForGame(gameId, winnerId);

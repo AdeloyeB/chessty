@@ -35,6 +35,26 @@ import {
 } from '../services/jury';
 import type { VerdictOption } from '../drizzle/jury-schema';
 import { JURY_RATE_LIMITERS, rateLimitResponse } from '../middleware/rate-limiter';
+import { sanitizeText } from '../utils/sanitize';
+
+// ---------------------------------------------------------------------------
+// Security Helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Randomize a timestamp to prevent test case detection via timing analysis.
+ * Returns a random timestamp within the last N days.
+ *
+ * WHY: Test cases are injected into the jury system to calibrate juror accuracy.
+ * If jurors could identify test cases by their timestamps (e.g., "this game was
+ * created exactly when I enrolled"), they could game the system. This function
+ * makes all timestamps look like random recent games.
+ */
+function randomizeTimestamp(maxDaysAgo: number = 30): Date {
+  const now = Date.now();
+  const randomOffset = Math.random() * maxDaysAgo * 24 * 60 * 60 * 1000;
+  return new Date(now - randomOffset);
+}
 
 // ---------------------------------------------------------------------------
 // Validation Schemas
@@ -44,7 +64,10 @@ const VerdictSchema = z.object({
   engineAssistance: z.enum(['insufficient', 'guilty']),
   inputAutomation: z.enum(['insufficient', 'guilty']),
   externalAssistance: z.enum(['insufficient', 'guilty']),
-  notes: z.string().max(2000).optional(),
+  // Sanitize at entry point for defense-in-depth
+  // This removes XSS vectors, script tags, and dangerous patterns before they enter the system
+  notes: z.string().max(2000).optional()
+    .transform(val => val ? sanitizeText(val, 2000) : undefined),
   confidence: z.number().min(1).max(5).optional(),
 });
 
@@ -97,6 +120,20 @@ export async function handleGetEligibility(req: Request): Promise<Response> {
  */
 export async function handleEnroll(req: Request): Promise<Response> {
   try {
+    // Rate limit by IP FIRST (before auth) to prevent exhaustion attacks
+    // WHY: If we rate-limit after auth, an attacker can make many requests with
+    // invalid tokens to exhaust the rate limit bucket for a legitimate user's IP.
+    // By rate-limiting the IP first, we block abuse before any expensive auth work.
+    const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0].trim()
+      || req.headers.get('x-real-ip')
+      || 'unknown';
+
+    const ipRateResult = JURY_RATE_LIMITERS.enroll.check(`ip:${clientIp}`);
+    if (!ipRateResult.allowed) {
+      return rateLimitResponse(ipRateResult);
+    }
+
+    // Now authenticate
     const auth = await authenticateRequest(req);
     if (!auth) {
       return Response.json(
@@ -108,7 +145,7 @@ export async function handleEnroll(req: Request): Promise<Response> {
       );
     }
 
-    // Rate limit check
+    // Also rate limit by user ID (defense in depth)
     const rateResult = JURY_RATE_LIMITERS.enroll.check(auth.userId);
     if (!rateResult.allowed) {
       return rateLimitResponse(rateResult);
@@ -281,6 +318,36 @@ export async function handleGetCase(req: Request, caseId: string): Promise<Respo
       source: undefined,
     } : undefined;
 
+    // Normalize timestamps to prevent test case detection via timing analysis
+    // WHY: Test cases might have timestamps that correlate with juror enrollment,
+    // or be from the future, or have other timing patterns that reveal them.
+    // By randomizing all timestamps to look like recent games, we make test cases
+    // indistinguishable from real cases.
+    const normalizedGame = {
+      id: game.id,
+      pgn: game.pgn,
+      moves: game.moves,
+      result: game.result,
+      timeControlInitial: game.timeControlInitial,
+      timeControlIncrement: game.timeControlIncrement,
+
+      // Randomized timestamps - all games appear to be from the last 30 days
+      createdAt: randomizeTimestamp(30),
+      updatedAt: randomizeTimestamp(30),
+
+      // Anonymized player references
+      suspectColor: suspectIsWhite ? 'white' : 'black',
+      suspectPlayerId: anonymizedPlayerId, // Anonymous ID like "Player_ABC123"
+
+      // Accuracy data (if available)
+      whiteAccuracy: game.whiteAccuracy,
+      blackAccuracy: game.blackAccuracy,
+      whiteBlunders: game.whiteBlunders,
+      blackBlunders: game.blackBlunders,
+      whiteMistakes: game.whiteMistakes,
+      blackMistakes: game.blackMistakes,
+    };
+
     return Response.json({
       success: true,
       data: {
@@ -289,27 +356,8 @@ export async function handleGetCase(req: Request, caseId: string): Promise<Respo
         deadline: juryCase.deadline,
         status: juryCase.status,
 
-        // Anonymized game data
-        game: {
-          id: game.id,
-          pgn: game.pgn,
-          moves: game.moves,
-          result: game.result,
-          timeControlInitial: game.timeControlInitial,
-          timeControlIncrement: game.timeControlIncrement,
-
-          // Anonymized player references
-          suspectColor: suspectIsWhite ? 'white' : 'black',
-          suspectPlayerId: anonymizedPlayerId, // Anonymous ID like "Player_ABC123"
-
-          // Accuracy data (if available)
-          whiteAccuracy: game.whiteAccuracy,
-          blackAccuracy: game.blackAccuracy,
-          whiteBlunders: game.whiteBlunders,
-          blackBlunders: game.blackBlunders,
-          whiteMistakes: game.whiteMistakes,
-          blackMistakes: game.blackMistakes,
-        },
+        // Anonymized game data with normalized timestamps
+        game: normalizedGame,
 
         // Anti-cheat metadata (what flagged this game) - sanitized
         anticheatMetadata: sanitizedMetadata,
