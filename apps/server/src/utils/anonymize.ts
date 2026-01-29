@@ -4,7 +4,7 @@
  * Generates irreversible but deterministic anonymous player IDs.
  *
  * WHY THIS EXISTS:
- * Jurors reviewing cases should not be able to identify players.
+ * Arbiters reviewing Overwatch cases should not be able to identify players.
  * The anonymized ID must be:
  * 1. Deterministic - same input always produces same output
  * 2. Irreversible - cannot derive original player ID from anonymous ID
@@ -43,7 +43,7 @@ function getAnonymizationSecret(): string {
  * allowing consistent references within a case review, but cannot
  * be reversed to obtain the original player ID.
  *
- * @param caseId - The jury case ID
+ * @param caseId - The overwatch case ID
  * @param playerId - The real player ID to anonymize
  * @returns Anonymous ID like "Player_a3f8c2d1"
  *
@@ -68,7 +68,7 @@ export function anonymizePlayerId(caseId: string, playerId: string): string {
  * Generate anonymous IDs for multiple players in a case.
  * Useful when anonymizing both players in a game.
  *
- * @param caseId - The jury case ID
+ * @param caseId - The overwatch case ID
  * @param playerIds - Array of player IDs to anonymize
  * @returns Map of original ID to anonymous ID
  */

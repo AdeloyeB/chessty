@@ -14,9 +14,9 @@
  * 2. evaluateGame() calls anti-cheat system to get suspicion score
  * 3. decideSettlement() determines action based on score:
  *    - Low (<95): Auto-settle -> winner gets paid immediately
- *    - Medium (95-98): Hold for review -> jury case created
+ *    - Medium (95-98): Hold for review -> overwatch case created
  *    - High (>98): Urgent hold -> immediate player restrictions
- * 4. If held: Jury reviews, then resolveDispute() processes verdict
+ * 4. If held: Overwatch reviews, then resolveDispute() processes verdict
  * 5. Safety valve: handleTimeout() releases funds after 48 hours
  *
  * SECURITY NOTES:
@@ -31,7 +31,7 @@ import {
   games,
   settlements,
   settlementHistory,
-  juryCases,
+  overwatchCases,
 } from '../../drizzle';
 import type { SettlementRecord, CheatFlag } from '../../drizzle';
 import type {
@@ -357,7 +357,7 @@ export async function settleGame(
 /**
  * Hold funds for review when suspicion is detected.
  *
- * This marks the settlement as disputed and creates a jury case
+ * This marks the settlement as disputed and creates a overwatch case
  * for community review.
  *
  * @param settlementId - The settlement to hold
@@ -380,12 +380,12 @@ export async function holdForReview(
     throw new Error(`Settlement ${settlementId} is not pending`);
   }
 
-  // Create a jury case for review
+  // Create an overwatch case for review
   const deadline = new Date();
   deadline.setHours(deadline.getHours() + TIMEOUT_HOURS);
 
-  const [juryCase] = await db
-    .insert(juryCases)
+  const [overwatchCase] = await db
+    .insert(overwatchCases)
     .values({
       gameId: settlement.gameId,
       suspectPlayerId: flaggedPlayerId,
@@ -404,7 +404,7 @@ export async function holdForReview(
       status: 'disputed',
       suspicionScore: suspicionScore.toString(),
       flaggedPlayerId,
-      juryCaseId: juryCase.id,
+      overwatchCaseId: overwatchCase.id,
       updatedAt: new Date(),
     })
     .where(eq(settlements.id, settlementId));
@@ -419,7 +419,7 @@ export async function holdForReview(
       flaggedPlayerId,
       suspicionScore,
       priority,
-      juryCaseId: juryCase.id,
+      overwatchCaseId: overwatchCase.id,
     },
   });
 
@@ -429,13 +429,13 @@ export async function holdForReview(
   );
 
   // TODO: Send notification to flagged player about review
-  // TODO: Trigger juror assignment process
+  // TODO: Trigger arbiter assignment process
 
-  return juryCase.id;
+  return overwatchCase.id;
 }
 
 /**
- * Resolve a dispute after jury verdict.
+ * Resolve a dispute after overwatch verdict.
  *
  * Based on the verdict:
  * - 'not_guilty': Pay the original winner
@@ -447,7 +447,7 @@ export async function holdForReview(
  * - Concurrent resolution attempts
  *
  * @param settlementId - The disputed settlement
- * @param verdict - The jury's decision
+ * @param verdict - The overwatch's decision
  * @param victimId - If guilty, who should receive compensation
  */
 export async function resolveDispute(
@@ -524,7 +524,7 @@ export async function resolveDispute(
       .set({
         status: 'resolved',
         settledAt: new Date(),
-        settledBy: 'jury',
+        settledBy: 'overwatch',
         // Update winner if verdict changed the outcome
         winnerId: verdict === 'guilty' && victimId ? victimId : settlement.winnerId,
         winnerPayout: payout.toString(),
@@ -582,7 +582,7 @@ export async function handleTimeout(settlementId: string): Promise<void> {
     const settlement = mapSettlementRecord(lockedSettlement);
 
     if (settlement.status !== 'disputed') {
-      // Already resolved by jury verdict - skip silently
+      // Already resolved by overwatch verdict - skip silently
       // This is not an error; it's expected in race conditions
       console.log(
         `[Settlement] Timeout skipped for ${settlementId} - already ${settlement.status}`
@@ -881,7 +881,7 @@ function mapSettlementRecord(record: SettlementRecord): Settlement {
     status: record.status as SettlementStatus,
     suspicionScore: record.suspicionScore ? parseFloat(record.suspicionScore) : null,
     flaggedPlayerId: record.flaggedPlayerId,
-    juryCaseId: record.juryCaseId,
+    overwatchCaseId: record.overwatchCaseId,
     settledAt: record.settledAt,
     settledBy: record.settledBy as Settlement['settledBy'],
     escrowTxHash: record.escrowTxHash,

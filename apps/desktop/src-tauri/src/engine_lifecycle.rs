@@ -507,37 +507,458 @@ impl Drop for LazyEngine {
 mod tests {
     use super::*;
 
+    // =========================================================================
+    // LazyEngine Construction Tests
+    // =========================================================================
+
     #[test]
     fn test_lazy_engine_new() {
-        // Can't test async functions easily without tokio runtime,
-        // but we can at least verify construction works.
+        // LazyEngine should construct without errors.
+        // This verifies all internal fields initialize correctly.
         let _engine = LazyEngine::new();
     }
 
     #[test]
+    fn test_lazy_engine_default() {
+        // Default trait should work identically to new().
+        let _engine = LazyEngine::default();
+    }
+
+    // =========================================================================
+    // LazyEngineState Construction Tests
+    // =========================================================================
+
+    #[test]
     fn test_lazy_engine_state_new() {
+        // LazyEngineState wraps LazyEngine for Tauri state management.
         let _state = LazyEngineState::new();
     }
 
+    #[test]
+    fn test_lazy_engine_state_default() {
+        // Default trait should work.
+        let _state = LazyEngineState::default();
+    }
+
+    #[test]
+    fn test_lazy_engine_state_clone() {
+        // LazyEngineState should be Clone (required for some Tauri patterns).
+        let state1 = LazyEngineState::new();
+        let _state2 = state1.clone();
+    }
+
+    // =========================================================================
+    // is_spawned() Tests
+    // =========================================================================
+
     #[tokio::test]
     async fn test_is_spawned_initially_false() {
+        // A new LazyEngine has no engine spawned.
         let engine = LazyEngine::new();
+        assert!(
+            !engine.is_spawned().await,
+            "Engine should not be spawned initially"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_is_spawned_state_initially_false() {
+        // LazyEngineState delegates to LazyEngine.
+        let state = LazyEngineState::new();
+        assert!(
+            !state.is_spawned().await,
+            "State should report engine not spawned initially"
+        );
+    }
+
+    // =========================================================================
+    // idle_duration() Tests
+    // =========================================================================
+
+    #[tokio::test]
+    async fn test_idle_duration_starts_at_zero() {
+        // Immediately after creation, idle duration should be near zero.
+        let engine = LazyEngine::new();
+        let idle = engine.idle_duration().await;
+
+        // Allow small tolerance for test execution time
+        assert!(
+            idle < Duration::from_millis(100),
+            "Idle duration should start near zero, got {:?}",
+            idle
+        );
+    }
+
+    #[tokio::test]
+    async fn test_idle_duration_increases_over_time() {
+        // Idle duration should increase as time passes.
+        let engine = LazyEngine::new();
+
+        // Wait a bit
+        tokio::time::sleep(Duration::from_millis(50)).await;
+
+        let idle = engine.idle_duration().await;
+
+        // Should have increased by at least 40ms (allowing for timing variance)
+        assert!(
+            idle >= Duration::from_millis(40),
+            "Idle duration should increase over time, got {:?}",
+            idle
+        );
+    }
+
+    #[tokio::test]
+    async fn test_idle_duration_resets_on_last_use_update() {
+        // Manually updating last_use should reset idle duration.
+        // This simulates what get_or_spawn() does internally.
+        let engine = LazyEngine::new();
+
+        // Wait to accumulate some idle time
+        tokio::time::sleep(Duration::from_millis(50)).await;
+
+        // Verify idle time accumulated
+        let idle_before = engine.idle_duration().await;
+        assert!(idle_before >= Duration::from_millis(40));
+
+        // Simulate what get_or_spawn does: update last_use
+        *engine.last_use.lock().await = Instant::now();
+
+        // Idle duration should reset to near zero
+        let idle_after = engine.idle_duration().await;
+        assert!(
+            idle_after < Duration::from_millis(20),
+            "Idle duration should reset after last_use update, got {:?}",
+            idle_after
+        );
+    }
+
+    // =========================================================================
+    // shutdown_signal Tests
+    // =========================================================================
+
+    #[tokio::test]
+    async fn test_shutdown_signal_initially_false() {
+        // Shutdown signal should start as false.
+        let engine = LazyEngine::new();
+        assert!(
+            !engine.is_shutdown_signaled().await,
+            "Shutdown should not be signaled initially"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_signal_shutdown_sets_flag() {
+        // Calling signal_shutdown() should set the flag to true.
+        let engine = LazyEngine::new();
+
+        engine.signal_shutdown().await;
+
+        assert!(
+            engine.is_shutdown_signaled().await,
+            "Shutdown should be signaled after signal_shutdown()"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_signal_shutdown_idempotent() {
+        // Multiple calls to signal_shutdown() should be safe.
+        let engine = LazyEngine::new();
+
+        engine.signal_shutdown().await;
+        engine.signal_shutdown().await;
+        engine.signal_shutdown().await;
+
+        assert!(
+            engine.is_shutdown_signaled().await,
+            "Shutdown should remain signaled"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_signal_shutdown_via_state() {
+        // LazyEngineState should delegate signal_shutdown.
+        let state = LazyEngineState::new();
+
+        assert!(!state.inner.is_shutdown_signaled().await);
+
+        state.signal_shutdown().await;
+
+        assert!(state.inner.is_shutdown_signaled().await);
+    }
+
+    // =========================================================================
+    // shutdown() Tests (without actual engine)
+    // =========================================================================
+
+    #[tokio::test]
+    async fn test_shutdown_when_not_spawned() {
+        // Shutdown should be safe to call even if engine was never spawned.
+        let engine = LazyEngine::new();
+
+        // Should not panic
+        engine.shutdown().await;
+
+        // Still not spawned
         assert!(!engine.is_spawned().await);
     }
 
     #[tokio::test]
-    async fn test_idle_duration_starts_at_zero() {
-        let engine = LazyEngine::new();
-        let idle = engine.idle_duration().await;
-        // Should be very small (just created)
-        assert!(idle < Duration::from_secs(1));
+    async fn test_shutdown_via_state_when_not_spawned() {
+        // LazyEngineState.shutdown() should be safe when not spawned.
+        let state = LazyEngineState::new();
+
+        // Should not panic
+        state.shutdown().await;
+    }
+
+    // =========================================================================
+    // AnalysisTracker via LazyEngineState Tests
+    // =========================================================================
+
+    #[tokio::test]
+    async fn test_with_tracker_register() {
+        // Test registering analysis through the state's tracker interface.
+        let state = LazyEngineState::new();
+
+        let (id, token) = state.with_tracker(|tracker| tracker.register()).await;
+
+        assert!(!id.is_empty(), "Should return a non-empty ID");
+        assert!(!token.is_cancelled(), "Token should not be cancelled");
     }
 
     #[tokio::test]
-    async fn test_shutdown_signal() {
-        let engine = LazyEngine::new();
-        assert!(!engine.is_shutdown_signaled().await);
+    async fn test_with_tracker_cancel() {
+        // Test cancelling analysis through the state's tracker interface.
+        let state = LazyEngineState::new();
+
+        let (id, token) = state.with_tracker(|tracker| tracker.register()).await;
+
+        let cancelled = state.with_tracker(|tracker| tracker.cancel(&id)).await;
+
+        assert!(cancelled, "Should successfully cancel");
+        assert!(token.is_cancelled(), "Token should be cancelled");
+    }
+
+    #[tokio::test]
+    async fn test_tracker_arc_clone() {
+        // tracker_arc() should return a cloneable Arc for use in spawned tasks.
+        let state = LazyEngineState::new();
+
+        let tracker = state.tracker_arc();
+        let _tracker_clone = Arc::clone(&tracker);
+
+        // Both should work
+        {
+            let mut guard = tracker.lock().await;
+            let (_id, _token) = guard.register();
+        }
+    }
+
+    #[tokio::test]
+    async fn test_tracker_arc_shared_state() {
+        // Changes through one Arc should be visible through another.
+        let state = LazyEngineState::new();
+
+        let tracker1 = state.tracker_arc();
+        let tracker2 = state.tracker_arc();
+
+        // Register through tracker1
+        let id = {
+            let mut guard = tracker1.lock().await;
+            let (id, _token) = guard.register();
+            id
+        };
+
+        // Cancel through tracker2
+        let cancelled = {
+            let mut guard = tracker2.lock().await;
+            guard.cancel(&id)
+        };
+
+        assert!(cancelled, "Should see registration from other Arc clone");
+    }
+
+    // =========================================================================
+    // Constant Verification Tests
+    // =========================================================================
+
+    #[test]
+    fn test_idle_timeout_is_60_seconds() {
+        // Document and verify the idle timeout constant.
+        assert_eq!(
+            IDLE_TIMEOUT_SECS, 60,
+            "Idle timeout should be 60 seconds as documented"
+        );
+    }
+
+    #[test]
+    fn test_check_interval_is_10_seconds() {
+        // Document and verify the check interval constant.
+        assert_eq!(
+            IDLE_CHECK_INTERVAL_SECS, 10,
+            "Check interval should be 10 seconds"
+        );
+    }
+
+    // =========================================================================
+    // Idle Monitor Tests
+    // =========================================================================
+
+    #[tokio::test]
+    async fn test_idle_monitor_respects_shutdown_signal() {
+        // The idle monitor should stop when shutdown is signaled.
+        let engine = Arc::new(LazyEngine::new());
+        let engine_clone = Arc::clone(&engine);
+
+        // Start the monitor
+        start_idle_monitor(engine_clone);
+
+        // Signal shutdown immediately
         engine.signal_shutdown().await;
-        assert!(engine.is_shutdown_signaled().await);
+
+        // Give the monitor time to see the signal and stop
+        // (It checks every IDLE_CHECK_INTERVAL_SECS, but we can't wait that long in tests)
+        // This test verifies the setup doesn't panic, actual timing test would need longer.
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+
+    // =========================================================================
+    // Drop Implementation Tests
+    // =========================================================================
+
+    #[test]
+    fn test_drop_lazy_engine_safe_when_not_spawned() {
+        // Drop should be safe even if engine was never spawned.
+        {
+            let _engine = LazyEngine::new();
+            // engine is dropped here
+        }
+        // Should not panic
+    }
+
+    #[test]
+    fn test_drop_sets_shutdown_signal() {
+        // Drop should set shutdown signal to stop idle monitor.
+        // We can't easily test this since we can't access fields after drop,
+        // but we can verify drop doesn't panic.
+        let engine = LazyEngine::new();
+        drop(engine);
+    }
+
+    // =========================================================================
+    // get_or_spawn() Tests (without actual spawning)
+    // =========================================================================
+    //
+    // We can't test actual spawning without a Tauri AppHandle, but we can
+    // test some behaviors around the double-check pattern.
+    // =========================================================================
+
+    #[tokio::test]
+    #[ignore = "Requires Tauri AppHandle and Stockfish sidecar"]
+    async fn test_get_or_spawn_creates_engine() {
+        // This would test that get_or_spawn actually spawns an engine.
+        // Requires: tauri::test::mock_app() or similar setup.
+        todo!("Integration test: get_or_spawn creates engine on first call");
+    }
+
+    #[tokio::test]
+    #[ignore = "Requires Tauri AppHandle and Stockfish sidecar"]
+    async fn test_get_or_spawn_reuses_existing() {
+        // This would test that subsequent calls reuse the existing handle.
+        todo!("Integration test: get_or_spawn reuses existing engine");
+    }
+
+    #[tokio::test]
+    #[ignore = "Requires Tauri AppHandle and Stockfish sidecar"]
+    async fn test_get_or_spawn_updates_last_use() {
+        // This would verify that get_or_spawn updates the last_use timestamp.
+        todo!("Integration test: get_or_spawn updates last_use timestamp");
+    }
+
+    #[tokio::test]
+    #[ignore = "Requires Tauri AppHandle and Stockfish sidecar"]
+    async fn test_idle_monitor_shuts_down_after_timeout() {
+        // This would test the full idle monitor flow.
+        todo!("Integration test: monitor shuts down engine after 60s idle");
+    }
+
+    // =========================================================================
+    // Thread Safety Tests
+    // =========================================================================
+
+    #[tokio::test]
+    async fn test_concurrent_is_spawned_calls() {
+        // Multiple concurrent calls to is_spawned should be safe.
+        let engine = Arc::new(LazyEngine::new());
+
+        let handles: Vec<_> = (0..10)
+            .map(|_| {
+                let engine_clone = Arc::clone(&engine);
+                tokio::spawn(async move { engine_clone.is_spawned().await })
+            })
+            .collect();
+
+        // All should complete without deadlock
+        for handle in handles {
+            let result = handle.await.expect("Task should complete");
+            assert!(!result, "All should report not spawned");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_concurrent_idle_duration_calls() {
+        // Multiple concurrent calls to idle_duration should be safe.
+        let engine = Arc::new(LazyEngine::new());
+
+        let handles: Vec<_> = (0..10)
+            .map(|_| {
+                let engine_clone = Arc::clone(&engine);
+                tokio::spawn(async move { engine_clone.idle_duration().await })
+            })
+            .collect();
+
+        // All should complete without deadlock
+        for handle in handles {
+            let _duration = handle.await.expect("Task should complete");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_concurrent_tracker_operations() {
+        // Multiple tasks accessing tracker concurrently should be safe.
+        let state = Arc::new(LazyEngineState::new());
+
+        // Spawn multiple tasks that register and cancel
+        let handles: Vec<_> = (0..5)
+            .map(|_| {
+                let state_clone = Arc::clone(&state);
+                tokio::spawn(async move {
+                    let tracker = state_clone.tracker_arc();
+
+                    // Register
+                    let (id, token) = {
+                        let mut guard = tracker.lock().await;
+                        guard.register()
+                    };
+
+                    // Small delay
+                    tokio::time::sleep(Duration::from_millis(5)).await;
+
+                    // Cancel
+                    {
+                        let mut guard = tracker.lock().await;
+                        guard.cancel(&id);
+                    }
+
+                    token.is_cancelled()
+                })
+            })
+            .collect();
+
+        // All should complete and tokens should be cancelled
+        for handle in handles {
+            let was_cancelled = handle.await.expect("Task should complete");
+            assert!(was_cancelled, "Token should be cancelled");
+        }
     }
 }

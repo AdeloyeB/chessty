@@ -92,7 +92,7 @@ import {
   handleGetCase,
   handleSubmitVerdict,
   handleGetStats,
-} from './routes/jury';
+} from './routes/overwatch';
 import {
   handleWebSocketUpgrade,
   handleWebSocketOpen,
@@ -149,10 +149,10 @@ function jsonResponse(response: Response): Response {
 // Startup Validation
 // =============================================================================
 // Verify required secrets exist before starting the server.
-// This prevents runtime crashes in critical paths (e.g., jury anonymization).
+// This prevents runtime crashes in critical paths (e.g., Arbiter Overwatch anonymization).
 
 const REQUIRED_PRODUCTION_SECRETS = [
-  'ANONYMIZATION_SECRET', // Required for jury player anonymization (HMAC-based)
+  'ANONYMIZATION_SECRET', // Required for Arbiter Overwatch player anonymization (HMAC-based)
 ] as const;
 
 if (process.env.NODE_ENV === 'production') {
@@ -401,23 +401,23 @@ Bun.serve<WebSocketData>({
         const body = await req.json().catch(() => null);
         response = await handleUpdateFlag(flagId, body);
       }
-      // Jury routes
-      else if (path === '/api/jury/eligibility' && method === 'GET') {
+      // Arbiter Overwatch routes
+      else if (path === '/api/overwatch/eligibility' && method === 'GET') {
         response = await handleGetEligibility(req);
-      } else if (path === '/api/jury/enroll' && method === 'POST') {
+      } else if (path === '/api/overwatch/enroll' && method === 'POST') {
         response = await handleEnroll(req);
-      } else if (path === '/api/jury/cases' && method === 'GET') {
+      } else if (path === '/api/overwatch/cases' && method === 'GET') {
         response = await handleGetCases(req);
-      } else if (path === '/api/jury/stats' && method === 'GET') {
+      } else if (path === '/api/overwatch/stats' && method === 'GET') {
         response = await handleGetStats(req);
-      } else if (path.match(/^\/api\/jury\/cases\/[^/]+\/verdict$/) && method === 'POST') {
+      } else if (path.match(/^\/api\/overwatch\/cases\/[^/]+\/verdict$/) && method === 'POST') {
         const caseId = path.split('/')[4];
         if (!isValidId(caseId)) {
           response = invalidIdResponse();
         } else {
           response = await handleSubmitVerdict(req, caseId);
         }
-      } else if (path.match(/^\/api\/jury\/cases\/[^/]+$/) && method === 'GET') {
+      } else if (path.match(/^\/api\/overwatch\/cases\/[^/]+$/) && method === 'GET') {
         const caseId = path.split('/')[4];
         if (!isValidId(caseId)) {
           response = invalidIdResponse();
@@ -521,9 +521,9 @@ setInterval(async () => {
   }
 }, 5 * 60 * 1000);
 
-// Start jury system periodic tasks (case resolution, assignment expiration)
-import { startJuryPeriodicTasks } from './events/handlers/jury';
-startJuryPeriodicTasks();
+// Start Arbiter Overwatch periodic tasks (case resolution, assignment expiration)
+import { startOverwatchPeriodicTasks } from './events/handlers/overwatch';
+startOverwatchPeriodicTasks();
 
 console.log(`🚀 Chess Game Server running on http://localhost:${PORT}`);
 console.log(`📡 WebSocket available at ws://localhost:${PORT}/ws`);

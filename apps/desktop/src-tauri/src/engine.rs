@@ -1136,6 +1136,620 @@ impl Default for EngineState {
 }
 
 // =============================================================================
+// Unit Tests
+// =============================================================================
+//
+// These tests verify the UCI parsing logic and helper functions without needing
+// a running Stockfish process. Tests that would require actual Stockfish are
+// marked with #[ignore] and need integration test setup.
+// =============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // =========================================================================
+    // parse_info_line() Tests
+    // =========================================================================
+    //
+    // The info line parser extracts evaluation data from Stockfish's progress
+    // output. It needs to handle various formats robustly.
+    // =========================================================================
+
+    #[test]
+    fn test_parse_info_line_full_format() {
+        // Test parsing a complete info line with all fields.
+        // This is the typical format during analysis.
+        let line = "info depth 15 seldepth 22 score cp 32 nodes 450000 time 234 pv e2e4 e7e5 g1f3";
+        let eval = parse_info_line(line).expect("Should parse valid info line");
+
+        assert_eq!(eval.depth, 15, "Should extract depth correctly");
+        assert_eq!(eval.score_cp, 32, "Should extract centipawn score");
+        assert!(eval.score_mate.is_none(), "No mate score in this line");
+        assert_eq!(eval.nodes, 450000, "Should extract node count");
+        assert_eq!(eval.time_ms, 234, "Should extract time in ms");
+        assert_eq!(
+            eval.pv,
+            vec!["e2e4", "e7e5", "g1f3"],
+            "Should extract PV moves"
+        );
+    }
+
+    #[test]
+    fn test_parse_info_line_minimal_with_pv() {
+        // Minimal info line that should still parse (has depth and pv).
+        let line = "info depth 10 score cp 50 pv e2e4";
+        let eval = parse_info_line(line).expect("Should parse minimal info line");
+
+        assert_eq!(eval.depth, 10);
+        assert_eq!(eval.score_cp, 50);
+        assert_eq!(eval.pv, vec!["e2e4"]);
+        assert_eq!(eval.nodes, 0, "Missing nodes should default to 0");
+        assert_eq!(eval.time_ms, 0, "Missing time should default to 0");
+    }
+
+    #[test]
+    fn test_parse_info_line_mate_positive() {
+        // Mate in 3 moves for white (positive mate score).
+        // Stockfish uses "score mate N" where N > 0 means white wins.
+        let line = "info depth 20 score mate 3 pv e2e4 e7e5 d1h5";
+        let eval = parse_info_line(line).expect("Should parse mate line");
+
+        assert_eq!(eval.score_mate, Some(3), "Should extract mate in 3");
+        assert_eq!(
+            eval.score_cp, 30000,
+            "Positive mate should set large positive cp"
+        );
+    }
+
+    #[test]
+    fn test_parse_info_line_mate_negative() {
+        // Mate in 5 moves for black (negative mate score).
+        // N < 0 means black is winning (white gets mated).
+        let line = "info depth 25 score mate -5 pv d7d5 e2e4";
+        let eval = parse_info_line(line).expect("Should parse negative mate line");
+
+        assert_eq!(eval.score_mate, Some(-5), "Should extract mate in -5");
+        assert_eq!(
+            eval.score_cp, -30000,
+            "Negative mate should set large negative cp"
+        );
+    }
+
+    #[test]
+    fn test_parse_info_line_no_depth() {
+        // Lines without depth should return None (incomplete info).
+        let line = "info score cp 50 pv e2e4";
+        assert!(
+            parse_info_line(line).is_none(),
+            "Should return None for line without depth"
+        );
+    }
+
+    #[test]
+    fn test_parse_info_line_no_pv() {
+        // Lines without PV should return None (we need the move sequence).
+        let line = "info depth 10 score cp 50";
+        assert!(
+            parse_info_line(line).is_none(),
+            "Should return None for line without pv"
+        );
+    }
+
+    #[test]
+    fn test_parse_info_line_currmove() {
+        // "currmove" lines are progress updates without analysis, should be skipped.
+        let line = "info depth 0 currmove e2e4 currmovenumber 1";
+        assert!(
+            parse_info_line(line).is_none(),
+            "Should skip currmove lines (no pv)"
+        );
+    }
+
+    #[test]
+    fn test_parse_info_line_pv_stops_at_uci_keyword() {
+        // Robustness: PV parsing should stop if it hits another UCI keyword.
+        // This shouldn't happen normally but defends against malformed output.
+        let line = "info depth 10 score cp 50 pv e2e4 e7e5 score cp 60";
+        let eval = parse_info_line(line).expect("Should parse line with keyword after pv");
+
+        // Should stop collecting moves when hitting "score"
+        assert_eq!(
+            eval.pv,
+            vec!["e2e4", "e7e5"],
+            "PV should stop at UCI keyword"
+        );
+    }
+
+    #[test]
+    fn test_parse_info_line_pv_validates_move_format() {
+        // UCI moves are 4-5 alphanumeric characters (e2e4, e7e8q for promotion).
+        // Invalid formats should stop PV collection.
+        let line = "info depth 10 score cp 50 pv e2e4 invalid! g1f3";
+        let eval = parse_info_line(line).expect("Should parse line with invalid move in pv");
+
+        // Should stop at "invalid!" which doesn't match move format
+        assert_eq!(
+            eval.pv,
+            vec!["e2e4"],
+            "PV should stop at invalid move format"
+        );
+    }
+
+    #[test]
+    fn test_parse_info_line_promotion_moves() {
+        // Promotion moves are 5 characters: e7e8q (pawn e7 to e8, promote to queen).
+        let line = "info depth 10 score cp 900 pv e7e8q d8d1";
+        let eval = parse_info_line(line).expect("Should parse line with promotion");
+
+        assert_eq!(
+            eval.pv,
+            vec!["e7e8q", "d8d1"],
+            "Should accept 5-char promotion moves"
+        );
+    }
+
+    #[test]
+    fn test_parse_info_line_long_pv() {
+        // PV can be quite long in deep analysis.
+        let line = "info depth 30 score cp 15 pv e2e4 e7e5 g1f3 b8c6 f1b5 a7a6 b5a4 g8f6 e1g1 f8e7";
+        let eval = parse_info_line(line).expect("Should parse long PV");
+
+        assert_eq!(eval.pv.len(), 10, "Should extract all 10 moves in PV");
+        assert_eq!(eval.pv[0], "e2e4");
+        assert_eq!(eval.pv[9], "f8e7");
+    }
+
+    #[test]
+    fn test_parse_info_line_negative_score() {
+        // Negative centipawn scores (black is winning).
+        let line = "info depth 12 score cp -150 pv d7d5";
+        let eval = parse_info_line(line).expect("Should parse negative score");
+
+        assert_eq!(
+            eval.score_cp, -150,
+            "Should correctly parse negative centipawn score"
+        );
+    }
+
+    #[test]
+    fn test_parse_info_line_large_values() {
+        // Handles large node counts and time values.
+        let line = "info depth 25 score cp 100 nodes 1234567890 time 60000 pv e2e4";
+        let eval = parse_info_line(line).expect("Should parse large values");
+
+        assert_eq!(eval.nodes, 1234567890, "Should handle large node count");
+        assert_eq!(eval.time_ms, 60000, "Should handle large time (60 seconds)");
+    }
+
+    // =========================================================================
+    // parse_bestmove() Tests
+    // =========================================================================
+    //
+    // The bestmove parser extracts the final recommended move from Stockfish.
+    // =========================================================================
+
+    #[test]
+    fn test_parse_bestmove_with_ponder() {
+        // Standard format: "bestmove <move> ponder <move>"
+        // "ponder" is the expected reply — we only care about the best move.
+        let line = "bestmove e2e4 ponder e7e5";
+        let result = parse_bestmove(line);
+
+        assert_eq!(result, Some("e2e4".to_string()), "Should extract best move");
+    }
+
+    #[test]
+    fn test_parse_bestmove_without_ponder() {
+        // Sometimes Stockfish omits the ponder move.
+        let line = "bestmove g1f3";
+        let result = parse_bestmove(line);
+
+        assert_eq!(
+            result,
+            Some("g1f3".to_string()),
+            "Should extract move without ponder"
+        );
+    }
+
+    #[test]
+    fn test_parse_bestmove_promotion() {
+        // Promotion moves in bestmove.
+        let line = "bestmove a7a8q ponder b8c6";
+        let result = parse_bestmove(line);
+
+        assert_eq!(
+            result,
+            Some("a7a8q".to_string()),
+            "Should extract promotion move"
+        );
+    }
+
+    #[test]
+    fn test_parse_bestmove_none() {
+        // "(none)" is returned when there are no legal moves (checkmate/stalemate).
+        let line = "bestmove (none)";
+        let result = parse_bestmove(line);
+
+        assert!(result.is_none(), "Should return None for (none) best move");
+    }
+
+    #[test]
+    fn test_parse_bestmove_malformed() {
+        // Malformed lines should return None safely.
+        let line = "bestmove";
+        let result = parse_bestmove(line);
+
+        assert!(result.is_none(), "Should return None for malformed line");
+    }
+
+    #[test]
+    fn test_parse_bestmove_wrong_prefix() {
+        // Lines that don't start with "bestmove" should return None.
+        let line = "info depth 10 bestmove e2e4";
+        let result = parse_bestmove(line);
+
+        assert!(
+            result.is_none(),
+            "Should return None for non-bestmove line"
+        );
+    }
+
+    // =========================================================================
+    // EngineConfig::auto_detect() Tests
+    // =========================================================================
+    //
+    // Auto-detection should produce sane values within the documented ranges.
+    // We can't control the test machine's CPU count, so we verify constraints.
+    // =========================================================================
+
+    #[test]
+    fn test_engine_config_auto_detect_threads_range() {
+        // Threads should be between 2 and 4 (background-friendly cap).
+        let config = EngineConfig::auto_detect();
+
+        assert!(
+            config.threads >= 2,
+            "Threads should be at least 2 for parallel search, got {}",
+            config.threads
+        );
+        assert!(
+            config.threads <= 4,
+            "Threads should be capped at 4 for background use, got {}",
+            config.threads
+        );
+    }
+
+    #[test]
+    fn test_engine_config_auto_detect_hash_range() {
+        // Hash should be between 128 and 256 MB.
+        let config = EngineConfig::auto_detect();
+
+        assert!(
+            config.hash_mb >= 128,
+            "Hash should be at least 128 MB, got {}",
+            config.hash_mb
+        );
+        assert!(
+            config.hash_mb <= 256,
+            "Hash should be capped at 256 MB for background use, got {}",
+            config.hash_mb
+        );
+    }
+
+    #[test]
+    fn test_engine_config_hash_proportional_to_threads() {
+        // Hash is calculated as threads * 64, clamped to 128-256.
+        let config = EngineConfig::auto_detect();
+
+        // threads * 64 should equal hash_mb (before clamping)
+        // With 2-4 threads: 128-256 MB, which matches our clamp range.
+        let expected_unclamped = config.threads * 64;
+        let expected_clamped = expected_unclamped.clamp(128, 256);
+
+        assert_eq!(
+            config.hash_mb, expected_clamped,
+            "Hash should be threads * 64 (clamped)"
+        );
+    }
+
+    // =========================================================================
+    // AnalysisTracker Tests
+    // =========================================================================
+    //
+    // The tracker manages cancellation tokens for ongoing analyses.
+    // =========================================================================
+
+    #[test]
+    fn test_analysis_tracker_new() {
+        // Tracker starts empty.
+        let tracker = AnalysisTracker::new();
+        assert!(tracker.active.is_empty(), "New tracker should be empty");
+    }
+
+    #[test]
+    fn test_analysis_tracker_register_returns_unique_ids() {
+        // Each registration should return a unique ID.
+        let mut tracker = AnalysisTracker::new();
+
+        let (id1, _token1) = tracker.register();
+        let (id2, _token2) = tracker.register();
+        let (id3, _token3) = tracker.register();
+
+        assert_ne!(id1, id2, "IDs should be unique");
+        assert_ne!(id2, id3, "IDs should be unique");
+        assert_ne!(id1, id3, "IDs should be unique");
+    }
+
+    #[test]
+    fn test_analysis_tracker_register_adds_to_active() {
+        // Registration should add the ID to the active map.
+        let mut tracker = AnalysisTracker::new();
+
+        let (id, _token) = tracker.register();
+
+        assert!(
+            tracker.active.contains_key(&id),
+            "ID should be in active map"
+        );
+        assert_eq!(tracker.active.len(), 1, "Should have exactly one active");
+    }
+
+    #[test]
+    fn test_analysis_tracker_cancel_existing() {
+        // Cancelling an existing ID should return true and remove it.
+        let mut tracker = AnalysisTracker::new();
+
+        let (id, _token) = tracker.register();
+        let cancelled = tracker.cancel(&id);
+
+        assert!(cancelled, "Should return true for existing ID");
+        assert!(
+            !tracker.active.contains_key(&id),
+            "ID should be removed after cancel"
+        );
+    }
+
+    #[test]
+    fn test_analysis_tracker_cancel_nonexistent() {
+        // Cancelling a non-existent ID should return false.
+        let mut tracker = AnalysisTracker::new();
+
+        let cancelled = tracker.cancel("nonexistent-id");
+
+        assert!(
+            !cancelled,
+            "Should return false for non-existent ID"
+        );
+    }
+
+    #[test]
+    fn test_analysis_tracker_cancel_triggers_token() {
+        // When we cancel, the token should be marked as cancelled.
+        let mut tracker = AnalysisTracker::new();
+
+        let (id, token) = tracker.register();
+
+        // Before cancel
+        assert!(
+            !token.is_cancelled(),
+            "Token should not be cancelled before cancel()"
+        );
+
+        // Cancel it
+        tracker.cancel(&id);
+
+        // After cancel
+        assert!(
+            token.is_cancelled(),
+            "Token should be cancelled after cancel()"
+        );
+    }
+
+    #[test]
+    fn test_analysis_tracker_remove_cleans_up() {
+        // Remove should clean up without triggering cancellation.
+        let mut tracker = AnalysisTracker::new();
+
+        let (id, token) = tracker.register();
+        tracker.remove(&id);
+
+        assert!(
+            !tracker.active.contains_key(&id),
+            "ID should be removed"
+        );
+        // Note: remove() doesn't cancel the token (it's for normal completion)
+        // The token is dropped when remove() is called, but since we cloned it
+        // in register(), checking is_cancelled() here tests the clone.
+        // The token in the hashmap was dropped, but our clone is still valid.
+        assert!(
+            !token.is_cancelled(),
+            "Remove should not trigger cancellation"
+        );
+    }
+
+    #[test]
+    fn test_analysis_tracker_remove_nonexistent_safe() {
+        // Removing a non-existent ID should be safe (no-op).
+        let mut tracker = AnalysisTracker::new();
+
+        // Should not panic
+        tracker.remove("nonexistent-id");
+
+        assert!(tracker.active.is_empty(), "Tracker should still be empty");
+    }
+
+    #[test]
+    fn test_analysis_tracker_multiple_operations() {
+        // Test a sequence of register, cancel, remove operations.
+        let mut tracker = AnalysisTracker::new();
+
+        // Register 3 analyses
+        let (id1, token1) = tracker.register();
+        let (id2, token2) = tracker.register();
+        let (id3, _token3) = tracker.register();
+
+        assert_eq!(tracker.active.len(), 3);
+
+        // Cancel id1
+        assert!(tracker.cancel(&id1));
+        assert!(token1.is_cancelled());
+        assert_eq!(tracker.active.len(), 2);
+
+        // Remove id2 (normal completion)
+        tracker.remove(&id2);
+        assert!(!token2.is_cancelled());
+        assert_eq!(tracker.active.len(), 1);
+
+        // id3 should still be active
+        assert!(tracker.active.contains_key(&id3));
+    }
+
+    #[test]
+    fn test_analysis_tracker_default() {
+        // Default trait should create empty tracker.
+        let tracker = AnalysisTracker::default();
+        assert!(tracker.active.is_empty());
+    }
+
+    // =========================================================================
+    // EngineState Tests
+    // =========================================================================
+
+    #[test]
+    fn test_engine_state_new() {
+        // EngineState should initialize with None handle.
+        let _state = EngineState::new();
+        // Can't easily test the contents without async, but construction should work.
+    }
+
+    #[test]
+    fn test_engine_state_default() {
+        // Default trait should work.
+        let _state = EngineState::default();
+    }
+
+    // =========================================================================
+    // EngineInfo Tests
+    // =========================================================================
+
+    #[test]
+    fn test_engine_info_serialization() {
+        // EngineInfo should serialize/deserialize correctly (used for IPC).
+        let info = EngineInfo {
+            name: "Stockfish 17".to_string(),
+            author: "T. Romstad".to_string(),
+            ready: true,
+            threads: 4,
+            hash_mb: 256,
+        };
+
+        // Serialize to JSON
+        let json = serde_json::to_string(&info).expect("Should serialize");
+        assert!(json.contains("Stockfish 17"));
+        assert!(json.contains("threads"));
+
+        // Deserialize back
+        let deserialized: EngineInfo =
+            serde_json::from_str(&json).expect("Should deserialize");
+        assert_eq!(deserialized.name, "Stockfish 17");
+        assert_eq!(deserialized.threads, 4);
+    }
+
+    // =========================================================================
+    // EngineEvaluation Tests
+    // =========================================================================
+
+    #[test]
+    fn test_engine_evaluation_serialization() {
+        // EngineEvaluation should serialize/deserialize correctly.
+        let eval = EngineEvaluation {
+            fen: "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1".to_string(),
+            best_move: "e7e5".to_string(),
+            best_move_san: Some("e5".to_string()),
+            score_cp: 50,
+            score_mate: None,
+            depth: 20,
+            pv: vec!["e7e5".to_string(), "g1f3".to_string()],
+            nodes: 1000000,
+            time_ms: 500,
+        };
+
+        let json = serde_json::to_string(&eval).expect("Should serialize");
+        assert!(json.contains("e7e5"));
+        assert!(json.contains("\"depth\":20"));
+
+        let deserialized: EngineEvaluation =
+            serde_json::from_str(&json).expect("Should deserialize");
+        assert_eq!(deserialized.best_move, "e7e5");
+        assert_eq!(deserialized.depth, 20);
+    }
+
+    #[test]
+    fn test_engine_evaluation_with_mate() {
+        // Test evaluation with mate score.
+        let eval = EngineEvaluation {
+            fen: "some_position".to_string(),
+            best_move: "d1h5".to_string(),
+            best_move_san: Some("Qh5#".to_string()),
+            score_cp: 30000,
+            score_mate: Some(1),
+            depth: 15,
+            pv: vec!["d1h5".to_string()],
+            nodes: 50000,
+            time_ms: 100,
+        };
+
+        let json = serde_json::to_string(&eval).expect("Should serialize");
+        assert!(json.contains("\"score_mate\":1"));
+    }
+
+    // =========================================================================
+    // PartialEval Tests
+    // =========================================================================
+
+    #[test]
+    fn test_partial_eval_default() {
+        // PartialEval default should have zero values.
+        let eval = PartialEval::default();
+
+        assert_eq!(eval.depth, 0);
+        assert_eq!(eval.score_cp, 0);
+        assert!(eval.score_mate.is_none());
+        assert!(eval.pv.is_empty());
+        assert_eq!(eval.nodes, 0);
+        assert_eq!(eval.time_ms, 0);
+    }
+
+    // =========================================================================
+    // Integration Tests (Require Running Stockfish)
+    // =========================================================================
+    //
+    // These tests are marked #[ignore] because they require:
+    // 1. A Tauri runtime with AppHandle
+    // 2. The Stockfish sidecar binary to be available
+    //
+    // Run with: cargo test -- --ignored
+    // =========================================================================
+
+    #[tokio::test]
+    #[ignore = "Requires Tauri AppHandle and Stockfish sidecar"]
+    async fn test_spawn_engine_integration() {
+        // This would test actual engine spawning.
+        // Requires: tauri::test::mock_app() or similar setup.
+        todo!("Integration test: spawn engine and verify UCI handshake");
+    }
+
+    #[tokio::test]
+    #[ignore = "Requires Tauri AppHandle and Stockfish sidecar"]
+    async fn test_analyze_position_integration() {
+        // This would test actual position analysis.
+        // Requires: running Stockfish process.
+        todo!("Integration test: analyze starting position");
+    }
+}
+
+// =============================================================================
 // Resource Cleanup — Drop Trait Implementation
 // =============================================================================
 // The Drop trait is Rust's destructor — it runs automatically when a value

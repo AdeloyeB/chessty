@@ -7,7 +7,7 @@
  *
  * WHY WE NEED THIS:
  * In a real-money platform, concurrent operations on the same settlement
- * can cause race conditions. For example, if a jury verdict and timeout
+ * can cause race conditions. For example, if an Arbiter Overwatch verdict and timeout
  * both try to resolve the same dispute at the same time, we could:
  * - Pay the same funds twice (double-spend)
  * - Leave funds stuck in limbo

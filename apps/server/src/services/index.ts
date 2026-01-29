@@ -11,4 +11,4 @@ export * as spectatorPredictionService from './spectatorPrediction';
 export * as anticheatService from './anticheat';
 export * as stockfishService from './stockfish';
 export * as settlementService from './settlement';
-export * as juryService from './jury';
+export * as overwatchService from './overwatch';

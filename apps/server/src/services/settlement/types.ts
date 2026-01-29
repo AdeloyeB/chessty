@@ -16,9 +16,9 @@
  * 3. Based on score:
  *    - Low suspicion (<95): Auto-settle (pay winner immediately)
  *    - Medium suspicion (95-98): Hold for review with high priority
- *    - High suspicion (>98): Hold with urgent priority, create jury case
+ *    - High suspicion (>98): Hold with urgent priority, create overwatch case
  * 4. If held:
- *    - Jury reviews the case
+ *    - Overwatch reviews the case
  *    - Verdict determines payout (innocent: pay winner, guilty: compensate victim)
  *    - 48-hour timeout auto-releases if no verdict
  */
@@ -32,9 +32,9 @@
  *
  * pending:   Settlement created, awaiting suspicion evaluation
  * settled:   Funds distributed to winner (clean game or cleared after review)
- * disputed:  Funds held, awaiting jury verdict
+ * disputed:  Funds held, awaiting overwatch verdict
  * resolving: Intermediate state during resolution (prevents concurrent processing)
- * resolved:  Dispute resolved (after jury verdict or timeout)
+ * resolved:  Dispute resolved (after overwatch verdict or timeout)
  *
  * NOTE: 'resolving' is a transient state that should only exist during an
  * active transaction. If a settlement is stuck in 'resolving' state, it
@@ -46,11 +46,11 @@ export type SettlementStatus = 'pending' | 'settled' | 'disputed' | 'resolving' 
  * Who or what triggered the final settlement.
  *
  * auto:    Automatic settlement (clean game, low suspicion)
- * jury:    Human jury made a verdict
+ * overwatch:    Human overwatch made a verdict
  * timeout: 48-hour safety valve released funds automatically
  * admin:   Manual admin intervention
  */
-export type SettledBy = 'auto' | 'jury' | 'timeout' | 'admin';
+export type SettledBy = 'auto' | 'overwatch' | 'timeout' | 'admin';
 
 // ---------------------------------------------------------------------------
 // Core Settlement Types
@@ -106,10 +106,10 @@ export interface Settlement {
   flaggedPlayerId: string | null;
 
   /**
-   * Link to the jury review case if disputed.
+   * Link to the overwatch review case if disputed.
    * Uses the reviewTasks table from anticheat-schema.
    */
-  juryCaseId: string | null;
+  overwatchCaseId: string | null;
 
   /** When the settlement was finalized. null if still pending/disputed. */
   settledAt: Date | null;

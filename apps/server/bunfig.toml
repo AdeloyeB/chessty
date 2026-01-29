@@ -1,0 +1,14 @@
+# Bun configuration for the server package
+# See: https://bun.sh/docs/runtime/bunfig
+
+[test]
+# Run tests with coverage reporting
+coverage = false
+
+# Timeout for individual tests (in ms)
+timeout = 30000
+
+# Preload scripts to run before tests
+# Note: Module mocking in Bun has process-wide scope.
+# Tests that mock the same modules should be run separately.
+# Use: bun test:wallet-service and bun test:wallet-routes

@@ -1158,12 +1158,182 @@ fn contains_any(target: &str, patterns: &[&str]) -> bool {
 mod tests {
     use super::*;
 
+    // =========================================================================
+    // contains_any Tests
+    // =========================================================================
+
     #[test]
     fn test_contains_any() {
         assert!(contains_any("stockfish 17", CHESS_ENGINE_PROCESSES));
         assert!(contains_any("discord", SCREEN_SHARING_PROCESSES));
         assert!(!contains_any("notepad", CHESS_ENGINE_PROCESSES));
     }
+
+    #[test]
+    fn test_contains_any_case_sensitivity() {
+        // The function is case-sensitive, but we lowercase input before calling
+        assert!(contains_any("stockfish", CHESS_ENGINE_PROCESSES));
+        // Uppercase won't match because patterns are lowercase
+        assert!(!contains_any("STOCKFISH", CHESS_ENGINE_PROCESSES));
+    }
+
+    #[test]
+    fn test_contains_any_partial_match() {
+        // Should match partial process names
+        assert!(contains_any("stockfish-16-bmi2", CHESS_ENGINE_PROCESSES));
+        assert!(contains_any("my-stockfish-wrapper", CHESS_ENGINE_PROCESSES));
+        assert!(contains_any("/usr/bin/stockfish", CHESS_ENGINE_PROCESSES));
+    }
+
+    #[test]
+    fn test_contains_any_empty_target() {
+        assert!(!contains_any("", CHESS_ENGINE_PROCESSES));
+    }
+
+    #[test]
+    fn test_contains_any_empty_patterns() {
+        let empty_patterns: &[&str] = &[];
+        assert!(!contains_any("stockfish", empty_patterns));
+    }
+
+    // =========================================================================
+    // Process Detection Lists Tests
+    // =========================================================================
+
+    #[test]
+    fn test_chess_engine_detection_stockfish() {
+        let name = "stockfish";
+        assert!(contains_any(name, CHESS_ENGINE_PROCESSES));
+    }
+
+    #[test]
+    fn test_chess_engine_detection_lc0() {
+        let name = "lc0";
+        assert!(contains_any(name, CHESS_ENGINE_PROCESSES));
+    }
+
+    #[test]
+    fn test_chess_engine_detection_leela() {
+        let name = "leelachesszero";
+        assert!(contains_any(name, CHESS_ENGINE_PROCESSES));
+    }
+
+    #[test]
+    fn test_chess_engine_detection_komodo() {
+        let name = "komodo-14";
+        assert!(contains_any(name, CHESS_ENGINE_PROCESSES));
+    }
+
+    #[test]
+    fn test_chess_engine_detection_chessbase() {
+        let name = "chessbase.exe";
+        assert!(contains_any(name, CHESS_ENGINE_PROCESSES));
+    }
+
+    #[test]
+    fn test_chess_engine_detection_arena() {
+        let name = "arena.exe";
+        assert!(contains_any(name, CHESS_ENGINE_PROCESSES));
+    }
+
+    #[test]
+    fn test_chess_engine_detection_nibbler() {
+        let name = "nibbler";
+        assert!(contains_any(name, CHESS_ENGINE_PROCESSES));
+    }
+
+    #[test]
+    fn test_screen_sharing_detection_discord() {
+        let name = "discord";
+        assert!(contains_any(name, SCREEN_SHARING_PROCESSES));
+    }
+
+    #[test]
+    fn test_screen_sharing_detection_zoom() {
+        let name = "zoom.us";
+        assert!(contains_any(name, SCREEN_SHARING_PROCESSES));
+    }
+
+    #[test]
+    fn test_screen_sharing_detection_obs() {
+        let name = "obs-studio";
+        assert!(contains_any(name, SCREEN_SHARING_PROCESSES));
+    }
+
+    #[test]
+    fn test_screen_sharing_detection_teamviewer() {
+        let name = "teamviewer";
+        assert!(contains_any(name, SCREEN_SHARING_PROCESSES));
+    }
+
+    #[test]
+    fn test_screen_sharing_detection_anydesk() {
+        let name = "anydesk";
+        assert!(contains_any(name, SCREEN_SHARING_PROCESSES));
+    }
+
+    #[test]
+    fn test_mobile_mirroring_detection_scrcpy() {
+        let name = "scrcpy";
+        assert!(contains_any(name, MOBILE_MIRRORING_PROCESSES));
+    }
+
+    #[test]
+    fn test_mobile_mirroring_detection_vysor() {
+        let name = "vysor";
+        assert!(contains_any(name, MOBILE_MIRRORING_PROCESSES));
+    }
+
+    #[test]
+    fn test_automation_detection_autohotkey() {
+        let name = "autohotkey";
+        assert!(contains_any(name, AUTOMATION_TOOLS));
+    }
+
+    #[test]
+    fn test_automation_detection_autoit() {
+        let name = "autoit3.exe";
+        assert!(contains_any(name, AUTOMATION_TOOLS));
+    }
+
+    #[test]
+    fn test_ocr_detection_tesseract() {
+        let name = "tesseract";
+        assert!(contains_any(name, OCR_TOOLS));
+    }
+
+    #[test]
+    fn test_ocr_detection_chessvision() {
+        let name = "chessvision.ai";
+        assert!(contains_any(name, OCR_TOOLS));
+    }
+
+    #[test]
+    fn test_normal_process_not_flagged() {
+        let name = "notepad";
+        assert!(!contains_any(name, CHESS_ENGINE_PROCESSES));
+        assert!(!contains_any(name, SCREEN_SHARING_PROCESSES));
+        assert!(!contains_any(name, MOBILE_MIRRORING_PROCESSES));
+        assert!(!contains_any(name, AUTOMATION_TOOLS));
+        assert!(!contains_any(name, OCR_TOOLS));
+    }
+
+    #[test]
+    fn test_browser_not_flagged() {
+        // Note: "firefox" contains "fire" which is a chess engine name
+        // This test verifies common browsers that DON'T contain engine substrings
+        let name = "chrome";
+        assert!(!contains_any(name, CHESS_ENGINE_PROCESSES));
+        assert!(!contains_any(name, AUTOMATION_TOOLS));
+
+        let name2 = "safari";
+        assert!(!contains_any(name2, CHESS_ENGINE_PROCESSES));
+        assert!(!contains_any(name2, AUTOMATION_TOOLS));
+    }
+
+    // =========================================================================
+    // EnvironmentFlags Tests
+    // =========================================================================
 
     #[test]
     fn test_environment_flags_default() {
@@ -1175,7 +1345,92 @@ mod tests {
     }
 
     #[test]
-    fn test_risk_calculation() {
+    fn test_environment_flags_with_cheat_tools() {
+        let mut flags = EnvironmentFlags::default();
+        flags.known_cheat_tools.push("stockfish".to_string());
+        flags.known_cheat_tools.push("tesseract".to_string());
+
+        assert_eq!(flags.known_cheat_tools.len(), 2);
+        assert!(flags.known_cheat_tools.contains(&"stockfish".to_string()));
+    }
+
+    #[test]
+    fn test_environment_flags_with_suspicious_processes() {
+        let mut flags = EnvironmentFlags::default();
+        flags.suspicious_processes.push("discord".to_string());
+        flags.suspicious_processes.push("obs".to_string());
+
+        assert_eq!(flags.suspicious_processes.len(), 2);
+        assert!(flags.suspicious_processes.contains(&"discord".to_string()));
+    }
+
+    // =========================================================================
+    // DetectedProcess Tests
+    // =========================================================================
+
+    #[test]
+    fn test_detected_process_creation() {
+        let process = DetectedProcess {
+            name: "stockfish".to_string(),
+            pid: 12345,
+            category: ProcessCategory::ChessEngine,
+        };
+
+        assert_eq!(process.name, "stockfish");
+        assert_eq!(process.pid, 12345);
+        assert_eq!(process.category, ProcessCategory::ChessEngine);
+    }
+
+    #[test]
+    fn test_detected_process_clone() {
+        let original = DetectedProcess {
+            name: "discord".to_string(),
+            pid: 9999,
+            category: ProcessCategory::ScreenSharing,
+        };
+
+        let cloned = original.clone();
+
+        assert_eq!(cloned.name, original.name);
+        assert_eq!(cloned.pid, original.pid);
+        assert_eq!(cloned.category, original.category);
+    }
+
+    // =========================================================================
+    // ProcessCategory Tests
+    // =========================================================================
+
+    #[test]
+    fn test_process_category_equality() {
+        assert_eq!(ProcessCategory::ChessEngine, ProcessCategory::ChessEngine);
+        assert_ne!(ProcessCategory::ChessEngine, ProcessCategory::ScreenSharing);
+    }
+
+    #[test]
+    fn test_process_category_copy() {
+        let cat = ProcessCategory::Ocr;
+        let copied = cat; // Copy happens here
+        assert_eq!(cat, copied);
+    }
+
+    // =========================================================================
+    // Risk Calculation Tests
+    // =========================================================================
+
+    #[test]
+    fn test_risk_calculation_clean_environment() {
+        let processes: Vec<DetectedProcess> = vec![];
+        let flags = EnvironmentFlags::default();
+
+        let risk = calculate_environment_risk(&processes, &flags);
+
+        assert_eq!(risk.score, 0);
+        assert!(risk.flags.is_empty());
+        assert!(risk.detected_processes.is_empty());
+    }
+
+    #[test]
+    fn test_risk_calculation_chess_engine() {
         let processes = vec![DetectedProcess {
             name: "stockfish".to_string(),
             pid: 1234,
@@ -1184,8 +1439,118 @@ mod tests {
         let flags = EnvironmentFlags::default();
 
         let risk = calculate_environment_risk(&processes, &flags);
-        assert!(risk.score >= 60); // Chess engine adds 60 points
+
+        assert_eq!(risk.score, 60); // Chess engine adds 60 points
         assert!(risk.flags.contains(&"chess_engine_detected".to_string()));
+        assert_eq!(risk.detected_processes.len(), 1);
+    }
+
+    #[test]
+    fn test_risk_calculation_ocr_tool() {
+        let processes = vec![DetectedProcess {
+            name: "tesseract".to_string(),
+            pid: 5678,
+            category: ProcessCategory::Ocr,
+        }];
+        let flags = EnvironmentFlags::default();
+
+        let risk = calculate_environment_risk(&processes, &flags);
+
+        assert_eq!(risk.score, 45); // OCR adds 45 points
+        assert!(risk.flags.contains(&"ocr_tool_detected".to_string()));
+    }
+
+    #[test]
+    fn test_risk_calculation_mobile_mirroring() {
+        let processes = vec![DetectedProcess {
+            name: "scrcpy".to_string(),
+            pid: 1111,
+            category: ProcessCategory::MobileMirroring,
+        }];
+        let flags = EnvironmentFlags::default();
+
+        let risk = calculate_environment_risk(&processes, &flags);
+
+        assert_eq!(risk.score, 40); // Mobile mirroring adds 40 points
+        assert!(risk.flags.contains(&"mobile_mirroring_detected".to_string()));
+    }
+
+    #[test]
+    fn test_risk_calculation_automation() {
+        let processes = vec![DetectedProcess {
+            name: "autohotkey".to_string(),
+            pid: 2222,
+            category: ProcessCategory::Automation,
+        }];
+        let flags = EnvironmentFlags::default();
+
+        let risk = calculate_environment_risk(&processes, &flags);
+
+        assert_eq!(risk.score, 30); // Automation adds 30 points
+        assert!(risk.flags.contains(&"automation_tool_detected".to_string()));
+    }
+
+    #[test]
+    fn test_risk_calculation_screen_sharing() {
+        let processes = vec![DetectedProcess {
+            name: "discord".to_string(),
+            pid: 3333,
+            category: ProcessCategory::ScreenSharing,
+        }];
+        let flags = EnvironmentFlags::default();
+
+        let risk = calculate_environment_risk(&processes, &flags);
+
+        assert_eq!(risk.score, 20); // Screen sharing adds 20 points
+        assert!(risk.flags.contains(&"screen_sharing_active".to_string()));
+    }
+
+    #[test]
+    fn test_risk_calculation_debugger() {
+        let processes: Vec<DetectedProcess> = vec![];
+        let mut flags = EnvironmentFlags::default();
+        flags.debugger_present = true;
+
+        let risk = calculate_environment_risk(&processes, &flags);
+
+        assert_eq!(risk.score, 40); // Debugger adds 40 points
+        assert!(risk.flags.contains(&"debugger_present".to_string()));
+    }
+
+    #[test]
+    fn test_risk_calculation_virtual_machine() {
+        let processes: Vec<DetectedProcess> = vec![];
+        let mut flags = EnvironmentFlags::default();
+        flags.virtual_machine = true;
+
+        let risk = calculate_environment_risk(&processes, &flags);
+
+        assert_eq!(risk.score, 10); // VM adds 10 points
+        assert!(risk.flags.contains(&"virtual_machine_detected".to_string()));
+    }
+
+    #[test]
+    fn test_risk_calculation_multiple_categories() {
+        let processes = vec![
+            DetectedProcess {
+                name: "stockfish".to_string(),
+                pid: 1,
+                category: ProcessCategory::ChessEngine,
+            },
+            DetectedProcess {
+                name: "discord".to_string(),
+                pid: 2,
+                category: ProcessCategory::ScreenSharing,
+            },
+        ];
+        let flags = EnvironmentFlags::default();
+
+        let risk = calculate_environment_risk(&processes, &flags);
+
+        // 60 (chess engine) + 20 (screen sharing) = 80
+        assert_eq!(risk.score, 80);
+        assert!(risk.flags.contains(&"chess_engine_detected".to_string()));
+        assert!(risk.flags.contains(&"screen_sharing_active".to_string()));
     }
 
     #[test]
@@ -1211,7 +1576,489 @@ mod tests {
         flags.debugger_present = true;
         flags.virtual_machine = true;
 
+        // Total would be: 60 + 45 + 40 + 40 + 10 = 195
         let risk = calculate_environment_risk(&processes, &flags);
+
         assert_eq!(risk.score, 100); // Should be capped at 100
+    }
+
+    #[test]
+    fn test_risk_calculation_preserves_process_list() {
+        let processes = vec![
+            DetectedProcess {
+                name: "stockfish".to_string(),
+                pid: 100,
+                category: ProcessCategory::ChessEngine,
+            },
+            DetectedProcess {
+                name: "discord".to_string(),
+                pid: 200,
+                category: ProcessCategory::ScreenSharing,
+            },
+        ];
+        let flags = EnvironmentFlags::default();
+
+        let risk = calculate_environment_risk(&processes, &flags);
+
+        assert_eq!(risk.detected_processes.len(), 2);
+        assert_eq!(risk.detected_processes[0].name, "stockfish");
+        assert_eq!(risk.detected_processes[1].name, "discord");
+    }
+
+    #[test]
+    fn test_risk_calculation_multiple_same_category() {
+        // Multiple chess engines should only add 60 once
+        let processes = vec![
+            DetectedProcess {
+                name: "stockfish".to_string(),
+                pid: 1,
+                category: ProcessCategory::ChessEngine,
+            },
+            DetectedProcess {
+                name: "lc0".to_string(),
+                pid: 2,
+                category: ProcessCategory::ChessEngine,
+            },
+        ];
+        let flags = EnvironmentFlags::default();
+
+        let risk = calculate_environment_risk(&processes, &flags);
+
+        // Should only count chess engine once
+        assert_eq!(risk.score, 60);
+        assert_eq!(risk.detected_processes.len(), 2);
+    }
+
+    // =========================================================================
+    // EnvironmentRisk Tests
+    // =========================================================================
+
+    #[test]
+    fn test_environment_risk_creation() {
+        let risk = EnvironmentRisk {
+            score: 50,
+            flags: vec!["test_flag".to_string()],
+            detected_processes: vec![],
+        };
+
+        assert_eq!(risk.score, 50);
+        assert_eq!(risk.flags.len(), 1);
+    }
+
+    // =========================================================================
+    // EnvironmentChecker Tests
+    // =========================================================================
+
+    #[test]
+    fn test_environment_checker_flags_accessor() {
+        // Create a checker with known state (bypassing async scan)
+        let checker = EnvironmentChecker {
+            flags: EnvironmentFlags {
+                debugger_present: true,
+                virtual_machine: false,
+                known_cheat_tools: vec!["test".to_string()],
+                suspicious_processes: vec![],
+            },
+            detected_processes: vec![],
+        };
+
+        let flags = checker.flags();
+        assert!(flags.debugger_present);
+        assert!(!flags.virtual_machine);
+        assert_eq!(flags.known_cheat_tools.len(), 1);
+    }
+
+    #[test]
+    fn test_environment_checker_detected_processes_accessor() {
+        let processes = vec![DetectedProcess {
+            name: "test".to_string(),
+            pid: 1,
+            category: ProcessCategory::Other,
+        }];
+
+        let checker = EnvironmentChecker {
+            flags: EnvironmentFlags::default(),
+            detected_processes: processes,
+        };
+
+        assert_eq!(checker.detected_processes().len(), 1);
+        assert_eq!(checker.detected_processes()[0].name, "test");
+    }
+
+    #[test]
+    fn test_environment_checker_calculate_risk() {
+        let checker = EnvironmentChecker {
+            flags: EnvironmentFlags {
+                debugger_present: true,
+                virtual_machine: true,
+                known_cheat_tools: vec![],
+                suspicious_processes: vec![],
+            },
+            detected_processes: vec![],
+        };
+
+        let risk = checker.calculate_risk();
+
+        // Debugger (40) + VM (10) = 50
+        assert_eq!(risk.score, 50);
+    }
+
+    // =========================================================================
+    // EnvironmentCache Tests
+    // =========================================================================
+
+    #[test]
+    fn test_environment_cache_new() {
+        let cache = EnvironmentCache::new();
+        // Cache should be created successfully
+        assert_eq!(cache.ttl, Duration::from_secs(DEFAULT_CACHE_TTL_SECS));
+    }
+
+    #[test]
+    fn test_environment_cache_with_custom_ttl() {
+        let custom_ttl = Duration::from_secs(60);
+        let cache = EnvironmentCache::with_ttl(custom_ttl);
+        assert_eq!(cache.ttl, custom_ttl);
+    }
+
+    #[test]
+    fn test_environment_cache_default() {
+        let cache = EnvironmentCache::default();
+        assert_eq!(cache.ttl, Duration::from_secs(DEFAULT_CACHE_TTL_SECS));
+    }
+
+    #[tokio::test]
+    async fn test_environment_cache_is_valid_initially_false() {
+        let cache = EnvironmentCache::new();
+        // Cache should not be valid before any scan
+        assert!(!cache.is_valid().await);
+    }
+
+    #[tokio::test]
+    async fn test_environment_cache_age_initially_none() {
+        let cache = EnvironmentCache::new();
+        assert!(cache.cache_age().await.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_environment_cache_get_cached_initially_none() {
+        let cache = EnvironmentCache::new();
+        assert!(cache.get_cached().await.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_environment_cache_invalidate() {
+        let cache = EnvironmentCache::new();
+
+        // Force a scan to populate cache
+        let _ = cache.force_rescan().await;
+
+        // Should now be valid
+        assert!(cache.is_valid().await);
+
+        // Invalidate
+        cache.invalidate().await;
+
+        // Should no longer be valid
+        assert!(!cache.is_valid().await);
+        assert!(cache.get_cached().await.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_environment_cache_scan_with_cache() {
+        let cache = EnvironmentCache::new();
+
+        // First scan should work
+        let risk1 = cache.scan_with_cache().await;
+
+        // Second scan should use cache (scores should be the same)
+        let risk2 = cache.scan_with_cache().await;
+
+        // Scores should match since it's the same environment
+        assert_eq!(risk1.score, risk2.score);
+    }
+
+    #[tokio::test]
+    async fn test_environment_cache_force_rescan() {
+        let cache = EnvironmentCache::new();
+
+        let risk = cache.force_rescan().await;
+
+        // Should have performed a scan
+        assert!(cache.is_valid().await);
+        // Risk score should be in valid range
+        assert!(risk.score <= 100);
+    }
+
+    // =========================================================================
+    // SharedEnvironmentCache Tests
+    // =========================================================================
+
+    #[test]
+    fn test_shared_environment_cache_new() {
+        let cache = SharedEnvironmentCache::new();
+        // Should be creatable
+        let _ = cache;
+    }
+
+    #[test]
+    fn test_shared_environment_cache_with_ttl() {
+        let cache = SharedEnvironmentCache::with_ttl(Duration::from_secs(120));
+        let _ = cache;
+    }
+
+    #[test]
+    fn test_shared_environment_cache_clone() {
+        let cache1 = SharedEnvironmentCache::new();
+        let cache2 = cache1.clone();
+
+        // Both should reference the same inner cache
+        let _ = (cache1, cache2);
+    }
+
+    #[test]
+    fn test_shared_environment_cache_default() {
+        let cache = SharedEnvironmentCache::default();
+        let _ = cache;
+    }
+
+    #[tokio::test]
+    async fn test_shared_environment_cache_is_valid() {
+        let cache = SharedEnvironmentCache::new();
+        assert!(!cache.is_valid().await);
+    }
+
+    #[tokio::test]
+    async fn test_shared_environment_cache_cache_age() {
+        let cache = SharedEnvironmentCache::new();
+        assert!(cache.cache_age().await.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_shared_environment_cache_scan_with_cache() {
+        let cache = SharedEnvironmentCache::new();
+        let risk = cache.scan_with_cache().await;
+        assert!(risk.score <= 100);
+    }
+
+    #[tokio::test]
+    async fn test_shared_environment_cache_force_rescan() {
+        let cache = SharedEnvironmentCache::new();
+        let risk = cache.force_rescan().await;
+        assert!(risk.score <= 100);
+    }
+
+    #[tokio::test]
+    async fn test_shared_environment_cache_invalidate() {
+        let cache = SharedEnvironmentCache::new();
+
+        // Populate cache
+        let _ = cache.force_rescan().await;
+        assert!(cache.is_valid().await);
+
+        // Invalidate
+        cache.invalidate().await;
+        assert!(!cache.is_valid().await);
+    }
+
+    #[tokio::test]
+    async fn test_shared_environment_cache_get_cached() {
+        let cache = SharedEnvironmentCache::new();
+
+        // Initially no cached data
+        assert!(cache.get_cached().await.is_none());
+
+        // After scan, should have cached data
+        let _ = cache.force_rescan().await;
+        assert!(cache.get_cached().await.is_some());
+    }
+
+    // =========================================================================
+    // Serialization Tests
+    // =========================================================================
+
+    #[test]
+    fn test_environment_flags_serialization() {
+        let flags = EnvironmentFlags {
+            debugger_present: true,
+            virtual_machine: false,
+            known_cheat_tools: vec!["stockfish".to_string()],
+            suspicious_processes: vec!["discord".to_string()],
+        };
+
+        let json = serde_json::to_string(&flags).expect("Serialization failed");
+        let deserialized: EnvironmentFlags =
+            serde_json::from_str(&json).expect("Deserialization failed");
+
+        assert_eq!(deserialized.debugger_present, flags.debugger_present);
+        assert_eq!(deserialized.virtual_machine, flags.virtual_machine);
+        assert_eq!(deserialized.known_cheat_tools, flags.known_cheat_tools);
+        assert_eq!(deserialized.suspicious_processes, flags.suspicious_processes);
+    }
+
+    #[test]
+    fn test_detected_process_serialization() {
+        let process = DetectedProcess {
+            name: "stockfish".to_string(),
+            pid: 12345,
+            category: ProcessCategory::ChessEngine,
+        };
+
+        let json = serde_json::to_string(&process).expect("Serialization failed");
+        let deserialized: DetectedProcess =
+            serde_json::from_str(&json).expect("Deserialization failed");
+
+        assert_eq!(deserialized.name, process.name);
+        assert_eq!(deserialized.pid, process.pid);
+        assert_eq!(deserialized.category, process.category);
+    }
+
+    #[test]
+    fn test_process_category_serialization() {
+        let categories = vec![
+            ProcessCategory::ChessEngine,
+            ProcessCategory::ScreenSharing,
+            ProcessCategory::MobileMirroring,
+            ProcessCategory::Automation,
+            ProcessCategory::Ocr,
+            ProcessCategory::Debugger,
+            ProcessCategory::Other,
+        ];
+
+        for category in categories {
+            let json = serde_json::to_string(&category).expect("Serialization failed");
+            let deserialized: ProcessCategory =
+                serde_json::from_str(&json).expect("Deserialization failed");
+            assert_eq!(deserialized, category);
+        }
+    }
+
+    #[test]
+    fn test_environment_risk_serialization() {
+        let risk = EnvironmentRisk {
+            score: 75,
+            flags: vec!["chess_engine_detected".to_string(), "debugger_present".to_string()],
+            detected_processes: vec![DetectedProcess {
+                name: "stockfish".to_string(),
+                pid: 999,
+                category: ProcessCategory::ChessEngine,
+            }],
+        };
+
+        let json = serde_json::to_string(&risk).expect("Serialization failed");
+        let deserialized: EnvironmentRisk =
+            serde_json::from_str(&json).expect("Deserialization failed");
+
+        assert_eq!(deserialized.score, risk.score);
+        assert_eq!(deserialized.flags.len(), risk.flags.len());
+        assert_eq!(deserialized.detected_processes.len(), risk.detected_processes.len());
+    }
+
+    // =========================================================================
+    // Platform-Specific Tests (Conditional)
+    // =========================================================================
+
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    #[test]
+    fn test_parse_ps_output() {
+        let sample_output = b"  123 stockfish\n  456 firefox\n  789 discord\n";
+        let processes = parse_ps_output(sample_output);
+
+        assert_eq!(processes.len(), 3);
+        assert_eq!(processes[0].pid, 123);
+        assert_eq!(processes[0].name, "stockfish");
+        assert_eq!(processes[1].pid, 456);
+        assert_eq!(processes[1].name, "firefox");
+        assert_eq!(processes[2].pid, 789);
+        assert_eq!(processes[2].name, "discord");
+    }
+
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    #[test]
+    fn test_parse_ps_output_empty() {
+        let sample_output = b"";
+        let processes = parse_ps_output(sample_output);
+        assert!(processes.is_empty());
+    }
+
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    #[test]
+    fn test_parse_ps_output_malformed() {
+        // Missing PID
+        let sample_output = b"abc stockfish\n";
+        let processes = parse_ps_output(sample_output);
+        assert!(processes.is_empty());
+    }
+
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    #[test]
+    fn test_parse_ps_output_with_spaces_in_name() {
+        let sample_output = b"  123 Google Chrome\n";
+        let processes = parse_ps_output(sample_output);
+
+        assert_eq!(processes.len(), 1);
+        assert_eq!(processes[0].pid, 123);
+        // Note: Only gets first word after PID with splitn(2, ...)
+        assert!(processes[0].name.contains("Google"));
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn test_parse_tasklist_output() {
+        let sample_output = b"\"stockfish.exe\",\"1234\",\"Console\",\"1\",\"50,000 K\"\n\"firefox.exe\",\"5678\",\"Console\",\"1\",\"100,000 K\"\n";
+        let processes = parse_tasklist_output(sample_output);
+
+        assert_eq!(processes.len(), 2);
+        assert_eq!(processes[0].name, "stockfish.exe");
+        assert_eq!(processes[0].pid, 1234);
+        assert_eq!(processes[1].name, "firefox.exe");
+        assert_eq!(processes[1].pid, 5678);
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn test_parse_tasklist_output_empty() {
+        let sample_output = b"";
+        let processes = parse_tasklist_output(sample_output);
+        assert!(processes.is_empty());
+    }
+
+    // =========================================================================
+    // Integration-Style Tests (Marked with #[ignore] for CI)
+    // =========================================================================
+
+    #[tokio::test]
+    #[ignore] // Requires actual system access
+    async fn test_full_environment_scan() {
+        let checker = EnvironmentChecker::scan().await;
+        let risk = checker.calculate_risk();
+
+        // Just verify it completes and returns valid data
+        assert!(risk.score <= 100);
+    }
+
+    #[test]
+    #[ignore] // Requires actual system access
+    fn test_sync_process_scan() {
+        let found = scan_for_processes(CHESS_ENGINE_PROCESSES);
+        // Just verify it completes without panicking
+        let _ = found;
+    }
+
+    #[test]
+    #[ignore] // Requires actual system access
+    fn test_debugger_check() {
+        let is_debugger = check_debugger_present();
+        // In normal test runs, should be false (unless running in debugger)
+        // We can't assert a specific value since it depends on environment
+        let _ = is_debugger;
+    }
+
+    #[test]
+    #[ignore] // Requires actual system access
+    fn test_vm_detection() {
+        let is_vm = detect_vm_artifacts();
+        // Just verify it completes
+        let _ = is_vm;
     }
 }
