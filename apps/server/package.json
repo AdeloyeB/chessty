@@ -30,6 +30,7 @@
     "jose": "^5.2.0",
     "nanoid": "^5.0.6",
     "otpauth": "^9.4.1",
+    "viem": "^2.45.0",
     "zod": "^3.23.0"
   },
   "devDependencies": {

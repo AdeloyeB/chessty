@@ -4,6 +4,7 @@ import * as schema from './pg-schema';
 import * as anticheatSchema from './anticheat-schema';
 import * as overwatchSchema from './overwatch-schema';
 import * as settlementSchema from './settlement-schema';
+import * as discordSchema from './discord-schema';
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -11,7 +12,7 @@ const pool = new Pool({
 });
 
 // Merge all schemas for the drizzle instance
-const allSchemas = { ...schema, ...anticheatSchema, ...overwatchSchema, ...settlementSchema };
+const allSchemas = { ...schema, ...anticheatSchema, ...overwatchSchema, ...settlementSchema, ...discordSchema };
 
 export const db = drizzle(pool, { schema: allSchemas });
 
@@ -19,3 +20,4 @@ export * from './pg-schema';
 export * from './anticheat-schema';
 export * from './overwatch-schema';
 export * from './settlement-schema';
+export * from './discord-schema';

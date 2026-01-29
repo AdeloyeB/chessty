@@ -94,6 +94,12 @@ import {
   handleGetStats,
 } from './routes/overwatch';
 import {
+  handleDiscordLink,
+  handleGetDiscordChallenge,
+  handleAcceptDiscordChallenge,
+  handleDeclineDiscordChallenge,
+} from './routes/discord';
+import {
   handleWebSocketUpgrade,
   handleWebSocketOpen,
   handleWebSocketClose,
@@ -425,6 +431,31 @@ Bun.serve<WebSocketData>({
           response = await handleGetCase(req, caseId);
         }
       }
+      // Discord routes
+      else if (path === '/api/discord/link' && method === 'POST') {
+        response = await handleDiscordLink(req);
+      } else if (path.match(/^\/api\/discord\/challenge\/[^/]+$/) && method === 'GET') {
+        const challengeId = path.split('/')[4];
+        if (!isValidId(challengeId)) {
+          response = invalidIdResponse();
+        } else {
+          response = await handleGetDiscordChallenge(req, challengeId);
+        }
+      } else if (path.match(/^\/api\/discord\/challenge\/[^/]+\/accept$/) && method === 'POST') {
+        const challengeId = path.split('/')[4];
+        if (!isValidId(challengeId)) {
+          response = invalidIdResponse();
+        } else {
+          response = await handleAcceptDiscordChallenge(req, challengeId);
+        }
+      } else if (path.match(/^\/api\/discord\/challenge\/[^/]+\/decline$/) && method === 'POST') {
+        const challengeId = path.split('/')[4];
+        if (!isValidId(challengeId)) {
+          response = invalidIdResponse();
+        } else {
+          response = await handleDeclineDiscordChallenge(req, challengeId);
+        }
+      }
       // Health check
       else if (path === '/health' && method === 'GET') {
         response = Response.json({
@@ -524,6 +555,26 @@ setInterval(async () => {
 // Start Arbiter Overwatch periodic tasks (case resolution, assignment expiration)
 import { startOverwatchPeriodicTasks } from './events/handlers/overwatch';
 startOverwatchPeriodicTasks();
+
+// Start Discord bot (if configured)
+import { startDiscordBot } from './discord/bot';
+startDiscordBot().catch((error) => {
+  console.error('[Discord] Failed to start bot:', error);
+});
+
+// Periodic cleanup of expired Discord tokens and challenges (every 10 minutes)
+import { cleanupExpiredLinkTokens, expireChallenges } from './services/discord';
+setInterval(async () => {
+  try {
+    const expiredTokens = await cleanupExpiredLinkTokens();
+    const expiredChallenges = await expireChallenges();
+    if (expiredTokens > 0 || expiredChallenges > 0) {
+      console.log(`[Discord Cleanup] Removed ${expiredTokens} tokens, ${expiredChallenges} challenges`);
+    }
+  } catch (error) {
+    console.error('[Discord Cleanup] Error:', error);
+  }
+}, 10 * 60 * 1000);
 
 console.log(`🚀 Chess Game Server running on http://localhost:${PORT}`);
 console.log(`📡 WebSocket available at ws://localhost:${PORT}/ws`);
