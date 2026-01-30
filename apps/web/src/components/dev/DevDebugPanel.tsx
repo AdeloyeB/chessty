@@ -30,7 +30,8 @@ import {
 } from '@/lib/mock/mockData';
 import { AnalysisBoard } from '@/components/analysis/AnalysisBoard';
 import { OverwatchDevPanel } from '@/components/dev/overwatch';
-import type { HistoryGame, Move } from '@chess-game/shared';
+import { overlay } from '@/lib/desktop';
+import type { HistoryGame, Move, Game } from '@chess-game/shared';
 
 // Only render in development
 const isDev = process.env.NODE_ENV === 'development';
@@ -156,6 +157,39 @@ const MOCK_ANALYSIS_GAME: HistoryGame = {
   startingFen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
   endedAt: new Date(),
   duration: 420,
+};
+
+// Mock game for overlay testing - needs a full Game object
+const MOCK_OVERLAY_GAME_ID = 'overlay-test-game-001';
+const MOCK_OVERLAY_GAME: Game = {
+  id: MOCK_OVERLAY_GAME_ID,
+  whitePlayerId: 'player-white-001',
+  blackPlayerId: 'player-black-001',
+  winnerId: null,
+  status: 'active',
+  result: null,
+  currentFen: 'r1bqkb1r/pppp1ppp/2n2n2/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 4 4',
+  pgn: '1. e4 e5 2. Nf3 Nc6 3. Bc4 Nf6',
+  moves: [
+    { from: 'e2', to: 'e4', san: 'e4', fen: 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1', timestamp: 1 },
+    { from: 'e7', to: 'e5', san: 'e5', fen: 'rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq e6 0 2', timestamp: 2 },
+    { from: 'g1', to: 'f3', san: 'Nf3', fen: 'rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2', timestamp: 3 },
+    { from: 'b8', to: 'c6', san: 'Nc6', fen: 'r1bqkbnr/pppp1ppp/2n5/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 3', timestamp: 4 },
+    { from: 'f1', to: 'c4', san: 'Bc4', fen: 'r1bqkbnr/pppp1ppp/2n5/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 3 3', timestamp: 5 },
+    { from: 'g8', to: 'f6', san: 'Nf6', fen: 'r1bqkb1r/pppp1ppp/2n2n2/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 4 4', timestamp: 6 },
+  ] as Move[],
+  timeControl: { initial: 300, increment: 0 },
+  whiteTimeRemaining: 267,
+  blackTimeRemaining: 243,
+  wagerAmount: 50,
+  totalPot: 100,
+  whiteEloAtStart: 1850,
+  blackEloAtStart: 1920,
+  eloChange: null,
+  createdAt: new Date(),
+  updatedAt: new Date(),
+  startedAt: new Date(),
+  endedAt: null,
 };
 
 export function DevDebugPanel() {
@@ -386,6 +420,44 @@ export function DevDebugPanel() {
         });
       }, index * 500);
     });
+  };
+
+  // ── Overlay handlers ─────────────────────────────────────────────────
+  const handleOpenOverlay = async () => {
+    // Set up the game store with mock data first
+    const [p1, p2] = getRandomPlayers(2);
+    const white = toPublicUser(p1);
+    const black = toPublicUser(p2);
+
+    // Configure the game store so the overlay has data to display
+    game.setGame(MOCK_OVERLAY_GAME);
+    game.setPlayers(white, black);
+    game.setPlayerColor('white');
+    game.setStatus('playing');
+
+    // Small delay to let state propagate, then open overlay
+    await new Promise((r) => setTimeout(r, 100));
+
+    try {
+      await overlay.open(MOCK_OVERLAY_GAME_ID);
+      console.log('[DevDebugPanel] Overlay opened for game:', MOCK_OVERLAY_GAME_ID);
+    } catch (err) {
+      console.error('[DevDebugPanel] Failed to open overlay:', err);
+      addNotification({
+        type: 'error',
+        title: 'overlay_failed',
+        message: 'Could not open overlay window. Are you running in Tauri?',
+      });
+    }
+  };
+
+  const handleCloseOverlay = async () => {
+    try {
+      await overlay.close();
+      console.log('[DevDebugPanel] Overlay closed');
+    } catch (err) {
+      console.error('[DevDebugPanel] Failed to close overlay:', err);
+    }
   };
 
   // ── Reset all stores ──────────────────────────────────────────────────
@@ -661,6 +733,21 @@ export function DevDebugPanel() {
               </button>
               <p className="text-xs font-mono text-purple-400/40 px-1">
                 opens with mock game data for testing
+              </p>
+            </Section>
+
+            <div className="border-t border-purple-500/10" />
+
+            {/* ═══ Section 6.5: Overlay Mode ═══ */}
+            <Section title="overlay_mode">
+              <button onClick={handleOpenOverlay} className={btn}>
+                ▶ open_overlay (mock game, Italian Game)
+              </button>
+              <button onClick={handleCloseOverlay} className={btnNeutral}>
+                ✕ close_overlay
+              </button>
+              <p className="text-xs font-mono text-purple-400/40 px-1">
+                opens compact overlay window (Tauri only)
               </p>
             </Section>
 

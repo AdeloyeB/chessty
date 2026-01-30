@@ -30,19 +30,19 @@ interface TrafficLightsProps {
 
 export function TrafficLights({ onClose, onMinimize, onMaximize }: TrafficLightsProps) {
   return (
-    <div className="flex items-center gap-2 group pl-3 pr-2">
+    <div className="flex items-center gap-1.5 group pl-2">
       {/* Close */}
       <button
         onClick={onClose}
         className="
-          w-3 h-3 rounded-full border border-white/30
-          bg-transparent transition-all duration-150
-          group-hover:bg-[#FF5F57] group-hover:border-[#FF5F57]
+          w-2.5 h-2.5 rounded-full border border-white/40
+          bg-white/10 transition-all duration-150
+          hover:bg-[#FF5F57] hover:border-[#FF5F57]
           flex items-center justify-center
         "
         aria-label="close window"
       >
-        <span className="text-[8px] leading-none text-transparent group-hover:text-black/80 font-bold">
+        <span className="text-[6px] leading-none text-transparent hover:text-black/80 font-bold">
           ×
         </span>
       </button>
@@ -51,14 +51,14 @@ export function TrafficLights({ onClose, onMinimize, onMaximize }: TrafficLights
       <button
         onClick={onMinimize}
         className="
-          w-3 h-3 rounded-full border border-white/30
-          bg-transparent transition-all duration-150
-          group-hover:bg-[#FFBD2E] group-hover:border-[#FFBD2E]
+          w-2.5 h-2.5 rounded-full border border-white/40
+          bg-white/10 transition-all duration-150
+          hover:bg-[#FFBD2E] hover:border-[#FFBD2E]
           flex items-center justify-center
         "
         aria-label="minimize window"
       >
-        <span className="text-[8px] leading-none text-transparent group-hover:text-black/80 font-bold">
+        <span className="text-[6px] leading-none text-transparent hover:text-black/80 font-bold">
           −
         </span>
       </button>
@@ -67,14 +67,14 @@ export function TrafficLights({ onClose, onMinimize, onMaximize }: TrafficLights
       <button
         onClick={onMaximize}
         className="
-          w-3 h-3 rounded-full border border-white/30
-          bg-transparent transition-all duration-150
-          group-hover:bg-[#28C940] group-hover:border-[#28C940]
+          w-2.5 h-2.5 rounded-full border border-white/40
+          bg-white/10 transition-all duration-150
+          hover:bg-[#28C940] hover:border-[#28C940]
           flex items-center justify-center
         "
         aria-label="maximize window"
       >
-        <span className="text-[8px] leading-none text-transparent group-hover:text-black/80 font-bold">
+        <span className="text-[6px] leading-none text-transparent hover:text-black/80 font-bold">
           +
         </span>
       </button>

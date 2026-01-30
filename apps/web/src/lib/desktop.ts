@@ -23,7 +23,7 @@ export const store = {
    * @param key - The storage key to look up
    * @returns The stored value, or null if the key doesn't exist
    */
-  async get(key: string): Promise<any> {
+  async get<T = unknown>(key: string): Promise<T | null> {
     const { invoke } = await import('@tauri-apps/api/core');
     return invoke('store_get', { key });
   },
@@ -34,7 +34,7 @@ export const store = {
    * @param key   - The storage key
    * @param value - Any JSON-serializable value
    */
-  async set(key: string, value: any): Promise<void> {
+  async set<T = unknown>(key: string, value: T): Promise<void> {
     const { invoke } = await import('@tauri-apps/api/core');
     return invoke('store_set', { key, value });
   },
@@ -55,6 +55,50 @@ export const store = {
   async clear(): Promise<void> {
     const { invoke } = await import('@tauri-apps/api/core');
     return invoke('store_clear');
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Overlay Window
+// ---------------------------------------------------------------------------
+// Opens a compact overlay window for playing chess while multitasking.
+// The overlay is a small, always-on-top window showing the current game.
+
+export const overlay = {
+  /**
+   * Open the overlay window for a specific game.
+   *
+   * @param gameId - The ID of the game to display in the overlay
+   * @returns Promise that resolves when the overlay window opens
+   */
+  async open(gameId: string): Promise<void> {
+    const { invoke } = await import('@tauri-apps/api/core');
+    return invoke('open_overlay', { gameId });
+  },
+
+  /**
+   * Close the overlay window if it's open.
+   */
+  async close(): Promise<void> {
+    const { invoke } = await import('@tauri-apps/api/core');
+    return invoke('close_overlay');
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Window Helpers
+// ---------------------------------------------------------------------------
+// Utilities for controlling the main application window.
+
+export const mainWindow = {
+  /**
+   * Minimize the main window.
+   * Useful when opening overlay mode so the user can focus on other apps.
+   */
+  async minimize(): Promise<void> {
+    const { getCurrentWindow } = await import('@tauri-apps/api/window');
+    const window = getCurrentWindow();
+    await window.minimize();
   },
 };
 

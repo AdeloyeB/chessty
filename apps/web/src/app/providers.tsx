@@ -14,11 +14,12 @@ interface ProvidersProps {
 export function Providers({ children }: ProvidersProps) {
   return (
     <WalletProvider>
-      <DesktopLayout />
-      <DeepLinkHandler />
-      {children}
-      <ToastContainer />
-      <DevDebugPanel />
+      <DesktopLayout>
+        <DeepLinkHandler />
+        {children}
+        <ToastContainer />
+        <DevDebugPanel />
+      </DesktopLayout>
     </WalletProvider>
   );
 }

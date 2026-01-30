@@ -7,7 +7,8 @@
     "build": "cargo tauri build"
   },
   "dependencies": {
-    "@chess-game/web": "workspace:*"
+    "@chess-game/web": "workspace:*",
+    "@cloudworxx/tauri-plugin-mac-rounded-corners": "^1.0.0"
   },
   "devDependencies": {
     "typescript": "^5.4.0"

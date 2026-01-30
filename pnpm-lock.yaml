@@ -45,6 +45,9 @@ importers:
       '@chess-game/web':
         specifier: workspace:*
         version: link:../web
+      '@cloudworxx/tauri-plugin-mac-rounded-corners':
+        specifier: ^1.0.0
+        version: 1.1.1(@tauri-apps/api@2.9.1)
     devDependencies:
       typescript:
         specifier: ^5.4.0
@@ -95,6 +98,9 @@ importers:
       '@chess-game/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      '@cloudworxx/tauri-plugin-mac-rounded-corners':
+        specifier: ^1.0.0
+        version: 1.1.1(@tauri-apps/api@2.0.3)
       '@dnd-kit/core':
         specifier: ^6.3.1
         version: 6.3.1(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
@@ -279,6 +285,13 @@ packages:
 
   '@base-org/account@2.4.0':
     resolution: {integrity: sha512-A4Umpi8B9/pqR78D1Yoze4xHyQaujioVRqqO3d6xuDFw9VRtjg6tK3bPlwE0aW+nVH/ntllCpPa2PbI8Rnjcug==}
+
+  '@cloudworxx/tauri-plugin-mac-rounded-corners@1.1.1':
+    resolution: {integrity: sha512-oF75CsaetpvqzMlbULMqGjpg4Y3GqdIIqU4+gbjtPEuLb2AYWGGprjL3UQfIm6Ew75pDFFgVxnL7rJBr5uttgg==}
+    engines: {node: '>=18.0.0'}
+    hasBin: true
+    peerDependencies:
+      '@tauri-apps/api': ^2
 
   '@coinbase/cdp-sdk@1.43.0':
     resolution: {integrity: sha512-Fre1tvoIi4HAoC8/PgBoLsuZ9mt7K0R50EEC6i+6FaipW7oO3MABCx+vGAcM7EpcbVa7E6hTFe2/a0UdoajvYQ==}
@@ -5064,6 +5077,14 @@ snapshots:
       - use-sync-external-store
       - utf-8-validate
       - zod
+
+  '@cloudworxx/tauri-plugin-mac-rounded-corners@1.1.1(@tauri-apps/api@2.0.3)':
+    dependencies:
+      '@tauri-apps/api': 2.0.3
+
+  '@cloudworxx/tauri-plugin-mac-rounded-corners@1.1.1(@tauri-apps/api@2.9.1)':
+    dependencies:
+      '@tauri-apps/api': 2.9.1
 
   '@coinbase/cdp-sdk@1.43.0(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)':
     dependencies:

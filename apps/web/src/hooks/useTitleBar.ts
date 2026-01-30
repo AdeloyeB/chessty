@@ -44,7 +44,13 @@ export function useTitleBar() {
     // Only run on client (after hydration)
     if (typeof window === 'undefined') return;
 
-    setIsTauriApp(true);
+    // Check if we're actually in a Tauri app by looking for the Tauri globals
+    // @ts-expect-error - __TAURI_INTERNALS__ is injected by Tauri runtime
+    const inTauri = typeof window !== 'undefined' && !!window.__TAURI_INTERNALS__;
+    setIsTauriApp(inTauri);
+
+    // Only run Tauri-specific setup if we're in Tauri
+    if (!inTauri) return;
 
     // Track mount state to prevent setting state after unmount
     // and to clean up listeners if the import resolves after unmount.
