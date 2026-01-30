@@ -18,7 +18,7 @@
 import { useMemo } from 'react';
 import type { Move } from '@chess-game/shared';
 import type { OverlayThemeColors } from '@/hooks/useOverlaySettings';
-import { OVERLAY_THEMES } from '@/hooks/useOverlaySettings';
+import { OVERLAY_THEMES, applyOpacityToColor } from '@/hooks/useOverlaySettings';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -45,6 +45,8 @@ interface OverlayStatsProps {
   playerRating?: number;
   /** Theme colors */
   themeColors?: OverlayThemeColors;
+  /** Window opacity (0.3-1.0) for transparent backgrounds */
+  opacity?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -62,7 +64,13 @@ export function OverlayStats({
   playerName = 'You',
   playerRating,
   themeColors = OVERLAY_THEMES.dark,
+  opacity = 1,
 }: OverlayStatsProps) {
+  // Apply opacity to background colors for window transparency
+  const bgWithOpacity = applyOpacityToColor(themeColors.surface, opacity);
+  const bgDarkWithOpacity = applyOpacityToColor(themeColors.background, opacity);
+  const borderWithOpacity = applyOpacityToColor(themeColors.border, opacity);
+  const borderSubtleWithOpacity = applyOpacityToColor(themeColors.borderSubtle, opacity);
   // Format moves into compact notation (e.g., "1.e4 e5 2.Nf3 Nc6")
   const moveNotation = useMemo(() => {
     if (moves.length === 0) return 'No moves yet';
@@ -81,14 +89,14 @@ export function OverlayStats({
     <div
       className="overflow-hidden"
       style={{
-        backgroundColor: themeColors.surface,
-        borderTop: `1px solid ${themeColors.border}`,
+        backgroundColor: bgWithOpacity,
+        borderTop: `1px solid ${borderWithOpacity}`,
       }}
     >
       {/* Header bar - always visible */}
       <div
         className="flex items-center justify-between px-3 py-2 cursor-pointer transition-colors"
-        style={{ backgroundColor: themeColors.surface }}
+        style={{ backgroundColor: bgWithOpacity }}
         onClick={onToggle}
       >
         {/* Player info */}
@@ -156,8 +164,8 @@ export function OverlayStats({
           <div
             className="p-2 max-h-20 overflow-y-auto"
             style={{
-              backgroundColor: themeColors.background,
-              border: `1px solid ${themeColors.borderSubtle}`,
+              backgroundColor: bgDarkWithOpacity,
+              border: `1px solid ${borderSubtleWithOpacity}`,
             }}
           >
             <p

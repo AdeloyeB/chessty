@@ -16,19 +16,26 @@
 'use client';
 
 import type { OverlayThemeColors } from '@/hooks/useOverlaySettings';
-import { OVERLAY_THEMES } from '@/hooks/useOverlaySettings';
+import { OVERLAY_THEMES, applyOpacityToColor } from '@/hooks/useOverlaySettings';
 
 interface OverlayDragHandleProps {
   /** Optional additional classes */
   className?: string;
   /** Theme colors */
   themeColors?: OverlayThemeColors;
+  /** Window opacity (0.3-1.0) for transparent backgrounds */
+  opacity?: number;
 }
 
 export function OverlayDragHandle({
   className = '',
   themeColors = OVERLAY_THEMES.dark,
+  opacity = 1,
 }: OverlayDragHandleProps) {
+  // Apply opacity to background colors for window transparency
+  const bgWithOpacity = applyOpacityToColor(themeColors.surface, opacity);
+  const borderWithOpacity = applyOpacityToColor(themeColors.border, opacity);
+
   return (
     <div
       data-tauri-drag-region
@@ -41,8 +48,8 @@ export function OverlayDragHandle({
         ${className}
       `}
       style={{
-        backgroundColor: themeColors.surface,
-        borderTop: `1px solid ${themeColors.border}`,
+        backgroundColor: bgWithOpacity,
+        borderTop: `1px solid ${borderWithOpacity}`,
       }}
     >
       {/* Hamburger icon - two horizontal lines */}

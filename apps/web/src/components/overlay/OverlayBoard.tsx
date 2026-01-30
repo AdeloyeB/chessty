@@ -45,7 +45,7 @@ import { useState, useCallback, useMemo } from 'react';
 import type { PublicUser, Move } from '@chess-game/shared';
 import type { Square, Move as ChessMove } from '@chess-game/shared/chess';
 import { Chess } from '@chess-game/shared/chess';
-import { useOverlaySettings, OVERLAY_SIZES } from '@/hooks/useOverlaySettings';
+import { useOverlaySettings, OVERLAY_SIZES, applyOpacityToColor } from '@/hooks/useOverlaySettings';
 // NOTE: Native macOS styling (rounded corners, traffic lights) is now applied
 // by Rust when the overlay window is created. See commands/overlay.rs.
 // This eliminates the race condition where React would try to style the window
@@ -239,14 +239,27 @@ export function OverlayBoard({
   // Get board size from settings
   const boardSize = OVERLAY_SIZES[settings.size].board;
 
+  // Memoize opacity-adjusted colors to avoid recalculating on every render.
+  // This applies the user's opacity setting to background colors while
+  // keeping text and interactive elements fully visible.
+  const bgWithOpacity = useMemo(
+    () => applyOpacityToColor(themeColors.surface, settings.opacity),
+    [themeColors.surface, settings.opacity]
+  );
+  const borderWithOpacity = useMemo(
+    () => applyOpacityToColor(themeColors.border, settings.opacity),
+    [themeColors.border, settings.opacity]
+  );
+
   return (
     <div
       className="flex flex-col overflow-hidden select-none rounded-xl"
       style={{
         width: OVERLAY_SIZES[settings.size].width,
-        opacity: settings.opacity,
-        backgroundColor: themeColors.surface,
-        border: `1px solid ${themeColors.border}`,
+        // Use RGBA backgrounds instead of container opacity.
+        // This makes backgrounds transparent while keeping content (text, pieces) fully visible.
+        backgroundColor: bgWithOpacity,
+        border: `1px solid ${borderWithOpacity}`,
       }}
     >
       {/* Header - drag region with close button, opponent info, and settings */}
@@ -255,8 +268,8 @@ export function OverlayBoard({
       <div
         className="flex items-center justify-between px-3 py-2 rounded-t-xl"
         style={{
-          backgroundColor: themeColors.surface,
-          borderBottom: `1px solid ${themeColors.border}`,
+          backgroundColor: bgWithOpacity,
+          borderBottom: `1px solid ${borderWithOpacity}`,
         }}
         data-tauri-drag-region
       >
@@ -328,8 +341,8 @@ export function OverlayBoard({
         <div
           className="flex justify-center py-1.5"
           style={{
-            backgroundColor: themeColors.surface,
-            borderBottom: `1px solid ${themeColors.borderSubtle}`,
+            backgroundColor: bgWithOpacity,
+            borderBottom: `1px solid ${applyOpacityToColor(themeColors.borderSubtle, settings.opacity)}`,
           }}
         >
           <OverlayClock
@@ -344,7 +357,7 @@ export function OverlayBoard({
       {/* Chessboard */}
       <div
         className="flex justify-center p-2"
-        style={{ backgroundColor: themeColors.background }}
+        style={{ backgroundColor: applyOpacityToColor(themeColors.background, settings.opacity) }}
       >
         <OverlayChessboard
           position={fen}
@@ -366,8 +379,8 @@ export function OverlayBoard({
         <div
           className="flex justify-center py-1.5"
           style={{
-            backgroundColor: themeColors.surface,
-            borderTop: `1px solid ${themeColors.borderSubtle}`,
+            backgroundColor: bgWithOpacity,
+            borderTop: `1px solid ${applyOpacityToColor(themeColors.borderSubtle, settings.opacity)}`,
           }}
         >
           <OverlayClock
@@ -391,10 +404,11 @@ export function OverlayBoard({
         playerName={player?.displayName || player?.username || 'You'}
         playerRating={player?.eloRating}
         themeColors={themeColors}
+        opacity={settings.opacity}
       />
 
       {/* Drag handle */}
-      <OverlayDragHandle themeColors={themeColors} />
+      <OverlayDragHandle themeColors={themeColors} opacity={settings.opacity} />
     </div>
   );
 }

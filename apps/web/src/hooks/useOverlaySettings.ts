@@ -84,6 +84,68 @@ export interface OverlayThemeColors {
  * Grey: Slate grey, softer on the eyes
  * Light: Clean white, classic look
  */
+/**
+ * Convert a hex color to rgba with specified opacity.
+ * Used to apply window opacity to backgrounds while keeping content fully visible.
+ *
+ * @param hex - Hex color (e.g., '#0a0a0a' or '#fff')
+ * @param opacity - Opacity value from 0 to 1
+ * @returns RGBA color string (e.g., 'rgba(10,10,10,0.5)')
+ */
+export function hexToRgba(hex: string, opacity: number): string {
+  // Handle shorthand hex (#fff -> #ffffff)
+  let fullHex = hex.replace('#', '');
+  if (fullHex.length === 3) {
+    fullHex = fullHex
+      .split('')
+      .map((c) => c + c)
+      .join('');
+  }
+
+  const r = parseInt(fullHex.substring(0, 2), 16);
+  const g = parseInt(fullHex.substring(2, 4), 16);
+  const b = parseInt(fullHex.substring(4, 6), 16);
+
+  return `rgba(${r},${g},${b},${opacity})`;
+}
+
+/**
+ * Apply opacity to a color string.
+ * Handles hex colors, rgb(), and existing rgba() values.
+ *
+ * @param color - Any CSS color (hex, rgb, rgba)
+ * @param opacity - Opacity value from 0 to 1
+ * @returns Color with opacity applied
+ */
+export function applyOpacityToColor(color: string, opacity: number): string {
+  // If already rgba, multiply the alphas
+  if (color.startsWith('rgba')) {
+    const match = color.match(/rgba\((\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\)/);
+    if (match) {
+      const [, r, g, b, a] = match;
+      const newAlpha = parseFloat(a) * opacity;
+      return `rgba(${r},${g},${b},${newAlpha.toFixed(3)})`;
+    }
+  }
+
+  // If rgb, add alpha
+  if (color.startsWith('rgb(')) {
+    const match = color.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+    if (match) {
+      const [, r, g, b] = match;
+      return `rgba(${r},${g},${b},${opacity})`;
+    }
+  }
+
+  // If hex, convert to rgba
+  if (color.startsWith('#')) {
+    return hexToRgba(color, opacity);
+  }
+
+  // Fallback: return original color (for named colors, etc.)
+  return color;
+}
+
 export const OVERLAY_THEMES: Record<OverlayTheme, OverlayThemeColors> = {
   dark: {
     // Backgrounds
