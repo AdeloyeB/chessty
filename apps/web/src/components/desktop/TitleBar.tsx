@@ -30,6 +30,7 @@
 import { useTitleBar } from '@/hooks/useTitleBar';
 import { useGameStore } from '@/store/game';
 import { useFeatureFlag } from '@/store/flags';
+import { useDesktopContext } from './DesktopLayout';
 import { TrafficLights } from './TrafficLights';
 import { WindowControls } from './WindowControls';
 
@@ -62,6 +63,7 @@ const baseTabs: { id: Tab; label: string }[] = [
 
 export function TitleBar({ activeTab, onTabChange, user, onLogout }: TitleBarProps) {
   const { isTauriApp, osType, isMaximized, close, minimize, toggleMaximize } = useTitleBar();
+  const { isNativeStyled } = useDesktopContext();
   const { status } = useGameStore();
   const spectatorEnabled = useFeatureFlag('spectator_mode');
 
@@ -91,10 +93,12 @@ export function TitleBar({ activeTab, onTabChange, user, onLogout }: TitleBarPro
         data-tauri-drag-region
       >
         {/* === LEFT SECTION === */}
-        {/* macOS: traffic lights first, then branding */}
-        {/* Windows/Linux: just branding */}
+        {/* macOS with native styling: native traffic lights are rendered by the OS
+            macOS without native styling: show custom React traffic lights (fallback)
+            Windows/Linux: just branding (window controls are on the right) */}
         <div className="flex items-center shrink-0">
-          {isMac && (
+          {/* Show custom React traffic lights only on macOS when native styling failed */}
+          {isMac && !isNativeStyled && (
             <TrafficLights
               onClose={close}
               onMinimize={minimize}
@@ -102,8 +106,8 @@ export function TitleBar({ activeTab, onTabChange, user, onLogout }: TitleBarPro
             />
           )}
 
-          {/* App branding */}
-          <div className="flex items-center gap-2 px-4">
+          {/* App branding - with left padding on macOS to accommodate native traffic lights */}
+          <div className={`flex items-center gap-2 px-4 ${isMac && isNativeStyled ? 'pl-[72px]' : ''}`}>
             <span className="text-2xl text-white/80">♔</span>
             {!isMac && (
               <span className="text-xs text-white/40 uppercase tracking-wider font-mono">

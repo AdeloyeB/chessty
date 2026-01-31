@@ -9,6 +9,7 @@
     "frontendDist": "../../web/out"
   },
   "app": {
+    "macOSPrivateApi": true,
     "windows": [
       {
         "title": "Chess Gamble",
@@ -24,7 +25,20 @@
     ],
     "security": {
       "csp": "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self' https://*.chessgamble.com wss://*.chessgamble.com; img-src 'self' data: blob: https:; font-src 'self' data:; media-src 'self'",
-      "devCsp": "default-src 'self'; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' http://localhost:* ws://localhost:* wss://localhost:* https://*.chessgamble.com wss://*.chessgamble.com; img-src 'self' data: blob: https:; font-src 'self' data:; media-src 'self'"
+      "devCsp": "default-src 'self'; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' http://localhost:* ws://localhost:* wss://localhost:* https://*.chessgamble.com wss://*.chessgamble.com; img-src 'self' data: blob: https:; font-src 'self' data:; media-src 'self'",
+      "capabilities": [
+        {
+          "identifier": "main-capability",
+          "description": "Main app window capabilities for native macOS styling and drag regions",
+          "windows": ["*"],
+          "permissions": [
+            "core:window:allow-start-dragging",
+            "core:window:allow-is-fullscreen",
+            "core:window:allow-is-maximized",
+            "core:event:allow-listen"
+          ]
+        }
+      ]
     }
   },
   "bundle": {

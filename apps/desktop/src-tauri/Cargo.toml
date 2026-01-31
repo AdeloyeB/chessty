@@ -9,7 +9,9 @@ edition = "2021"
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = ["devtools"] }
+# macos-private-api enables transparent windows on macOS for dynamically created windows.
+# Note: This prevents App Store submission, but enables true overlay transparency.
+tauri = { version = "2", features = ["devtools", "macos-private-api"] }
 tauri-plugin-store = "2"
 tauri-plugin-opener = "2"
 tauri-plugin-deep-link = "2"
@@ -39,6 +41,16 @@ tokio-util = "0.7"
 # uuid generates unique identifiers. We use it to give each analysis a unique ID
 # so the frontend can track and cancel specific analyses.
 uuid = { version = "1", features = ["v4"] }
+
+# macOS-specific dependencies for native window styling (rounded corners, traffic lights)
+# These use Apple's Cocoa framework APIs via the cocoa and objc crates.
+# - cocoa: Rust bindings to macOS's Cocoa framework (NSWindow, NSView, etc.)
+# - objc: Low-level Objective-C runtime bindings for calling macOS APIs
+# - lazy_static: Lazily initialized statics for caching window styling state
+[target.'cfg(target_os = "macos")'.dependencies]
+cocoa = "0.26"
+objc = "0.2.7"
+lazy_static = "1.4"
 
 [dev-dependencies]
 # mockall generates mock implementations of traits for testing.

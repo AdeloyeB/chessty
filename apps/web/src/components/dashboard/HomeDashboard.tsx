@@ -451,7 +451,7 @@ export function HomeDashboard() {
   ];
 
   return (
-    <div className="h-dvh bg-black flex flex-col overflow-hidden">
+    <div className="fixed inset-0 bg-black flex flex-col overflow-hidden pt-12 pb-10">
       {/* Desktop Titlebar — only renders inside Tauri (not in browser) */}
       <TitleBar
         activeTab={activeTab}

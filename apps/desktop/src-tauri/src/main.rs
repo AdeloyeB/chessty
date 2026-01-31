@@ -24,6 +24,14 @@ mod commands;
 mod engine;
 mod engine_lifecycle;
 
+// Platform-specific plugins for native OS features.
+// This module contains macOS-specific code for rounded corners and traffic lights.
+// On non-macOS platforms, this module exists but its submodules are empty no-ops.
+mod plugins;
+
+// Application state module for managed state (in-memory caches, etc.)
+mod state;
+
 // Anti-cheat module — client-side cheat detection (environment, input, network).
 // This is part of our defense-in-depth strategy. The client collects data about:
 // - Running processes (chess engines, screen sharing, automation tools)
@@ -35,7 +43,7 @@ mod engine_lifecycle;
 mod anticheat;
 
 use serde::Serialize;
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 use url::Url;
 
 // =============================================================================
@@ -122,6 +130,12 @@ use engine_lifecycle::LazyEngineState;
 // This holds the MoveInputRecorder and NetworkMonitor instances.
 use commands::AntiCheatState;
 
+// Import the OverlaySettingsCache for in-memory overlay settings.
+// This cache reduces disk I/O by serving reads from memory and batching
+// writes via a background auto-save task that runs every 2 seconds.
+use state::OverlaySettingsCache;
+use std::sync::Arc;
+
 fn main() {
     tauri::Builder::default()
         // =====================================================================
@@ -181,6 +195,9 @@ fn main() {
         // AntiCheatState holds the MoveInputRecorder and NetworkMonitor instances
         // for tracking input patterns and network activity during games.
         .manage(AntiCheatState::new())
+        // OverlaySettingsCache - in-memory cache with auto-save every 2 seconds.
+        // Initialized with defaults here; actual settings loaded from disk in setup().
+        .manage(Arc::new(OverlaySettingsCache::new()))
 
         // =====================================================================
         // IPC Command Registration
@@ -221,6 +238,20 @@ fn main() {
             commands::stop_network_monitoring,
             commands::analyze_network_patterns,
             commands::analyze_input_patterns_cmd,
+            // Overlay commands (always-on-top game overlay window)
+            commands::open_overlay,
+            commands::close_overlay,
+            commands::resize_overlay,
+            commands::set_overlay_opacity,
+            commands::set_overlay_size,
+            commands::save_overlay_position,
+            commands::get_overlay_settings,
+            commands::update_overlay_display,
+            // macOS native window styling (rounded corners, traffic lights)
+            // On Windows/Linux, these are no-ops that return Ok(()) immediately.
+            plugins::enable_modern_window_style,
+            plugins::enable_rounded_corners,
+            plugins::reposition_traffic_lights,
         ])
 
         // =====================================================================
@@ -284,6 +315,18 @@ fn main() {
                 for url in urls {
                     handle_deep_link(app.handle(), &url);
                 }
+            }
+
+            // -- Initialize Overlay Settings Cache -----------------------------
+            // Load overlay settings from disk and start the auto-save background task.
+            // The cache was registered with defaults above; now we populate it with
+            // persisted settings and start the 2-second auto-save loop.
+            {
+                let cache = app.state::<Arc<OverlaySettingsCache>>();
+                // Load settings from disk and update the cache
+                cache.load_from_app(app.handle());
+                // Start the background auto-save task
+                cache.start_auto_save(app.handle().clone());
             }
 
             Ok(())

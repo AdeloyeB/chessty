@@ -50,7 +50,7 @@
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use tauri::AppHandle;
+use tauri::{async_runtime, AppHandle};
 use tokio::sync::{Mutex, RwLock};
 
 use crate::engine::{spawn_engine, AnalysisTracker, EngineHandle};
@@ -319,7 +319,11 @@ impl Default for LazyEngine {
 /// lazy_engine.signal_shutdown().await;
 /// ```
 pub fn start_idle_monitor(lazy_engine: Arc<LazyEngine>) {
-    tokio::spawn(async move {
+    // Use tauri::async_runtime::spawn instead of tokio::spawn.
+    // This is necessary because this function may be called during Tauri's
+    // synchronous setup phase (in .manage()), before the Tokio runtime is
+    // fully initialized. Tauri's async_runtime handles this gracefully.
+    async_runtime::spawn(async move {
         let idle_timeout = Duration::from_secs(IDLE_TIMEOUT_SECS);
         let check_interval = Duration::from_secs(IDLE_CHECK_INTERVAL_SECS);
 
