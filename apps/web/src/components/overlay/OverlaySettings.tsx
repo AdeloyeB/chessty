@@ -101,28 +101,12 @@ export function OverlaySettings({
     [onOpacityChange, debouncedSetOpacity]
   );
 
-  // Resize the window when size changes
+  // Size change just updates state — the hook's useEffect handles window resize.
+  // This prevents duplicate resize calls (one from here + one from hook).
+  // The hook uses OVERLAY_SIZES as the single source of truth for dimensions.
   const handleSizeChange = useCallback(
-    async (size: OverlaySize) => {
+    (size: OverlaySize) => {
       onSizeChange(size);
-
-      // Resize the Tauri window to match
-      try {
-        const { getCurrentWindow } = await import('@tauri-apps/api/window');
-        const { LogicalSize } = await import('@tauri-apps/api/dpi');
-
-        // Board dimensions + padding for UI elements
-        const dimensions: Record<OverlaySize, { width: number; height: number }> = {
-          small: { width: 232, height: 360 },
-          medium: { width: 312, height: 480 },
-          large: { width: 392, height: 580 },
-        };
-
-        const { width, height } = dimensions[size];
-        await getCurrentWindow().setSize(new LogicalSize(width, height));
-      } catch (error) {
-        console.debug('Failed to resize window', error);
-      }
     },
     [onSizeChange]
   );
