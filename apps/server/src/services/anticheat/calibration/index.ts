@@ -51,6 +51,14 @@ export async function calibrateFromUsernames(
   gamesPerPlayer: number = 50,
   options?: LichessFetchOptions
 ): Promise<CalibrationResult> {
+  // Validate that we have both cheater and clean usernames
+  // Calibration requires samples from both classes to find optimal thresholds
+  if (cheaterUsernames.length === 0 || cleanUsernames.length === 0) {
+    throw new Error(
+      'Calibration requires at least one cheater and one clean username'
+    );
+  }
+
   // Fetch dataset
   const dataset = await fetchCalibrationDataset(
     cheaterUsernames,

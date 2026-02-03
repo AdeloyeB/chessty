@@ -84,7 +84,7 @@ export async function analyzeGame(
 
   // Calculate skill shift (quality change over game)
   const skillShiftScore = game.evaluations
-    ? calculateSkillShiftScore(game.evaluations)
+    ? calculateSkillShiftScore(game.evaluations, game.playerColor !== 'black')
     : 0;
 
   // Behavior score requires historical baseline - set to 0 for Lichess games
@@ -123,23 +123,62 @@ export async function analyzeGame(
  * Calculate engine correlation score from evaluations
  *
  * Higher scores indicate moves that match engine recommendations closely.
+ *
+ * IMPORTANT: We analyze only the target player's moves (every other ply).
+ * Evaluations are from White's perspective, so:
+ * - For White (even indices): position should improve (delta > 0 is good)
+ * - For Black (odd indices): position should worsen for White (delta < 0 is good)
+ *
+ * CPL = centipawn loss = how much the position worsened from the player's perspective
+ * We only count LOSSES (when the signed delta shows the position got worse for the player)
  */
 function calculateEngineScore(game: CalibrationGame): number {
   if (!game.evaluations || game.evaluations.length < 5) {
     return 0;
   }
 
-  // Calculate centipawn loss for each move
+  // Determine which color the player is (from playerColor field or default to white)
+  // Player's moves are at even indices (0, 2, 4...) for white, odd (1, 3, 5...) for black
+  const isPlayerWhite = game.playerColor !== 'black';
+
+  // Calculate centipawn loss for each of the PLAYER'S moves only
+  // The evaluation at index i is AFTER move i was played
+  // So for move i, the loss is eval[i] - eval[i-1]
   const cpLosses: number[] = [];
+
   for (let i = 1; i < game.evaluations.length; i++) {
-    // Loss is how much worse the position got (from player's perspective)
-    // Positive eval diff after our move = we made it better = low loss
+    // Determine who made the move that led to evaluation[i]
+    // Move 1 (index 1) is after White's first move, move 2 (index 2) is after Black's first move, etc.
+    // So odd indices are after White moves, even indices are after Black moves
+    const wasWhiteMove = i % 2 === 1;
+    const wasPlayerMove = wasWhiteMove === isPlayerWhite;
+
+    if (!wasPlayerMove) {
+      continue; // Skip opponent's moves
+    }
+
     const prevEval = game.evaluations[i - 1];
     const currEval = game.evaluations[i];
 
-    // For the player making the move, lower CPL is better
-    const cpLoss = Math.abs(currEval - prevEval);
+    // Compute SIGNED delta from the player's perspective
+    // Evaluations are from White's perspective (positive = White is better)
+    // For White: improvement = currEval > prevEval (delta > 0)
+    // For Black: improvement = currEval < prevEval (delta < 0, because Black benefits when White's eval drops)
+    let signedDelta: number;
+    if (isPlayerWhite) {
+      signedDelta = currEval - prevEval; // Positive = White improved
+    } else {
+      signedDelta = prevEval - currEval; // Positive = Black improved (White's position got worse)
+    }
+
+    // CPL is only counted when the position WORSENED (signedDelta < 0)
+    // If the position improved or stayed the same, CPL = 0
+    const cpLoss = signedDelta < 0 ? Math.abs(signedDelta) : 0;
     cpLosses.push(Math.min(cpLoss, 500)); // Cap at 500 to avoid outliers
+  }
+
+  if (cpLosses.length === 0) {
+    return 0;
   }
 
   // Calculate average CPL
@@ -208,8 +247,16 @@ function calculateTimingScore(clockTimes: number[], _moveCount: number): number 
  * Looks for suspicious mid-game improvement, like:
  * - Playing poorly at start, then suddenly playing perfectly
  * - CPL drops significantly partway through
+ *
+ * NOTE: This function analyzes both players' moves since we're looking at
+ * overall game quality shift, not individual player CPL. The assumption is
+ * that if a cheater starts using an engine mid-game, the overall position
+ * quality will improve (fewer fluctuations, more consistent evaluations).
+ *
+ * @param evaluations - Full evaluation array
+ * @param isPlayerWhite - Whether the player being analyzed is White (default: true)
  */
-function calculateSkillShiftScore(evaluations: number[]): number {
+function calculateSkillShiftScore(evaluations: number[], isPlayerWhite: boolean = true): number {
   if (evaluations.length < 20) {
     return 0;
   }
@@ -217,13 +264,18 @@ function calculateSkillShiftScore(evaluations: number[]): number {
   // Compare first half vs second half quality
   const midpoint = Math.floor(evaluations.length / 2);
 
-  // Calculate CPL for each half
-  const firstHalfCPL = calculateHalfCPL(evaluations.slice(0, midpoint));
-  const secondHalfCPL = calculateHalfCPL(evaluations.slice(midpoint));
+  // Calculate CPL for each half, for the specific player only
+  const firstHalfCPL = calculateHalfCPL(evaluations.slice(0, midpoint), 0, isPlayerWhite);
+  const secondHalfCPL = calculateHalfCPL(evaluations.slice(midpoint), midpoint, isPlayerWhite);
 
   // Significant improvement in second half is suspicious
   if (secondHalfCPL >= firstHalfCPL) {
     return 0; // No improvement or got worse
+  }
+
+  // Guard against division by zero
+  if (firstHalfCPL === 0) {
+    return 0;
   }
 
   // How much did they improve?
@@ -239,16 +291,56 @@ function calculateSkillShiftScore(evaluations: number[]): number {
 
 /**
  * Helper to calculate CPL for a portion of the game
+ *
+ * Uses SIGNED deltas to properly compute centipawn loss:
+ * - Only counts moves where the position WORSENED for the player
+ * - Filters to only the target player's moves (every other ply)
+ *
+ * @param evals - Array of evaluations (from White's perspective)
+ * @param startIndex - The starting index in the full game (to determine ply parity)
+ * @param isPlayerWhite - Whether the player being analyzed is White
  */
-function calculateHalfCPL(evals: number[]): number {
+function calculateHalfCPL(evals: number[], startIndex: number = 0, isPlayerWhite: boolean = true): number {
   if (evals.length < 2) return 100;
 
   let totalLoss = 0;
+  let moveCount = 0;
+
   for (let i = 1; i < evals.length; i++) {
-    totalLoss += Math.abs(evals[i] - evals[i - 1]);
+    // Calculate the global index to determine who made this move
+    const globalIndex = startIndex + i;
+
+    // Odd global indices are after White moves, even are after Black moves
+    const wasWhiteMove = globalIndex % 2 === 1;
+    const wasPlayerMove = wasWhiteMove === isPlayerWhite;
+
+    if (!wasPlayerMove) {
+      continue; // Skip opponent's moves
+    }
+
+    const prevEval = evals[i - 1];
+    const currEval = evals[i];
+
+    // Compute SIGNED delta from the player's perspective
+    let signedDelta: number;
+    if (isPlayerWhite) {
+      signedDelta = currEval - prevEval; // Positive = White improved
+    } else {
+      signedDelta = prevEval - currEval; // Positive = Black improved
+    }
+
+    // CPL is only counted when the position WORSENED (signedDelta < 0)
+    if (signedDelta < 0) {
+      totalLoss += Math.abs(signedDelta);
+    }
+    moveCount++;
   }
 
-  return totalLoss / (evals.length - 1);
+  if (moveCount === 0) {
+    return 100; // Default high CPL if no moves to analyze
+  }
+
+  return totalLoss / moveCount;
 }
 
 /**
@@ -270,8 +362,9 @@ function getExpectedCPL(rating: number): number {
  * Calculate additional metrics for analysis
  */
 function calculateMetrics(game: CalibrationGame): CalibrationAnalysis['metrics'] {
+  const isPlayerWhite = game.playerColor !== 'black';
   const avgCPL = game.evaluations
-    ? calculateHalfCPL(game.evaluations)
+    ? calculateHalfCPL(game.evaluations, 0, isPlayerWhite)
     : 0;
 
   return {
@@ -380,16 +473,29 @@ export function calculateMetricsAtThreshold(
  * @param analyses - Analyzed games
  * @param targetFPR - Maximum acceptable false positive rate (e.g., 0.01 for 1%)
  * @returns Optimal threshold and metrics
+ *
+ * EDGE CASE FIX: We include a threshold strictly greater than the maximum score
+ * to ensure we can always achieve FPR = 0 (by rejecting all samples).
+ * This prevents the function from returning a default that violates targetFPR.
  */
 export function findOptimalThreshold(
   analyses: CalibrationAnalysis[],
   targetFPR: number
 ): { threshold: number; metrics: CalibrationMetrics } {
-  // Sort by score descending
-  const sortedScores = [...new Set(analyses.map(a => a.aggregatedScore))].sort((a, b) => b - a);
+  // Get all unique scores and find the maximum
+  const allScores = analyses.map(a => a.aggregatedScore);
+  const maxScore = allScores.length > 0 ? Math.max(...allScores) : 0;
 
-  let bestThreshold = 1.0;
-  let bestMetrics = calculateMetricsAtThreshold(analyses, 1.0);
+  // Sort by score descending and include a threshold above max to guarantee FPR=0 is achievable
+  // Adding a small epsilon above maxScore ensures we have a threshold that rejects ALL samples
+  const sortedScores = [
+    maxScore + 0.001, // Threshold above max score → FPR = 0, TPR = 0
+    ...new Set(allScores),
+  ].sort((a, b) => b - a);
+
+  // Start with the highest threshold (above max score) to guarantee FPR = 0
+  let bestThreshold = sortedScores[0];
+  let bestMetrics = calculateMetricsAtThreshold(analyses, bestThreshold);
 
   for (const threshold of sortedScores) {
     const metrics = calculateMetricsAtThreshold(analyses, threshold);

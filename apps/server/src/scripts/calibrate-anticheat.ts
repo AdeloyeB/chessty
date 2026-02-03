@@ -148,10 +148,26 @@ async function main() {
     // Load username files
     try {
       const cheatersJson = await readFile(args.cheaters, 'utf-8');
-      cheaterUsernames = JSON.parse(cheatersJson);
+      const parsedCheaters: unknown = JSON.parse(cheatersJson);
+
+      // Validate cheaters file contains an array of strings
+      if (!Array.isArray(parsedCheaters) || !parsedCheaters.every((item) => typeof item === 'string')) {
+        console.error(`Error: --cheaters file "${args.cheaters}" must contain a JSON array of strings.`);
+        console.log('Expected format: ["username1", "username2", ...]');
+        process.exit(1);
+      }
+      cheaterUsernames = parsedCheaters;
 
       const cleanJson = await readFile(args.clean, 'utf-8');
-      cleanUsernames = JSON.parse(cleanJson);
+      const parsedClean: unknown = JSON.parse(cleanJson);
+
+      // Validate clean file contains an array of strings
+      if (!Array.isArray(parsedClean) || !parsedClean.every((item) => typeof item === 'string')) {
+        console.error(`Error: --clean file "${args.clean}" must contain a JSON array of strings.`);
+        console.log('Expected format: ["username1", "username2", ...]');
+        process.exit(1);
+      }
+      cleanUsernames = parsedClean;
     } catch (error) {
       console.error('Error loading username files:', error);
       process.exit(1);
@@ -159,6 +175,21 @@ async function main() {
   }
 
   const gamesPerPlayer = parseInt(args.games || '50', 10);
+
+  // Validate gamesPerPlayer is a positive finite number
+  if (!Number.isFinite(gamesPerPlayer) || gamesPerPlayer <= 0) {
+    console.error(`Error: --games must be a positive integer. Received: "${args.games}"`);
+    process.exit(1);
+  }
+
+  // Validate time-control if provided
+  const validTimeControls = ['bullet', 'blitz', 'rapid', 'classical'] as const;
+  if (args['time-control'] && !validTimeControls.includes(args['time-control'] as typeof validTimeControls[number])) {
+    console.error(`Error: --time-control must be one of: ${validTimeControls.join(', ')}`);
+    console.error(`Received: "${args['time-control']}"`);
+    process.exit(1);
+  }
+
   const outputFile = args.output || 'calibration-result.json';
 
   console.log(`Configuration:`);

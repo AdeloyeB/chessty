@@ -127,11 +127,17 @@ export async function loadCalibrationWeights(): Promise<LoadedCalibration> {
         console.warn(`[AntiCheat] Calibration weights sum to ${weightSum.toFixed(3)}, expected ~1.0`);
       }
 
-      // Validate thresholds are in ascending order
-      if (!(thresholds.monitor <= thresholds.restrictStakes &&
-            thresholds.restrictStakes <= thresholds.flagForReview &&
-            thresholds.flagForReview <= thresholds.suspend)) {
-        console.warn('[AntiCheat] Calibration thresholds are not in ascending order:', thresholds);
+      // Validate thresholds are in STRICTLY ascending order
+      // CRITICAL: Thresholds MUST be distinct and ascending for action escalation to work correctly.
+      // Equal thresholds would trigger multiple actions at the same score, breaking the escalation design.
+      if (!(thresholds.monitor < thresholds.restrictStakes &&
+            thresholds.restrictStakes < thresholds.flagForReview &&
+            thresholds.flagForReview < thresholds.suspend)) {
+        throw new Error(
+          `Calibration thresholds are not in ascending order: ` +
+          `monitor=${thresholds.monitor}, restrictStakes=${thresholds.restrictStakes}, ` +
+          `flagForReview=${thresholds.flagForReview}, suspend=${thresholds.suspend}`
+        );
       }
 
       currentCalibration = {

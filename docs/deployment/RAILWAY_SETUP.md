@@ -24,7 +24,7 @@
 
 ## Architecture Overview
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────────┐
 │                      PRODUCTION ARCHITECTURE                         │
 ├─────────────────────────────────────────────────────────────────────┤
@@ -88,7 +88,7 @@ Before setting up Railway, make sure you have:
 
 1. Click **"New Project"**
 2. Select **"Deploy from GitHub repo"**
-3. Find and select `the-chess-game` repository
+3. Find and select `chessty` repository
 4. Railway will detect the monorepo structure
 
 ### 3. Configure the Service
@@ -129,7 +129,7 @@ Go to **Variables** tab and add:
 | `DATABASE_URL` | `postgresql://...` | From Neon dashboard |
 | `NODE_ENV` | `production` | Enables production mode |
 | `PORT` | `${{RAILWAY_PORT}}` | Railway provides this |
-| `JWT_SECRET` | `your-secret-here` | Generate a strong random string |
+| `JWT_SECRET` | `your-secret-here` | Generate with `openssl rand -base64 32` |
 | `CORS_ORIGIN` | `https://your-domain.com` | Your frontend URL |
 
 **Optional (add later):**

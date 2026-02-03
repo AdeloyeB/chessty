@@ -210,17 +210,24 @@ export function convertToCalibrationGame(
     }
   }
 
-  // Extract evaluations for the player's moves
+  // Extract evaluations for ALL plies (both players)
+  // We preserve the full sequence so CPL calculations in calibrator.ts
+  // can correctly compare consecutive positions. The calibrator will
+  // select the appropriate indices based on playerColor (evens for white,
+  // odds for black) when computing centipawn loss.
   let evaluations: number[] | undefined;
   if (game.analysis) {
     evaluations = [];
-    for (let i = playerColor === 'white' ? 0 : 1; i < game.analysis.length; i += 2) {
+    for (let i = 0; i < game.analysis.length; i++) {
       const analysis = game.analysis[i];
       if (analysis?.eval !== undefined) {
         evaluations.push(analysis.eval);
       } else if (analysis?.mate !== undefined) {
         // Convert mate to a large centipawn value
         evaluations.push(analysis.mate > 0 ? 10000 : -10000);
+      } else {
+        // Push 0 as placeholder for missing evaluations to maintain alignment
+        evaluations.push(0);
       }
     }
   }

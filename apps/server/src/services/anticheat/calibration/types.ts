@@ -117,7 +117,7 @@ export interface CalibrationAnalysis {
   gameId: string;
   isCheater: boolean;
   playerRating: number;
-  timeControl: string;
+  timeControl: CalibrationGame['timeControl'];
   /** Individual signal scores (0-1) */
   scores: {
     engine: number;
