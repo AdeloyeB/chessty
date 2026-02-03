@@ -539,6 +539,17 @@ initializeFeatureFlags().catch((error) => {
   console.error('[FeatureFlags] Failed to initialize:', error);
 });
 
+// Initialize anti-cheat service (load calibration weights from database, validate Stockfish)
+// SKIP_STOCKFISH=true disables Stockfish validation (useful for dev environments without the binary)
+// In production, set SKIP_STOCKFISH=false to enable engine correlation detection
+import { initializeAnticheatService } from './services/anticheat';
+initializeAnticheatService({
+  skipStockfish: process.env.SKIP_STOCKFISH === 'true'
+}).catch((error) => {
+  // Non-fatal - will use default weights if database unavailable
+  console.error('[AntiCheat] Failed to initialize:', error);
+});
+
 // C8 FIX: Periodic cleanup of expired TOTP usage records (every 5 minutes)
 import { cleanupExpiredTOTPUsage } from './services/mfa';
 setInterval(async () => {

@@ -231,15 +231,11 @@ export function aggregateSuspicionScore(
   timingScore: number,
   mouseScore: number
 ): import('./types').AggregatedSuspicionScore {
-  // Weight each signal type
-  // These weights should be calibrated from empirical data
-  const weights = {
-    engine: 0.35, // Engine correlation is strongest signal
-    behavior: 0.20, // Behavior shift is moderate signal
-    skillShift: 0.20, // Mid-game shift is strong when detected
-    timing: 0.15, // Timing anomalies are supportive
-    mouse: 0.10, // Mouse patterns are weakest (easy to spoof)
-  };
+  // Get calibrated weights from the database (or defaults if not loaded)
+  // These are tuned using real Lichess cheater/clean data
+  const calibration = getCalibrationWeights();
+  const weights = calibration.weights;
+  const thresholds = calibration.thresholds;
 
   // Calculate weighted average
   const overallScore =
@@ -249,15 +245,15 @@ export function aggregateSuspicionScore(
     timingScore * weights.timing +
     mouseScore * weights.mouse;
 
-  // Determine recommended action based on score
+  // Determine recommended action based on calibrated thresholds
   let recommendedAction: import('./types').RecommendedAction;
-  if (overallScore < 0.2) {
+  if (overallScore < thresholds.monitor) {
     recommendedAction = 'none';
-  } else if (overallScore < 0.4) {
+  } else if (overallScore < thresholds.restrictStakes) {
     recommendedAction = 'monitor';
-  } else if (overallScore < 0.6) {
+  } else if (overallScore < thresholds.flagForReview) {
     recommendedAction = 'restrict_stakes';
-  } else if (overallScore < 0.8) {
+  } else if (overallScore < thresholds.suspend) {
     recommendedAction = 'flag_for_review';
   } else {
     recommendedAction = 'suspend_pending_review';
@@ -324,6 +320,20 @@ export function aggregateSuspicionScore(
 
 import { shutdownStockfishPool } from '../stockfish';
 import { validateStockfishSetup } from './engine-analysis';
+import {
+  loadCalibrationWeights,
+  getCalibrationWeights,
+  getCalibrationStatus,
+  reloadCalibrationWeights,
+} from './weights-loader';
+
+// Re-export weights loader functions for external use
+export {
+  loadCalibrationWeights,
+  getCalibrationWeights,
+  getCalibrationStatus,
+  reloadCalibrationWeights,
+};
 
 // Track initialization state
 let serviceInitialized = false;
@@ -344,8 +354,22 @@ let stockfishAvailable = false;
  */
 export async function initializeAnticheatService(options?: {
   skipStockfish?: boolean;
+  skipCalibration?: boolean;
 }): Promise<boolean> {
   console.log('[AntiCheat] Initializing anti-cheat service...');
+
+  // Load calibration weights from database
+  if (!options?.skipCalibration) {
+    try {
+      const calibration = await loadCalibrationWeights();
+      console.log(`[AntiCheat] Using calibration: ${calibration.version}`);
+    } catch (error) {
+      console.error('[AntiCheat] Failed to load calibration weights:', error);
+      console.log('[AntiCheat] Falling back to default weights');
+    }
+  } else {
+    console.log('[AntiCheat] Calibration loading skipped');
+  }
 
   // Initialize Stockfish unless skipped
   if (!options?.skipStockfish) {
@@ -396,11 +420,22 @@ export function getAnticheatServiceStatus(): {
   initialized: boolean;
   stockfishAvailable: boolean;
   analysisEnabled: boolean;
+  calibration: {
+    loaded: boolean;
+    version: string;
+    isDefault: boolean;
+  };
 } {
+  const calibrationStatus = getCalibrationStatus();
   return {
     initialized: serviceInitialized,
     stockfishAvailable,
     analysisEnabled: serviceInitialized && stockfishAvailable,
+    calibration: {
+      loaded: calibrationStatus.loaded,
+      version: calibrationStatus.version,
+      isDefault: calibrationStatus.isDefault,
+    },
   };
 }
 
