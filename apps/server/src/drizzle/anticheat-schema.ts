@@ -474,9 +474,60 @@ export const detectedSkillShiftsRelations = relations(detectedSkillShifts, ({ on
 }));
 
 // ============================================================================
+// CALIBRATION WEIGHTS TABLE
+// ============================================================================
+// Stores calibration results from the anti-cheat calibration system.
+// Weights are tuned using real Lichess data (cheater vs clean games).
+// The server loads the active weights on startup and uses them for scoring.
+export const calibrationWeights = pgTable('calibration_weights', {
+  // Primary key - auto-generated unique ID
+  id: text('id').primaryKey().$defaultFn(() => nanoid()),
+
+  // Version identifier (e.g., "2024-01-31-v1")
+  version: text('version').notNull(),
+
+  // Signal weights (must sum to ~1.0)
+  // These determine how much each signal contributes to the final score
+  engineWeight: numeric('engine_weight', { precision: 4, scale: 3 }).notNull(),
+  behaviorWeight: numeric('behavior_weight', { precision: 4, scale: 3 }).notNull(),
+  skillShiftWeight: numeric('skill_shift_weight', { precision: 4, scale: 3 }).notNull(),
+  timingWeight: numeric('timing_weight', { precision: 4, scale: 3 }).notNull(),
+  mouseWeight: numeric('mouse_weight', { precision: 4, scale: 3 }).notNull(),
+
+  // Action thresholds - score above these triggers the action
+  thresholdMonitor: numeric('threshold_monitor', { precision: 4, scale: 3 }).notNull(),
+  thresholdRestrictStakes: numeric('threshold_restrict_stakes', { precision: 4, scale: 3 }).notNull(),
+  thresholdFlagForReview: numeric('threshold_flag_for_review', { precision: 4, scale: 3 }).notNull(),
+  thresholdSuspend: numeric('threshold_suspend', { precision: 4, scale: 3 }).notNull(),
+
+  // Calibration metrics (how good is this calibration?)
+  truePositiveRate: numeric('true_positive_rate', { precision: 5, scale: 4 }),
+  falsePositiveRate: numeric('false_positive_rate', { precision: 5, scale: 4 }),
+  f1Score: numeric('f1_score', { precision: 5, scale: 4 }),
+  auc: numeric('auc', { precision: 5, scale: 4 }),
+
+  // Dataset stats (what data was used to calibrate?)
+  totalGames: integer('total_games'),
+  cheaterGames: integer('cheater_games'),
+  cleanGames: integer('clean_games'),
+
+  // Is this the currently active calibration?
+  isActive: boolean('is_active').notNull().default(false),
+
+  // When this calibration was created
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().$defaultFn(() => new Date()),
+
+  // Optional notes about this calibration
+  notes: text('notes'),
+});
+
+// ============================================================================
 // TYPE EXPORTS
 // ============================================================================
 // Export TypeScript types for use in application code
+
+export type CalibrationWeight = typeof calibrationWeights.$inferSelect;
+export type NewCalibrationWeight = typeof calibrationWeights.$inferInsert;
 
 export type CheatFlag = typeof cheatFlags.$inferSelect;
 export type NewCheatFlag = typeof cheatFlags.$inferInsert;

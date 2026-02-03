@@ -6,7 +6,13 @@ if (!databaseUrl) {
 }
 
 export default defineConfig({
-  schema: ['./src/drizzle/pg-schema.ts', './src/drizzle/anticheat-schema.ts'],
+  schema: [
+    './src/drizzle/pg-schema.ts',
+    './src/drizzle/anticheat-schema.ts',
+    './src/drizzle/overwatch-schema.ts',
+    './src/drizzle/settlement-schema.ts',
+    './src/drizzle/discord-schema.ts',
+  ],
   // Migrations output is gitignored - we use drizzle-kit push for deployments
   out: './src/drizzle/migrations',
   dialect: 'postgresql',
